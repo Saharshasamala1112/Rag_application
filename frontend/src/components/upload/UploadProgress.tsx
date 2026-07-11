@@ -9,7 +9,7 @@ export const UploadProgress = ({ isUploading, message }: UploadProgressProps) =>
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+    <div className={`rounded-3xl border p-4 text-sm ${isUploading ? 'border-sky-200 bg-sky-50 text-slate-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
       {isUploading ? 'Uploading and extracting your document…' : message}
     </div>
   )

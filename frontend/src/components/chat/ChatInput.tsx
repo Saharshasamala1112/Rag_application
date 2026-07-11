@@ -19,21 +19,33 @@ export const ChatInput = ({ onSubmit, disabled = false }: ChatInputProps) => {
   }
 
   return (
-    <div className="flex gap-3">
-      <input
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        placeholder="Ask a question about your document"
-        className="flex-1 rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-900"
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            submit()
-          }
-        }}
-      />
-      <Button onClick={submit} disabled={disabled}>
-        Ask
-      </Button>
+    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <textarea
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder="Type your question here…"
+          rows={2}
+          className="min-h-[80px] flex-1 resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none shadow-sm transition focus:border-slate-900"
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault()
+              submit()
+            }
+          }}
+        />
+
+        <div className="flex items-center gap-3">
+          <Button onClick={submit} disabled={disabled || !value.trim()}>
+            Send
+          </Button>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+        <span>Press Enter to send</span>
+        <span className="h-1 w-1 rounded-full bg-slate-400" />
+        <span>Shift + Enter for a new line</span>
+      </div>
     </div>
   )
 }
