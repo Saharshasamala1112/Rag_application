@@ -1,93 +1,512 @@
-# Rag_application
+# 🧠 RAG Application
 
+A **Retrieval-Augmented Generation (RAG)** application that enables users to upload documents and interact with them through an AI-powered conversational interface. By combining semantic search with Large Language Models (LLMs), the application provides accurate, context-aware responses based on the uploaded content.
 
+This project demonstrates the implementation of a modern full-stack RAG pipeline, integrating document processing, vector embeddings, semantic retrieval, and AI-powered question answering.
 
-## Getting started
+---
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+# 📖 Overview
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+Traditional language models rely only on their pre-trained knowledge, which can result in outdated or inaccurate responses. Retrieval-Augmented Generation (RAG) overcomes this limitation by retrieving relevant information from user-provided documents before generating answers.
 
-## Add your files
+This application allows users to:
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+- Upload documents
+- Automatically process and index them
+- Ask natural language questions
+- Receive responses grounded in the uploaded documents
+
+The project follows a modular architecture, making it easy to extend, maintain, and deploy.
+
+---
+
+# ✨ Features
+
+- 📄 Upload and process documents
+- 🤖 AI-powered question answering
+- 🔍 Semantic search using vector embeddings
+- 🧠 Retrieval-Augmented Generation (RAG)
+- ⚡ FastAPI backend
+- 🎨 React + TypeScript frontend
+- 🔐 Environment-based configuration
+- 📦 Modular architecture
+- 🐳 Docker support
+- 🚀 Easy deployment
+
+---
+
+# 🏗️ Project Structure
+
+```text
+rag_application/
+│
+├── backend/
+│   ├── app/
+│   ├── uploads/
+│   ├── vector_store/
+│   ├── requirements.txt
+│   └── main.py
+│
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── docker-compose.yml
+├── .env.example
+├── README.md
+└── .gitignore
+```
+
+---
+
+# ⚙️ Tech Stack
+
+## Frontend
+
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+
+## Backend
+
+- Python
+- FastAPI
+- Uvicorn
+
+## AI & Machine Learning
+
+- LangChain
+- Hugging Face Transformers
+- Sentence Transformers
+- FAISS / ChromaDB
+
+## DevOps
+
+- Docker
+- Docker Compose
+- Git
+- GitLab
+
+---
+
+# 📋 Prerequisites
+
+Before running the project, ensure the following are installed:
+
+- Python 3.11+
+- Node.js 20+
+- npm
+- Git
+- Docker & Docker Compose (optional but recommended)
+
+---
+
+# 📥 Clone the Repository
+
+```bash
+git clone https://code.swecha.org/saharsha1/rag_application.git
+```
+
+```bash
+cd rag_application
+```
+
+---
+
+# ⚙️ Backend Setup
+
+Navigate to the backend directory:
+
+```bash
+cd backend
+```
+
+Create a virtual environment:
+
+```bash
+python -m venv .venv
+```
+
+Activate the virtual environment:
+
+### Linux/macOS
+
+```bash
+source .venv/bin/activate
+```
+
+### Windows
+
+```bash
+.venv\Scripts\activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Copy environment variables:
+
+```bash
+cp .env.example .env
+```
+
+Edit the `.env` file according to your local configuration.
+
+---
+
+# 🚀 Run Backend
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Backend will be available at:
 
 ```
-cd existing_repo
-git remote add origin https://code.swecha.org/saharsha1/rag_application.git
-git branch -M main
-git push -uf origin main
+http://localhost:8000
 ```
 
-## Integrate with your tools
+Swagger API Documentation:
 
-* [Set up project integrations](https://code.swecha.org/saharsha1/rag_application/-/settings/integrations)
+```
+http://localhost:8000/docs
+```
 
-## Collaborate with your team
+---
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+# 💻 Frontend Setup
 
-## Test and Deploy
+Open another terminal.
 
-Use the built-in continuous integration in GitLab.
+Navigate to frontend:
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+```bash
+cd frontend
+```
 
-***
+Install dependencies:
 
-# Editing this README
+```bash
+npm install
+```
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+Run the development server:
 
-## Suggestions for a good README
+```bash
+npm run dev
+```
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+Frontend:
 
-## Name
-Choose a self-explaining name for your project.
+```
+http://localhost:5173
+```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+---
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+# 🐳 Docker Setup
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+## Build Containers
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```bash
+docker compose build
+```
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+## Start Containers
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```bash
+docker compose up
+```
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+Run in detached mode:
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+```bash
+docker compose up -d
+```
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+## Stop Containers
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+```bash
+docker compose down
+```
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+## Rebuild After Changes
 
-## License
-For open source projects, say how it is licensed.
+```bash
+docker compose up --build
+```
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+---
+
+# 🚀 Build for Production
+
+## Frontend
+
+```bash
+npm run build
+```
+
+Preview production build:
+
+```bash
+npm run preview
+```
+
+## Backend
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+---
+
+# 🌐 Hosting
+
+## Frontend
+
+Build:
+
+```bash
+npm run build
+```
+
+The generated production files will be located in:
+
+```text
+frontend/dist
+```
+
+These files can be hosted on:
+
+- GitLab Pages
+- Netlify
+- Vercel
+- Nginx
+- Apache
+
+---
+
+## Backend
+
+Run the production server:
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Or using Gunicorn:
+
+```bash
+gunicorn -k uvicorn.workers.UvicornWorker app.main:app
+```
+
+The backend can be deployed on:
+
+- Ubuntu Server
+- Docker
+- Railway
+- Render
+- DigitalOcean
+- AWS EC2
+
+---
+
+# 📚 Usage
+
+1. Start the backend server.
+2. Start the frontend application.
+3. Open the application in your browser.
+4. Upload one or more documents.
+5. Wait for indexing to complete.
+6. Ask questions in natural language.
+7. The application retrieves relevant document chunks.
+8. The AI generates context-aware responses.
+
+---
+
+# 🔌 API Endpoints
+
+| Method | Endpoint | Description |
+|---------|----------|-------------|
+| POST | `/upload` | Upload documents |
+| POST | `/query` | Query documents |
+| GET | `/health` | Health check |
+| GET | `/docs` | Swagger documentation |
+
+---
+
+# 🧪 Testing
+
+Backend tests:
+
+```bash
+pytest
+```
+
+Frontend tests:
+
+```bash
+npm test
+```
+
+Lint frontend:
+
+```bash
+npm run lint
+```
+
+---
+
+# 🛣️ Roadmap
+
+### Completed
+
+- Document upload
+- Semantic retrieval
+- Vector embeddings
+- FastAPI backend
+- React frontend
+- API integration
+- Docker support
+
+### Planned
+
+- Authentication
+- User management
+- Multi-document chat
+- Chat history
+- Streaming responses
+- OCR support
+- Additional document formats
+- Cloud deployment
+- Performance improvements
+
+---
+
+# 🤝 Contributing
+
+Contributions are welcome!
+
+1. Fork the repository
+
+2. Create a new branch
+
+```bash
+git checkout -b feature/new-feature
+```
+
+3. Commit changes
+
+```bash
+git commit -m "Add new feature"
+```
+
+4. Push changes
+
+```bash
+git push origin feature/new-feature
+```
+
+5. Create a Merge Request
+
+Please ensure your code follows the project structure and passes all tests before submitting.
+
+---
+
+# 👥 Team
+
+This project was collaboratively developed as a full-stack AI application.
+
+## **Saharsha Samala**
+### Frontend Developer
+
+**Responsibilities**
+
+- Designed and developed the complete frontend using React, TypeScript, and Vite.
+- Built responsive and interactive user interfaces.
+- Integrated frontend with backend APIs.
+- Implemented routing, state management, and reusable UI components.
+- Improved user experience through clean and scalable frontend architecture.
+
+---
+
+## **R. Nitheesha**
+### Backend Developer
+
+**Responsibilities**
+
+- Designed and developed the FastAPI backend.
+- Implemented document processing and embedding generation.
+- Integrated vector database for semantic retrieval.
+- Developed REST APIs for document upload and querying.
+- Managed backend architecture, configuration, and server-side functionality.
+
+---
+
+## 🤝 Collaboration
+
+Both team members collaborated on:
+
+- API integration
+- System architecture
+- Testing
+- Debugging
+- Deployment
+- Project documentation
+
+| Team Member | Role | Contribution |
+|------------|------|--------------|
+| **Saharsha Samala** | Frontend Developer | UI Development, API Integration, Frontend Architecture |
+| **R. Nitheesha** | Backend Developer | FastAPI Backend, Vector Search, Document Processing |
+
+---
+
+# 🙏 Acknowledgements
+
+We sincerely thank the open-source community and the developers behind the technologies that made this project possible.
+
+Special thanks to:
+
+- FastAPI
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- LangChain
+- Hugging Face
+- Sentence Transformers
+- FAISS
+- ChromaDB
+- Docker
+- Python
+
+Their outstanding work has greatly contributed to the development of this project.
+
+---
+
+# 📄 License
+
+This project is licensed under the **MIT License**.
+
+You are free to use, modify, and distribute this project under the terms of the MIT License.
+
+---
+
+# 📌 Project Status
+
+🚧 **Active Development**
+
+This project is actively maintained and continuously improved with new features, optimizations, and enhanced AI capabilities.
+
+Community feedback, issue reports, and contributions are always welcome.
+
+---
+
+⭐ If you found this project helpful, consider giving it a ⭐ and contributing to its future development.
