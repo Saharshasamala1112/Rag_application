@@ -43,18 +43,26 @@ rag_application/
 │
 ├── backend/
 │   ├── app/
-│   ├── uploads/
-│   ├── vector_store/
+│   │   ├── api/routes/       # Health, upload, query, documents
+│   │   ├── config/           # Settings, logging
+│   │   ├── models/           # Pydantic models
+│   │   ├── rag/              # Core RAG: chunking, embeddings, retriever, reranker, LLM
+│   │   └── services/         # Business logic
+│   ├── data/uploads/         # Uploaded documents + indexes
 │   ├── requirements.txt
-│   └── main.py
+│   └── pyproject.toml
 │
 ├── frontend/
 │   ├── src/
-│   ├── public/
+│   │   ├── components/       # Chat, upload, common UI
+│   │   ├── hooks/            # useChat, useUpload
+│   │   ├── pages/            # Chat page
+│   │   ├── services/         # API service layer
+│   │   ├── store/            # Zustand stores
+│   │   └── types/            # TypeScript types
 │   ├── package.json
 │   └── vite.config.ts
 │
-├── docker-compose.yml
 ├── .env.example
 ├── README.md
 └── .gitignore
@@ -333,11 +341,18 @@ The backend can be deployed on:
 
 # 🔌 API Endpoints
 
+All endpoints are prefixed with `/api/v1`.
+
 | Method | Endpoint | Description |
 |---------|----------|-------------|
-| POST | `/upload` | Upload documents |
-| POST | `/query` | Query documents |
-| GET | `/health` | Health check |
+| GET | `/api/v1/health` | Health check |
+| POST | `/api/v1/upload` | Upload a PDF document |
+| POST | `/api/v1/query` | Query documents (returns full response) |
+| POST | `/api/v1/query/stream` | Query with SSE streaming |
+| GET | `/api/v1/documents` | List all uploaded documents |
+| GET | `/api/v1/documents/{id}` | Get document details |
+| DELETE | `/api/v1/documents/{id}` | Delete a document |
+| GET | `/api/v1/documents/{id}/preview` | Get document text preview |
 | GET | `/docs` | Swagger documentation |
 
 ---
@@ -368,25 +383,27 @@ npm run lint
 
 ### Completed
 
-- Document upload
-- Semantic retrieval
-- Vector embeddings
-- FastAPI backend
-- React frontend
-- API integration
-- Docker support
+- Document upload and processing
+- Hybrid search (semantic FAISS + BM25 with RRF fusion)
+- Cross-encoder reranking for relevance
+- Streaming SSE responses
+- Multi-document support with document management
+- Session management with chat history
+- Markdown rendering for answers
+- Source citations with relevance scores
+- FastAPI backend with CORS and API versioning
+- React + TypeScript frontend with Zustand state
+- Pydantic-settings configuration
 
 ### Planned
 
 - Authentication
 - User management
-- Multi-document chat
-- Chat history
-- Streaming responses
 - OCR support
 - Additional document formats
 - Cloud deployment
-- Performance improvements
+- Query expansion (HyDE)
+- Performance optimizations
 
 ---
 
