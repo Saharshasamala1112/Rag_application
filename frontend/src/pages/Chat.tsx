@@ -38,7 +38,7 @@ export const Chat = () => {
 
   useEffect(() => {
     fetchDocuments()
-  }, [])
+  }, [fetchDocuments])
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
