@@ -238,7 +238,13 @@ export const Chat = () => {
             </div>
           ) : null}
 
-          <input ref={fileInputRef} type="file" accept=".pdf" className="hidden" onChange={handleFileChange} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.txt,.md,.csv,.json,.html,.htm,.xml,.log,.py,.js,.ts,.java,.c,.cpp,.go,.rs,.rb,.php,.sh,.yaml,.yml,.toml,.ini,.cfg,.conf,.sql,.r,.swift,.kt,.scala,.tex,.bib,.rtf"
+            className="hidden"
+            onChange={handleFileChange}
+          />
 
           <ChatInput
             onSubmit={handleSubmit}

@@ -6,18 +6,13 @@ import time
 from pathlib import Path
 
 from app.config.settings import settings
-from app.rag.document_loader import DocumentLoader
-from app.rag.embeddings import EmbeddingService
 from app.rag.pipeline import DocumentPipeline
-from app.rag.reranker import Reranker
-from app.rag.retriever import Retriever
-from app.models.document import DocumentInfo
 
 logger = logging.getLogger(__name__)
 
 
 class UploadService:
-    """Handle PDF uploads and document management."""
+    """Handle document uploads and management."""
 
     def __init__(self) -> None:
         self.pipeline = DocumentPipeline()
@@ -43,14 +38,17 @@ class UploadService:
         output_dir = settings.upload_dir / document_id
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        pdf_path = output_dir / "original.pdf"
-        pdf_path.write_bytes(file_content)
+        # Preserve original file extension
+        ext = Path(filename).suffix.lower() or ".bin"
+        file_path = output_dir / f"original{ext}"
+        file_path.write_bytes(file_content)
 
-        result = self.pipeline.process(pdf_path)
+        result = self.pipeline.process(file_path)
 
         doc_info = {
             "document_id": document_id,
             "filename": filename,
+            "file_type": ext,
             "chunk_count": result["chunk_count"],
             "total_chars": result["total_chars"],
             "file_size": len(file_content),

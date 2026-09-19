@@ -16,9 +16,11 @@ export const useUpload = () => {
 
     try {
       const response = await uploadDocument(file)
+      const ext = file.name.includes('.') ? '.' + file.name.split('.').pop() : '.bin'
       const docInfo: DocumentInfo = {
         document_id: response.document_id,
         filename: response.filename,
+        file_type: ext,
         chunk_count: response.chunk_count,
         total_chars: 0,
         file_size: file.size,

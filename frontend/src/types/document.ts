@@ -1,6 +1,7 @@
 export type DocumentInfo = {
   document_id: string
   filename: string
+  file_type: string
   chunk_count: number
   total_chars: number
   file_size: number

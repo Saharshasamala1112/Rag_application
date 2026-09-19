@@ -24,31 +24,34 @@ class DocumentPipeline:
 
     def process(
         self,
-        pdf_path: Path,
+        file_path: Path,
     ) -> dict:
-        """Process a PDF and return document info."""
+        """Process a document file and return document info."""
         total_start = time.perf_counter()
 
-        logger.info("Extracting markdown from %s...", pdf_path.name)
+        logger.info("Extracting text from %s...", file_path.name)
         start = time.perf_counter()
 
-        markdown = self.loader.extract_markdown(pdf_path)
+        markdown = self.loader.extract_markdown(file_path)
 
-        logger.info("Markdown extraction completed in %.2fs.", time.perf_counter() - start)
+        if not markdown or not markdown.strip():
+            raise ValueError("No text content could be extracted from the document.")
+
+        logger.info("Text extraction completed in %.2fs.", time.perf_counter() - start)
 
         logger.info("Chunking document...")
         start = time.perf_counter()
 
         chunks = self.chunker.split(
             markdown=markdown,
-            document_id=pdf_path.parent.name,
-            source=pdf_path.name,
+            document_id=file_path.parent.name,
+            source=file_path.name,
         )
 
         logger.info("Created %d chunks in %.2fs.", len(chunks), time.perf_counter() - start)
 
         # Save chunks with metadata
-        chunks_file = pdf_path.parent / "chunks.json"
+        chunks_file = file_path.parent / "chunks.json"
         chunks_file.write_text(
             json.dumps(
                 [chunk.model_dump() for chunk in chunks],
@@ -67,7 +70,7 @@ class DocumentPipeline:
 
         self.vector_store.save(
             embeddings=embeddings,
-            output_dir=pdf_path.parent,
+            output_dir=file_path.parent,
         )
 
         total_time = time.perf_counter() - total_start
