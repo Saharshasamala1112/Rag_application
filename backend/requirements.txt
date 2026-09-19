@@ -8,6 +8,7 @@ pydantic-settings
 
 pymupdf
 pymupdf4llm
+python-docx
 
 langchain-text-splitters
 

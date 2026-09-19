@@ -9,16 +9,29 @@ from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are an expert AI assistant that answers questions accurately based on the provided document context.
+SYSTEM_PROMPT = """You are an elite AI research assistant specializing in document analysis and question answering. You are powered by advanced RAG (Retrieval-Augmented Generation) technology.
 
-RULES:
-1. Answer ONLY from the provided context. Do not make up information.
-2. If the answer is not in the context, say "I could not find the answer in the uploaded document."
-3. Be precise and concise. Use specific details from the context.
-4. When referencing information, mention which part of the document it came from.
-5. Use bullet points or structured formatting when listing multiple items.
-6. If the question is ambiguous, address the most likely interpretation.
-7. Never fabricate page numbers or section names not present in the context."""
+YOUR CORE CAPABILITIES:
+- Deep document understanding and comprehension
+- Precise extraction of facts, figures, dates, names, and technical details
+- Multi-source synthesis when answering from multiple document chunks
+- Structured, well-formatted responses using markdown
+
+RULES — YOU MUST FOLLOW ALL OF THESE:
+1. Answer EXCLUSIVELY from the provided document context. Never fabricate information.
+2. If the answer is not in the context, say: "I could not find this information in the uploaded document. Please try rephrasing your question or upload a different document."
+3. Be precise and authoritative. Quote exact text when relevant.
+4. Use specific details: numbers, dates, names, definitions, measurements.
+5. Structure your answers clearly:
+   - Use headers (##) for multi-part answers
+   - Use bullet points for lists
+   - Use **bold** for key terms
+   - Use > blockquotes for direct quotes from the document
+6. When the question is ambiguous, provide the most complete answer covering all interpretations found in the context.
+7. If multiple chunks provide different perspectives, synthesize them coherently.
+8. Never invent page numbers, section names, or references not present in the context.
+9. For factual questions, start with a direct answer, then provide supporting details.
+10. For analytical questions, break down your analysis step by step."""
 
 
 class LocalLLM:
@@ -31,20 +44,31 @@ class LocalLLM:
         self.client = Client(host=settings.ollama_host)
         self.model = model
 
-    def _build_prompt(
+    def _build_messages(
         self,
         question: str,
         context: str,
-    ) -> str:
-        return f"""{SYSTEM_PROMPT}
+    ) -> list[dict[str, str]]:
+        """Build the full message array with system + user messages."""
+
+        user_content = f"""Based on the document context below, provide a comprehensive and accurate answer to the question.
 
 --- DOCUMENT CONTEXT ---
 {context}
 --- END CONTEXT ---
 
-Question: {question}
+QUESTION: {question}
 
-Provide a clear, accurate answer based on the context above:"""
+INSTRUCTIONS:
+- Answer directly and completely based on the context above.
+- Use specific details and evidence from the document.
+- Format your response with clear structure (headers, bullets, bold key terms).
+- If information is missing from the context, explicitly state what is and isn't available."""
+
+        return [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ]
 
     def generate(
         self,
@@ -53,12 +77,12 @@ Provide a clear, accurate answer based on the context above:"""
     ) -> str:
         """Generate a complete answer."""
 
-        prompt = self._build_prompt(question, context)
+        messages = self._build_messages(question, context)
 
         try:
             response = self.client.chat(
                 model=self.model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 options={
                     "temperature": settings.ollama_temperature,
                     "num_predict": settings.ollama_num_predict,
@@ -79,12 +103,12 @@ Provide a clear, accurate answer based on the context above:"""
     ) -> Generator[str, None, None]:
         """Stream answer tokens."""
 
-        prompt = self._build_prompt(question, context)
+        messages = self._build_messages(question, context)
 
         try:
             stream = self.client.chat(
                 model=self.model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 options={
                     "temperature": settings.ollama_temperature,
                     "num_predict": settings.ollama_num_predict,
