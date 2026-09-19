@@ -54,9 +54,11 @@ export const Chat = () => {
 
   const handleUpload = async () => {
     if (!selectedFile) return
-    await upload(selectedFile)
+    const doc = await upload(selectedFile)
     setSelectedFile(null)
-    fetchDocuments()
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    if (doc) setActiveDocument(doc.document_id)
+    await fetchDocuments()
   }
 
   return (
