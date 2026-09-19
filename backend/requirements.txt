@@ -19,6 +19,8 @@ numpy
 
 ollama
 
+scikit-learn
+
 pytest
 
 ruff

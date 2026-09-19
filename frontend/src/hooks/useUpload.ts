@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { uploadDocument } from '../services/upload.service'
+import { uploadDocument, listDocuments } from '../services/upload.service'
 import { useDocumentStore } from '../store/document.store'
-import type { DocumentSummary } from '../types/document'
+import type { DocumentInfo } from '../types/document'
 
 export const useUpload = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [document, setDocument] = useState<DocumentSummary | null>(null)
-  const setDocumentStore = useDocumentStore((state) => state.setDocument)
+  const [lastDocument, setLastDocument] = useState<DocumentInfo | null>(null)
+  const addDocument = useDocumentStore((state) => state.addDocument)
+  const setDocuments = useDocumentStore((state) => state.setDocuments)
 
   const upload = async (file: File) => {
     setLoading(true)
@@ -15,16 +16,18 @@ export const useUpload = () => {
 
     try {
       const response = await uploadDocument(file)
-      const documentSummary = {
-        ...response.document,
-        fileSize: file.size,
-        fileType: file.type || 'Unknown',
-        uploadedAt: new Date().toISOString(),
+      const docInfo: DocumentInfo = {
+        document_id: response.document_id,
+        filename: response.filename,
+        chunk_count: response.chunk_count,
+        total_chars: 0,
+        file_size: file.size,
+        uploaded_at: new Date().toISOString(),
       }
 
-      setDocument(documentSummary)
-      setDocumentStore(documentSummary)
-      return documentSummary
+      setLastDocument(docInfo)
+      addDocument(docInfo)
+      return docInfo
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Upload failed'
       setError(message)
@@ -34,5 +37,14 @@ export const useUpload = () => {
     }
   }
 
-  return { upload, loading, error, document }
+  const fetchDocuments = async () => {
+    try {
+      const response = await listDocuments()
+      setDocuments(response.documents)
+    } catch (err) {
+      console.error('Failed to fetch documents:', err)
+    }
+  }
+
+  return { upload, loading, error, lastDocument, fetchDocuments }
 }

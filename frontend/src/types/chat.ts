@@ -1,9 +1,12 @@
 export type ChatRole = 'user' | 'assistant'
 
 export type ChatSource = {
-  id: string
-  title: string
-  snippet: string
+  chunk_id: number
+  content: string
+  source: string
+  score: number
+  page_number: number | null
+  header: string | null
 }
 
 export type ChatMessage = {
@@ -12,14 +15,27 @@ export type ChatMessage = {
   content: string
   sources?: ChatSource[]
   createdAt: string
+  isStreaming?: boolean
 }
 
-export type ChatRequest = {
+export type QueryRequest = {
   question: string
+  document_id?: string | null
+  top_k?: number
+  use_expansion?: boolean
+  use_reranking?: boolean
 }
 
-export type AskQuestionResponse = {
+export type QueryResponse = {
   answer: string
-  sources?: ChatSource[]
+  sources: ChatSource[]
+  query_expanded: string | null
+  retrieval_time_ms: number
+  generation_time_ms: number
+  total_time_ms: number
 }
 
+export type SSEEvent = {
+  type: 'sources' | 'token' | 'done' | 'error'
+  content: string | ChatSource[]
+}

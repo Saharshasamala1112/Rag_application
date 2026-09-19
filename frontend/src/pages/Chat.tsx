@@ -4,115 +4,249 @@ import { ChatBox } from '../components/chat/ChatBox'
 import { ChatInput } from '../components/chat/ChatInput'
 import { useChat } from '../hooks/useChat'
 import { useUpload } from '../hooks/useUpload'
+import { useDocumentStore } from '../store/document.store'
+
+const quickPrompts = [
+  'Summarize this document',
+  'What are the key points?',
+  'Explain the main concepts',
+  'What conclusions are drawn?',
+]
 
 export const Chat = () => {
-  const { messages, loading, ask } = useChat()
-  const { upload, loading: uploading } = useUpload()
+  const {
+    messages,
+    loading,
+    ask,
+    clearMessages,
+    sessions,
+    activeSessionId,
+    createSession,
+    setActiveSession,
+    deleteSession,
+  } = useChat()
+
+  const { upload, loading: uploading, fetchDocuments } = useUpload()
+  const documents = useDocumentStore((s) => s.documents)
+  const activeDocumentId = useDocumentStore((s) => s.activeDocumentId)
+  const setActiveDocument = useDocumentStore((s) => s.setActiveDocument)
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [status, setStatus] = useState('Upload a document or ask a question right away.')
-  const chatEndRef = useRef<HTMLDivElement | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const quickPrompts = ['Summarize this document', 'Extract key points', 'Answer from context']
+  const [showSidebar, setShowSidebar] = useState(true)
+  const chatEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fetchDocuments()
+  }, [])
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  const handleSubmit = async (question: string) => {
-    setStatus('Thinking...')
-    await ask(question)
-    setStatus('Ready to assist.')
+  const handleSubmit = async (q: string) => {
+    await ask(q)
   }
 
-  const handleChooseFile = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null
-    setSelectedFile(file)
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setSelectedFile(e.target.files?.[0] ?? null)
   }
 
   const handleUpload = async () => {
     if (!selectedFile) return
-    setStatus('Uploading the document...')
     await upload(selectedFile)
     setSelectedFile(null)
-    setStatus('Document ready. Ask your question.')
+    fetchDocuments()
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-140px)] flex-col gap-6">
-      <main className="space-y-6">
-        <section className="rounded-[36px] border border-slate-200 bg-white p-8 shadow-[0_30px_60px_-30px_rgba(15,23,42,0.2)]">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl space-y-4">
-              <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Professional AI chat</p>
-              <h1 className="text-4xl font-semibold text-slate-950 sm:text-5xl">A refined assistant for modern workflows</h1>
-              <p className="text-base leading-7 text-slate-600">
-                Upload a document or ask a question, and receive reliable answers in a focused, distraction-free workspace.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-700">
-              {status}
-            </div>
-          </div>
+    <div className="flex h-[calc(100vh-2rem)] gap-4">
+      {/* Sidebar */}
+      <aside
+        className={`${showSidebar ? 'w-72' : 'w-0'} shrink-0 transition-all duration-300 overflow-hidden flex flex-col border border-slate-200 rounded-2xl bg-white`}
+      >
+        <div className="p-4 border-b border-slate-100">
+          <button
+            type="button"
+            onClick={createSession}
+            className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+          >
+            + New Chat
+          </button>
+        </div>
 
-          <div className="mt-6 flex flex-wrap gap-2">
-            {quickPrompts.map((prompt) => (
+        <div className="p-3 border-b border-slate-100">
+          <p className="px-2 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Documents
+          </p>
+          <div className="space-y-1 max-h-40 overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => setActiveDocument(null)}
+              className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
+                !activeDocumentId
+                  ? 'bg-slate-100 font-medium text-slate-900'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              All documents
+            </button>
+            {documents.map((doc) => (
               <button
-                key={prompt}
+                key={doc.document_id}
                 type="button"
-                onClick={() => void handleSubmit(prompt)}
-                className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white"
+                onClick={() => setActiveDocument(doc.document_id)}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm transition truncate ${
+                  activeDocumentId === doc.document_id
+                    ? 'bg-slate-100 font-medium text-slate-900'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
               >
-                {prompt}
+                {doc.filename}
               </button>
             ))}
           </div>
-        </section>
+        </div>
 
-        <section className="relative overflow-hidden rounded-[36px] border border-slate-200 bg-slate-50 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.25)]">
-          <div className="max-h-[calc(100vh-420px)] overflow-y-auto px-5 py-6 sm:px-7">
-            {messages.length ? (
-              <ChatBox messages={messages} isTyping={loading} />
-            ) : (
-              <div className="flex min-h-[280px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center text-slate-500">
-                <p className="text-lg font-semibold text-slate-900">Start with a focused question</p>
-                <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
-                  Upload a document to ground the assistant in your context, or use one of the suggested prompts to begin.
-                </p>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-        </section>
-
-        <section className="rounded-[36px] border border-slate-200 bg-white p-5 shadow-[0_20px_40px_-20px_rgba(15,23,42,0.16)]">
-          {selectedFile ? (
-            <div className="mb-4 flex flex-col gap-3 rounded-3xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-semibold text-emerald-900">{selectedFile.name}</p>
-                <p className="text-sm text-emerald-700">Ready to upload and improve future answers.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => void handleUpload()}
-                disabled={uploading}
-                className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-emerald-300"
+        <div className="flex-1 overflow-y-auto p-3">
+          <p className="px-2 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Sessions
+          </p>
+          <div className="space-y-1">
+            {sessions.map((session) => (
+              <div
+                key={session.id}
+                className={`group flex items-center rounded-lg transition ${
+                  session.id === activeSessionId ? 'bg-slate-100' : 'hover:bg-slate-50'
+                }`}
               >
-                {uploading ? 'Uploading…' : 'Upload document'}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSession(session.id)}
+                  className="flex-1 px-3 py-2 text-left text-sm truncate text-slate-700"
+                >
+                  {session.title}
+                </button>
+                {sessions.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => deleteSession(session.id)}
+                    className="mr-1 p-1 rounded opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition"
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-3 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={clearMessages}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+          >
+            Clear messages
+          </button>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <main className="flex flex-1 flex-col gap-4 min-w-0">
+        {/* Header */}
+        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-6 py-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowSidebar(!showSidebar)}
+              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 transition"
+            >
+              ☰
+            </button>
+            <div>
+              <h1 className="text-lg font-semibold text-slate-900">RAG Assistant</h1>
+              <p className="text-xs text-slate-500">
+                {activeDocumentId
+                  ? `Querying: ${documents.find((d) => d.document_id === activeDocumentId)?.filename ?? 'document'}`
+                  : 'Querying all documents'}
+              </p>
             </div>
+          </div>
+          {loading ? (
+            <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Thinking...
+            </div>
+          ) : null}
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-6">
+          {messages.length > 0 ? (
+            <ChatBox messages={messages} isTyping={loading} />
           ) : (
-            <div className="mb-4 rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Upload a PDF or text document to add grounding context before asking questions.
+            <div className="flex h-full flex-col items-center justify-center text-center">
+              <div className="text-4xl mb-4">💬</div>
+              <h2 className="text-lg font-semibold text-slate-900">Ask anything</h2>
+              <p className="mt-2 max-w-md text-sm text-slate-500">
+                Upload documents and ask questions. The AI finds relevant information
+                and provides accurate answers with sources.
+              </p>
+              <div className="mt-6 grid grid-cols-2 gap-2 max-w-lg">
+                {quickPrompts.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => void handleSubmit(prompt)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
+          <div ref={chatEndRef} />
+        </div>
 
-          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
-          <ChatInput onSubmit={handleSubmit} disabled={loading} onUploadClick={handleChooseFile} uploadDisabled={uploading} />
-        </section>
+        {/* Upload + Input */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          {selectedFile ? (
+            <div className="mb-3 flex items-center justify-between rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-sky-900">{selectedFile.name}</p>
+                <p className="text-xs text-sky-600">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedFile(null)}
+                  className="rounded-lg px-3 py-1.5 text-xs text-sky-600 hover:bg-sky-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleUpload()}
+                  disabled={uploading}
+                  className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+                >
+                  {uploading ? 'Uploading...' : 'Upload'}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          <input ref={fileInputRef} type="file" accept=".pdf" className="hidden" onChange={handleFileChange} />
+
+          <ChatInput
+            onSubmit={handleSubmit}
+            disabled={loading}
+            onUploadClick={() => fileInputRef.current?.click()}
+            uploadDisabled={uploading}
+          />
+        </div>
       </main>
     </div>
   )

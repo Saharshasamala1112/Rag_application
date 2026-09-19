@@ -1,14 +1,26 @@
 import { create } from 'zustand'
-import type { DocumentSummary } from '../types/document'
+import type { DocumentInfo } from '../types/document'
 
 type DocumentState = {
-  document: DocumentSummary | null
-  setDocument: (document: DocumentSummary) => void
-  clearDocument: () => void
+  documents: DocumentInfo[]
+  activeDocumentId: string | null
+  setDocuments: (documents: DocumentInfo[]) => void
+  addDocument: (document: DocumentInfo) => void
+  removeDocument: (documentId: string) => void
+  setActiveDocument: (documentId: string | null) => void
 }
 
 export const useDocumentStore = create<DocumentState>((set) => ({
-  document: null,
-  setDocument: (document) => set({ document }),
-  clearDocument: () => set({ document: null }),
+  documents: [],
+  activeDocumentId: null,
+  setDocuments: (documents) => set({ documents }),
+  addDocument: (document) =>
+    set((state) => ({ documents: [document, ...state.documents] })),
+  removeDocument: (documentId) =>
+    set((state) => ({
+      documents: state.documents.filter((d) => d.document_id !== documentId),
+      activeDocumentId:
+        state.activeDocumentId === documentId ? null : state.activeDocumentId,
+    })),
+  setActiveDocument: (documentId) => set({ activeDocumentId: documentId }),
 }))
