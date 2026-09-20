@@ -1,4 +1,6 @@
 import logging
+import time
+import uuid
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,9 +19,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="High-End RAG Backend",
-    description="Advanced RAG with hybrid search, reranking, and streaming",
-    version="2.0.0",
+    title="DocuChat RAG API",
+    description="Production RAG with hybrid search, reranking, and streaming",
+    version="3.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -32,6 +34,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    """Add request ID and timing to every request."""
+    request_id = uuid.uuid4().hex[:8]
+    request.state.request_id = request_id
+    start = time.perf_counter()
+
+    response = await call_next(request)
+
+    elapsed = (time.perf_counter() - start) * 1000
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Response-Time"] = f"{elapsed:.0f}ms"
+
+    logger.info(
+        "[%s] %s %s -> %d (%.0fms)",
+        request_id,
+        request.method,
+        request.url.path,
+        response.status_code,
+        elapsed,
+    )
+    return response
+
+
 app.include_router(api_router, prefix="/api/v1")
 
 
@@ -39,7 +66,7 @@ app.include_router(api_router, prefix="/api/v1")
 async def llm_error_handler(_request: Request, exc: LLMError) -> JSONResponse:
     return JSONResponse(
         status_code=503,
-        content={"detail": str(exc)},
+        content={"detail": str(exc), "type": "llm_error"},
     )
 
 
@@ -48,7 +75,7 @@ async def global_error_handler(_request: Request, exc: Exception) -> JSONRespons
     logger.exception("Unhandled exception: %s", exc)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error."},
+        content={"detail": "Internal server error.", "type": "server_error"},
     )
 
 
@@ -65,4 +92,4 @@ def on_startup() -> None:
 
 @app.get("/")
 def root() -> dict:
-    return {"name": "High-End RAG API", "version": "2.0.0", "docs": "/docs"}
+    return {"name": "DocuChat RAG API", "version": "3.0.0", "docs": "/docs"}

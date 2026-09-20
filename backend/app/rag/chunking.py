@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -9,7 +10,7 @@ from app.models.document import DocumentChunk
 
 
 class DocumentChunker:
-    """Intelligent chunking that preserves structure and metadata."""
+    """Intelligent chunking that preserves structure, deduplicates, and enriches metadata."""
 
     def __init__(
         self,
@@ -32,6 +33,12 @@ class DocumentChunker:
             ],
             length_function=len,
         )
+        self._seen_hashes: set[str] = set()
+
+    def _content_hash(self, text: str) -> str:
+        """Compute a content hash for deduplication."""
+        normalized = re.sub(r"\s+", " ", text.strip().lower())
+        return hashlib.md5(normalized.encode()).hexdigest()
 
     def _extract_header(self, text: str) -> str | None:
         """Extract the nearest markdown header from a chunk."""
@@ -52,14 +59,25 @@ class DocumentChunker:
         document_id: str,
         source: str,
     ) -> list[DocumentChunk]:
-        """Split markdown into chunks with metadata."""
+        """Split markdown into chunks with metadata and deduplication."""
 
         texts = self.splitter.split_text(markdown)
 
         chunks: list[DocumentChunk] = []
         current_pos = 0
+        chunk_index = 0
 
-        for index, text in enumerate(texts):
+        for text in texts:
+            # Deduplication: skip near-identical chunks
+            h = self._content_hash(text)
+            if h in self._seen_hashes:
+                start_pos = markdown.find(text[:80], current_pos)
+                if start_pos == -1:
+                    start_pos = current_pos
+                current_pos = start_pos + len(text)
+                continue
+            self._seen_hashes.add(h)
+
             start_pos = markdown.find(text[:80], current_pos)
             if start_pos == -1:
                 start_pos = current_pos
@@ -70,7 +88,7 @@ class DocumentChunker:
 
             chunks.append(
                 DocumentChunk(
-                    chunk_id=index,
+                    chunk_id=chunk_index,
                     document_id=document_id,
                     source=source,
                     chunk_length=len(text),
@@ -82,6 +100,7 @@ class DocumentChunker:
                 )
             )
 
+            chunk_index += 1
             current_pos = end_pos
 
         return chunks

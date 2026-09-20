@@ -15,7 +15,7 @@ ALLOWED_EXTENSIONS = set(SUPPORTED_EXTENSIONS.keys())
 async def upload_document(
     file: UploadFile = File(...),
 ) -> dict:
-    """Upload and process a document (PDF, TXT, MD, CSV, JSON, HTML, code files, etc.)."""
+    """Upload and process a document (PDF, TXT, MD, CSV, JSON, HTML, code files)."""
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided.")
@@ -45,6 +45,8 @@ async def upload_document(
             file_content=content,
             filename=file.filename,
         )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(
             status_code=500,

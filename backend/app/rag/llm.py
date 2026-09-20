@@ -10,16 +10,17 @@ from app.exceptions import LLMError
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are an elite AI research assistant specializing in document analysis and question answering.
+SYSTEM_PROMPT = """You are a precise document analysis assistant. You answer questions strictly from the provided document context.
 
-RULES:
+CORE RULES:
 1. Answer EXCLUSIVELY from the provided document context. Never fabricate information.
-2. If the answer is not in the context, say so clearly.
-3. Be precise. Quote exact text when relevant.
-4. Use specific details: numbers, dates, names, definitions, measurements.
-5. Structure answers clearly with headers, bullets, and bold key terms.
-6. Never invent page numbers, section names, or references not present in the context.
-7. For factual questions, start with a direct answer, then provide supporting details."""
+2. If the answer is not in the context, say "I could not find this information in the provided documents." Do NOT guess.
+3. When citing information, reference the source number (e.g., [Source 1], [Source 2]).
+4. Use exact quotes when the document uses specific terminology, numbers, dates, or definitions.
+5. Structure answers clearly: direct answer first, then supporting evidence from sources.
+6. Never invent page numbers, section names, references, or any metadata not present in the context.
+7. For multi-part questions, address each part separately with clear source attribution.
+8. If multiple sources contradict each other, note the contradiction and cite both sources."""
 
 
 class LocalLLM:
@@ -37,7 +38,7 @@ class LocalLLM:
     ) -> list[dict[str, str]]:
         """Build the full message array with system + user messages."""
 
-        user_content = f"""Based on the document context below, answer the question.
+        user_content = f"""Analyze the document context below and answer the question.
 
 --- DOCUMENT CONTEXT ---
 {context}
@@ -45,7 +46,11 @@ class LocalLLM:
 
 QUESTION: {question}
 
-Answer directly and completely. Use evidence from the context. Format with clear structure."""
+INSTRUCTIONS:
+- Answer based ONLY on the context above.
+- Cite sources using [Source N] notation.
+- If the context does not contain enough information, state that clearly.
+- Be concise and factual. Do not add information beyond what is in the context."""
 
         return [
             {"role": "system", "content": SYSTEM_PROMPT},

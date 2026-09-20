@@ -21,6 +21,7 @@ export const useChat = () => {
   const activeDocumentId = useDocumentStore((state) => state.activeDocumentId)
 
   const [loading, setLoading] = useState(false)
+  const [status, setStatus] = useState<string | null>(null)
 
   const messages = useMemo(() => {
     const active = sessions.find((s) => s.id === activeSessionId)
@@ -36,6 +37,7 @@ export const useChat = () => {
     }
     addUserMessage(userMessage)
     setLoading(true)
+    setStatus('Preparing...')
 
     const assistantId = `assistant-${Date.now()}`
     const assistantMessage: ChatMessage = {
@@ -56,6 +58,7 @@ export const useChat = () => {
           use_reranking: true,
         },
         (token: string) => {
+          setStatus(null)
           const current = useChatStore.getState().getMessages()
           const msg = current.find((m) => m.id === assistantId)
           const newContent = (msg?.content || '') + token
@@ -64,15 +67,20 @@ export const useChat = () => {
         (sources: ChatSource[]) => {
           setStreamingSources(assistantId, sources)
         },
+        (statusMsg: string) => {
+          setStatus(statusMsg)
+        },
         () => {
           finishStreaming(assistantId)
           setLoading(false)
+          setStatus(null)
         },
         (errorMsg: string) => {
           toast.error(errorMsg)
           updateAssistantMessage(assistantId, `Error: ${errorMsg}`)
           finishStreaming(assistantId)
           setLoading(false)
+          setStatus(null)
         },
       )
     } catch (err) {
@@ -81,12 +89,14 @@ export const useChat = () => {
       updateAssistantMessage(assistantId, `Error: ${message}`)
       finishStreaming(assistantId)
       setLoading(false)
+      setStatus(null)
     }
   }, [activeDocumentId, addUserMessage, addAssistantMessage, updateAssistantMessage, setStreamingSources, finishStreaming])
 
   return {
     messages,
     loading,
+    status,
     ask,
     clearMessages,
     activeSessionId,

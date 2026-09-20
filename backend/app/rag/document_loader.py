@@ -10,6 +10,17 @@ from pathlib import Path
 import pymupdf4llm
 
 
+def normalize_text(text: str) -> str:
+    """Normalize extracted text for consistent processing."""
+    text = re.sub(r"[^\S\n]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = "\n".join(line.rstrip() for line in text.split("\n"))
+    text = text.replace("\u2013", "-").replace("\u2014", " - ")
+    text = text.replace("\u2018", "'").replace("\u2019", "'")
+    text = text.replace("\u201c", '"').replace("\u201d", '"')
+    return text.strip()
+
+
 SUPPORTED_EXTENSIONS = {
     ".pdf": "PDF Document",
     ".doc": "Word Document (Legacy)",
@@ -60,7 +71,10 @@ class DocumentLoader:
         suffix = file_path.suffix.lower()
 
         if suffix == ".pdf":
-            return pymupdf4llm.to_markdown(str(file_path))
+            raw = pymupdf4llm.to_markdown(str(file_path))
+            if isinstance(raw, list):
+                raw = str(raw)
+            return normalize_text(raw)
 
         if suffix == ".docx":
             return DocumentLoader._extract_docx(file_path)
@@ -90,12 +104,13 @@ class DocumentLoader:
     def _extract_text(file_path: Path) -> str:
         """Extract text from plain text files."""
         try:
-            return file_path.read_text(encoding="utf-8")
+            raw = file_path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             try:
-                return file_path.read_text(encoding="latin-1")
+                raw = file_path.read_text(encoding="latin-1")
             except Exception:
-                return file_path.read_text(encoding="utf-8", errors="replace")
+                raw = file_path.read_text(encoding="utf-8", errors="replace")
+        return normalize_text(raw)
 
     @staticmethod
     def _extract_docx(file_path: Path) -> str:
@@ -111,7 +126,9 @@ class DocumentLoader:
                 if not text:
                     continue
 
-                style_name = para.style.name if para.style else ""
+                style_name = ""
+                if para.style and para.style.name:
+                    style_name = para.style.name
 
                 if style_name.startswith("Heading 1"):
                     lines.append(f"\n# {text}\n")
@@ -146,7 +163,7 @@ class DocumentLoader:
         except ImportError:
             # python-docx not installed, try antiword
             return DocumentLoader._extract_doc_antiword(file_path)
-        except Exception as e:
+        except Exception:
             # Fallback: try reading as zip (docx is a zip)
             return DocumentLoader._extract_docx_fallback(file_path)
 

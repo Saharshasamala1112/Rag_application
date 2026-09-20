@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 from pathlib import Path
 
 from app.config.settings import settings
@@ -9,10 +10,13 @@ from app.exceptions import LLMError
 from app.models.request import QueryRequest
 from app.models.response import QueryResponse, SourceChunk
 from app.rag.llm import LocalLLM
-from app.rag.retriever import Retriever
 from app.rag.reranker import Reranker
+from app.rag.retriever import Retriever
 
 logger = logging.getLogger(__name__)
+
+# Approximate token budget for context (leaves room for prompt + answer)
+MAX_CONTEXT_CHARS = 6000
 
 
 class QueryService:
@@ -39,9 +43,22 @@ class QueryService:
                 dirs.append(child)
         return dirs
 
+    def _deduplicate_chunks(self, chunks: list[dict]) -> list[dict]:
+        """Remove duplicate chunks by content similarity."""
+        seen: set[str] = set()
+        unique: list[dict] = []
+        for chunk in chunks:
+            key = chunk["content"][:200].strip().lower()
+            if key not in seen:
+                seen.add(key)
+                unique.append(chunk)
+        return unique
+
     def _build_context(self, context_chunks: list[dict]) -> str:
-        """Build context string with source metadata for the LLM."""
-        parts = []
+        """Build context string with source metadata, respecting token budget."""
+        parts: list[str] = []
+        total_chars = 0
+
         for i, chunk in enumerate(context_chunks):
             source = chunk.get("source", "unknown")
             page = chunk.get("page_number")
@@ -50,8 +67,21 @@ class QueryService:
             if page:
                 meta += f" (Page {page})"
             if header:
-                meta += f" — {header}"
-            parts.append(f"{meta}\n{chunk['content']}")
+                meta += f" \u2014 {header}"
+
+            content = chunk["content"]
+            part = f"{meta}\n{content}"
+
+            if total_chars + len(part) > MAX_CONTEXT_CHARS:
+                remaining = MAX_CONTEXT_CHARS - total_chars
+                if remaining > 100:
+                    content = content[: remaining - len(meta) - 10] + "..."
+                    parts.append(f"{meta}\n{content}")
+                break
+
+            parts.append(part)
+            total_chars += len(part)
+
         return "\n\n---\n\n".join(parts)
 
     def _build_sources(self, context_chunks: list[dict]) -> list[SourceChunk]:
@@ -85,6 +115,7 @@ class QueryService:
         """Retrieve relevant chunks and generate an answer."""
 
         total_start = time.perf_counter()
+        request_id = uuid.uuid4().hex[:8]
 
         document_dirs = self.resolve_document_dirs(request.document_id)
         if not document_dirs:
@@ -114,6 +145,9 @@ class QueryService:
                 total_time_ms=(time.perf_counter() - total_start) * 1000,
             )
 
+        # Deduplicate
+        results = self._deduplicate_chunks(results)
+
         # Reranking
         if request.use_reranking and len(results) > top_k:
             results = self.reranker.rerank(
@@ -125,7 +159,10 @@ class QueryService:
         context_chunks = results[:top_k]
         context = self._build_context(context_chunks)
 
-        logger.info("Context length: %d chars from %d chunks.", len(context), len(context_chunks))
+        logger.info(
+            "[%s] Context: %d chars from %d chunks. Retrieval: %.0fms",
+            request_id, len(context), len(context_chunks), retrieval_time,
+        )
 
         # Generation
         llm_start = time.perf_counter()
@@ -148,6 +185,11 @@ class QueryService:
 
         sources = self._build_sources(context_chunks)
 
+        logger.info(
+            "[%s] Generation: %.0fms. Total: %.0fms. Sources: %d",
+            request_id, generation_time, total_time, len(sources),
+        )
+
         return QueryResponse(
             answer=answer,
             sources=sources,
@@ -160,12 +202,17 @@ class QueryService:
         self,
         request: QueryRequest,
     ):
-        """Stream response chunks for SSE."""
+        """Stream response chunks for SSE with progress events."""
 
+        request_id = uuid.uuid4().hex[:8]
         document_dirs = self.resolve_document_dirs(request.document_id)
+
         if not document_dirs:
-            yield {"type": "error", "content": "No documents found."}
+            yield {"type": "error", "content": "No documents found. Please upload a document first."}
             return
+
+        # Progress: retrieving
+        yield {"type": "status", "content": "Retrieving relevant chunks..."}
 
         top_k = request.top_k or settings.final_top_k
 
@@ -176,8 +223,14 @@ class QueryService:
         )
 
         if not results:
-            yield {"type": "error", "content": "No relevant information found."}
+            yield {"type": "error", "content": "No relevant information found in the documents."}
             return
+
+        # Progress: processing
+        yield {"type": "status", "content": "Processing and ranking results..."}
+
+        # Deduplicate
+        results = self._deduplicate_chunks(results)
 
         if request.use_reranking and len(results) > top_k:
             results = self.reranker.rerank(
@@ -190,11 +243,16 @@ class QueryService:
         context = self._build_context(context_chunks)
         sources = self._build_sources(context_chunks)
 
+        logger.info("[%s] Streaming query with %d sources.", request_id, len(sources))
+
         # Send sources first
         yield {
             "type": "sources",
             "content": [s.model_dump() for s in sources],
         }
+
+        # Progress: generating
+        yield {"type": "status", "content": "Generating answer..."}
 
         # Stream answer
         try:

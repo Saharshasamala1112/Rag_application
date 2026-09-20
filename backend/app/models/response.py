@@ -22,3 +22,14 @@ class QueryResponse(BaseModel):
     retrieval_time_ms: float = 0
     generation_time_ms: float = 0
     total_time_ms: float = 0
+
+
+class HealthResponse(BaseModel):
+    """Health check response."""
+
+    status: str = "ok"
+    version: str
+    model: str
+    embedding_model: str
+    ollama_available: bool
+    document_count: int = 0

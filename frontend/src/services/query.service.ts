@@ -10,6 +10,7 @@ export const queryDocumentsStream = async (
   payload: QueryRequest,
   onToken: (token: string) => void,
   onSources: (sources: QueryResponse['sources']) => void,
+  onStatus: (status: string) => void,
   onDone: () => void,
   onError: (error: string) => void,
 ): Promise<void> => {
@@ -23,7 +24,14 @@ export const queryDocumentsStream = async (
   })
 
   if (!response.ok) {
-    onError(`HTTP ${response.status}: ${response.statusText}`)
+    let detail = `HTTP ${response.status}: ${response.statusText}`
+    try {
+      const body = await response.json()
+      if (body.detail) detail = body.detail
+    } catch {
+      // keep default
+    }
+    onError(detail)
     return
   }
 
@@ -55,6 +63,8 @@ export const queryDocumentsStream = async (
               onToken(event.content)
             } else if (event.type === 'sources') {
               onSources(event.content)
+            } else if (event.type === 'status') {
+              onStatus(event.content)
             } else if (event.type === 'done') {
               onDone()
               return

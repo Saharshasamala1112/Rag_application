@@ -12,14 +12,17 @@ import {
   Loader2,
   Sun,
   Moon,
+  Monitor,
   ChevronDown,
   X,
+  FileText,
+  Clock,
 } from 'lucide-react'
 import { useChat } from '../hooks/useChat'
 import { useUpload } from '../hooks/useUpload'
 import { useDocumentStore } from '../store/document.store'
 import { deleteDocument } from '../services/upload.service'
-import type { ChatMessage as ChatMessageType } from '../types/chat'
+import type { ChatMessage as ChatMessageType, ChatSource } from '../types/chat'
 
 const quickPrompts = [
   'Summarize this document',
@@ -86,36 +89,67 @@ function FileIcon({ type }: { type: string }) {
   )
 }
 
+type ThemeMode = 'light' | 'dark' | 'system'
+
 function ThemeToggle() {
+  const [mode, setMode] = useState<ThemeMode>(() => {
+    if (typeof window === 'undefined') return 'system'
+    return (localStorage.getItem('docuchat-theme') as ThemeMode) || 'system'
+  })
+
   const [dark, setDark] = useState(() => {
     if (typeof window === 'undefined') return false
     const saved = localStorage.getItem('docuchat-theme')
-    if (saved) return saved === 'dark'
+    if (saved === 'dark') return true
+    if (saved === 'light') return false
     return window.matchMedia('(prefers-color-scheme: dark)').matches
   })
 
   useEffect(() => {
-    if (dark) {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
+    const applyTheme = (isDark: boolean) => {
+      if (isDark) {
+        document.documentElement.classList.add('dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+      }
     }
-    localStorage.setItem('docuchat-theme', dark ? 'dark' : 'light')
-  }, [dark])
+
+    if (mode === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)')
+      applyTheme(mq.matches)
+      setDark(mq.matches)
+      const handler = (e: MediaQueryListEvent) => {
+        applyTheme(e.matches)
+        setDark(e.matches)
+      }
+      mq.addEventListener('change', handler)
+      return () => mq.removeEventListener('change', handler)
+    }
+
+    applyTheme(mode === 'dark')
+    setDark(mode === 'dark')
+  }, [mode])
+
+  const cycle = () => {
+    const next: ThemeMode = mode === 'light' ? 'dark' : mode === 'dark' ? 'system' : 'light'
+    setMode(next)
+    localStorage.setItem('docuchat-theme', next)
+  }
 
   return (
     <button
       type="button"
-      onClick={() => setDark((prev) => !prev)}
-      aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+      onClick={cycle}
+      aria-label={`Theme: ${mode}. Click to cycle.`}
       className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition"
+      title={`Theme: ${mode}`}
     >
-      {dark ? <Sun size={16} /> : <Moon size={16} />}
+      {mode === 'system' ? <Monitor size={16} /> : dark ? <Sun size={16} /> : <Moon size={16} />}
     </button>
   )
 }
 
-function MessageBubble({ message }: { message: ChatMessageType }) {
+function MessageBubble({ message, onSelectSource }: { message: ChatMessageType; onSelectSource?: (source: ChatSource) => void }) {
   const isUser = message.role === 'user'
   const [sourcesExpanded, setSourcesExpanded] = useState(false)
 
@@ -233,8 +267,83 @@ function MessageBubble({ message }: { message: ChatMessageType }) {
             )}
           </div>
         )}
+        {/* Mobile "Open sources panel" button */}
+        {!isUser && message.sources && message.sources.length > 0 && !sourcesExpanded && onSelectSource && (
+          <button
+            type="button"
+            onClick={() => onSelectSource(message.sources![0])}
+            className="xl:hidden mt-2 text-[11px] font-medium text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition"
+          >
+            View all sources in panel →
+          </button>
+        )}
       </div>
     </div>
+  )
+}
+
+function SourcesPanel({
+  sources,
+  onClose,
+  mobile = false,
+}: {
+  sources: ChatSource[]
+  onClose: () => void
+  mobile?: boolean
+}) {
+  if (!sources.length) return null
+  return (
+    <aside
+      className={`
+        ${mobile ? 'w-full h-full fixed inset-0 z-50 bg-zinc-50 dark:bg-zinc-900' : 'w-[320px] shrink-0 border-l border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/30 overflow-y-auto hidden xl:block'}
+      `}
+    >
+      <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          Sources ({sources.length})
+        </h3>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition"
+        >
+          <X size={14} />
+        </button>
+      </div>
+      <div className="p-3 space-y-2">
+        {sources.map((source, idx) => (
+          <div
+            key={`${source.source}-${source.chunk_id}-${idx}`}
+            className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-3"
+          >
+            <div className="flex items-center gap-2 mb-1.5">
+              <FileText size={12} className="text-zinc-400 shrink-0" />
+              <span className="text-xs font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                {source.source}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 mb-2">
+              {source.page_number && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-zinc-400 dark:text-zinc-500">
+                  <span>p.{source.page_number}</span>
+                </span>
+              )}
+              {source.header && (
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 truncate">
+                  {source.header}
+                </span>
+              )}
+              <span className="ml-auto rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                {source.score}%
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed line-clamp-4">
+              {source.content}
+            </p>
+          </div>
+        ))}
+      </div>
+    </aside>
   )
 }
 
@@ -242,6 +351,7 @@ export const Chat = () => {
   const {
     messages,
     loading,
+    status,
     ask,
     sessions,
     activeSessionId,
@@ -263,6 +373,9 @@ export const Chat = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [docsExpanded, setDocsExpanded] = useState(true)
+  const [panelSources, setPanelSources] = useState<ChatSource[] | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [mobileView, setMobileView] = useState<'chat' | 'sources'>('chat')
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -282,11 +395,25 @@ export const Chat = () => {
 
   const handleUpload = async () => {
     if (!selectedFile) return
-    const doc = await upload(selectedFile)
-    setSelectedFile(null)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-    if (doc) setActiveDocument(doc.document_id)
-    await fetchDocuments()
+    setUploadProgress(10)
+    const timer = setInterval(() => {
+      setUploadProgress((p) => Math.min(p + 5, 90))
+    }, 300)
+    try {
+      const doc = await upload(selectedFile)
+      setUploadProgress(100)
+      setTimeout(() => {
+        setUploadProgress(0)
+        setSelectedFile(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        if (doc) setActiveDocument(doc.document_id)
+        fetchDocuments()
+      }, 500)
+    } catch {
+      setUploadProgress(0)
+    } finally {
+      clearInterval(timer)
+    }
   }
 
   const handleDrop = useCallback((e: DragEvent) => {
@@ -401,7 +528,7 @@ export const Chat = () => {
       {/* Sidebar */}
       <aside
         className={`${
-          showSidebar ? 'w-[260px]' : 'w-0'
+          showSidebar ? 'w-full sm:w-[260px]' : 'w-0'
         } shrink-0 transition-all duration-300 overflow-hidden flex flex-col bg-[#171717] fixed lg:relative inset-y-0 left-0 z-40`}
       >
         <div className="p-3 flex flex-col h-full">
@@ -441,7 +568,10 @@ export const Chat = () => {
               >
                 <button
                   type="button"
-                  onClick={() => setActiveSession(session.id)}
+                  onClick={() => {
+                    setActiveSession(session.id)
+                    if (window.innerWidth < 1024) setShowSidebar(false)
+                  }}
                   className="flex-1 px-3 py-2 text-left text-sm truncate text-zinc-300"
                 >
                   {session.title}
@@ -482,6 +612,23 @@ export const Chat = () => {
             </button>
             {docsExpanded && (
               <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                {/* Upload progress bar */}
+                {uploadProgress > 0 && (
+                  <div className="px-3 py-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Loader2 size={10} className="text-emerald-400 animate-spin" />
+                      <span className="text-[10px] text-zinc-400">
+                        {uploadProgress < 100 ? `Uploading... ${uploadProgress}%` : 'Processing...'}
+                      </span>
+                    </div>
+                    <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
                 {documents.map((doc) => (
                   <div
                     key={doc.document_id}
@@ -557,7 +704,13 @@ export const Chat = () => {
               ? `Querying: ${documents.find((d) => d.document_id === activeDocumentId)?.filename || 'Document'}`
               : `${documents.length} document${documents.length !== 1 ? 's' : ''} available`}
           </p>
-          {loading && (
+          {loading && status && (
+            <div className="ml-auto flex items-center gap-2 rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+              <Loader2 size={12} className="animate-spin" />
+              {status}
+            </div>
+          )}
+          {loading && !status && (
             <div className="ml-auto flex items-center gap-2 rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
               <Loader2 size={12} className="animate-spin" />
               Analyzing...
@@ -574,7 +727,11 @@ export const Chat = () => {
           {messages.length > 0 ? (
             <div className="space-y-6 max-w-[48rem] mx-auto">
               {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} />
+                <MessageBubble
+                  key={msg.id}
+                  message={msg}
+                  onSelectSource={(source) => setPanelSources([source])}
+                />
               ))}
             </div>
           ) : (
@@ -691,6 +848,26 @@ export const Chat = () => {
           onChange={handleFileChange}
         />
       </main>
+
+      {/* Sources Panel - shown when viewing sources */}
+      {panelSources && panelSources.length > 0 && (
+        <SourcesPanel
+          sources={panelSources}
+          onClose={() => setPanelSources(null)}
+        />
+      )}
+
+      {/* Default sources panel for last message with sources */}
+      {!panelSources && messages.length > 0 && (() => {
+        const lastWithSources = [...messages].reverse().find((m) => m.sources && m.sources.length > 0)
+        if (!lastWithSources || lastWithSources.isStreaming) return null
+        return (
+          <SourcesPanel
+            sources={lastWithSources.sources!}
+            onClose={() => {}}
+          />
+        )
+      })()}
     </div>
   )
 }
