@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { uploadDocument, listDocuments } from '../services/upload.service'
 import { useDocumentStore } from '../store/document.store'
 import type { DocumentInfo } from '../types/document'
@@ -6,7 +6,6 @@ import type { DocumentInfo } from '../types/document'
 export const useUpload = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [lastDocument, setLastDocument] = useState<DocumentInfo | null>(null)
   const addDocument = useDocumentStore((state) => state.addDocument)
   const setDocuments = useDocumentStore((state) => state.setDocuments)
 
@@ -27,7 +26,6 @@ export const useUpload = () => {
         uploaded_at: new Date().toISOString(),
       }
 
-      setLastDocument(docInfo)
       addDocument(docInfo)
       return docInfo
     } catch (err) {
@@ -39,14 +37,14 @@ export const useUpload = () => {
     }
   }
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     try {
       const response = await listDocuments()
       setDocuments(response.documents)
     } catch (err) {
       console.error('Failed to fetch documents:', err)
     }
-  }
+  }, [setDocuments])
 
-  return { upload, loading, error, lastDocument, fetchDocuments }
+  return { upload, loading, error, fetchDocuments }
 }

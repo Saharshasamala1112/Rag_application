@@ -15,12 +15,13 @@ logger = logging.getLogger(__name__)
 
 
 class BM25Scorer:
-    """Simple BM25 scorer for hybrid search."""
+    """BM25 scorer with proper term frequency per document."""
 
     def __init__(self, k1: float = 1.5, b: float = 0.75) -> None:
         self.k1 = k1
         self.b = b
         self.doc_freqs: dict[str, int] = {}
+        self.doc_tfs: list[dict[str, int]] = []
         self.doc_lens: list[int] = []
         self.avg_doc_len: float = 0.0
         self.num_docs: int = 0
@@ -35,15 +36,29 @@ class BM25Scorer:
         self.avg_doc_len = sum(self.doc_lens) / len(self.doc_lens) if self.doc_lens else 0
         self.num_docs = len(tokenized)
 
+        # Document frequencies (how many docs contain each term)
         self.doc_freqs = {}
         for tokens in tokenized:
             unique_tokens = set(tokens)
             for token in unique_tokens:
                 self.doc_freqs[token] = self.doc_freqs.get(token, 0) + 1
 
+        # Per-document term frequencies
+        self.doc_tfs = []
+        for tokens in tokenized:
+            tf: dict[str, int] = {}
+            for token in tokens:
+                tf[token] = tf.get(token, 0) + 1
+            self.doc_tfs.append(tf)
+
     def score(self, query: str, doc_idx: int) -> float:
-        """Score a query against a document."""
+        """Score a query against a specific document."""
         query_tokens = self._tokenize(query)
+        if doc_idx >= len(self.doc_tfs):
+            return 0.0
+
+        tf = self.doc_tfs[doc_idx]
+        doc_len = self.doc_lens[doc_idx]
         score = 0.0
 
         for token in query_tokens:
@@ -51,10 +66,14 @@ class BM25Scorer:
                 continue
 
             df = self.doc_freqs[token]
-            idf = max(0, np.log((self.num_docs - df + 0.5) / (df + 0.5) + 1))
+            idf = np.log((self.num_docs - df + 0.5) / (df + 0.5) + 1)
 
-            # Term frequency in document (approximate from stored content)
-            score += idf
+            term_freq = tf.get(token, 0)
+            tf_norm = (term_freq * (self.k1 + 1)) / (
+                term_freq + self.k1 * (1 - self.b + self.b * doc_len / self.avg_doc_len)
+            )
+
+            score += idf * tf_norm
 
         return float(score)
 
@@ -64,12 +83,13 @@ class BM25Scorer:
 
 
 class Retriever:
-    """Hybrid retriever with semantic search, BM25, and reranking."""
+    """Hybrid retriever with semantic search, BM25, and RRF fusion."""
 
     def __init__(self) -> None:
         self.embedding_service = EmbeddingService()
         self.vector_store = VectorStore()
         self.bm25 = BM25Scorer()
+        self._fitted_docs_key: str | None = None
 
     def _load_chunks(self, document_dir: Path) -> list[dict]:
         """Load chunks from a document directory."""
@@ -84,7 +104,7 @@ class Retriever:
         document_dirs: list[Path],
         top_k: int = settings.retrieval_top_k,
     ) -> list[dict]:
-        """Retrieve relevant chunks using hybrid search."""
+        """Retrieve relevant chunks using hybrid search with RRF fusion."""
 
         all_chunks: list[dict] = []
         all_embeddings: list[np.ndarray] = []
@@ -99,8 +119,6 @@ class Retriever:
                 continue
 
             all_chunks.extend(chunks)
-
-            # Get all embeddings from index
             stored_embeddings = self.vector_store.get_embeddings(index)
             all_embeddings.append(stored_embeddings)
 
@@ -113,19 +131,25 @@ class Retriever:
         if all_embeddings:
             combined_embeddings = np.vstack(all_embeddings)
             faiss_index = self.vector_store.build_index(combined_embeddings)
-            _, indices = faiss_index.search(question_embedding.astype(np.float32), min(top_k, len(all_chunks)))
+            search_k = min(top_k * 2, len(all_chunks))
+            _, indices = faiss_index.search(question_embedding.astype(np.float32), search_k)
             semantic_results = [(int(idx), 1.0) for idx in indices[0] if idx != -1]
         else:
             semantic_results = []
 
-        # BM25 search
-        self.bm25.fit([c["content"] for c in all_chunks])
-        bm25_scores = self.bm25.batch_score(question, list(range(len(all_chunks))))
-        bm25_top = sorted(enumerate(bm25_scores), key=lambda x: x[1], reverse=True)[:top_k]
+        # BM25 search — fit only once per unique document set
+        docs_key = "|".join(str(c.get("chunk_id", i)) for i, c in enumerate(all_chunks[:10]))
+        if self._fitted_docs_key != docs_key:
+            self.bm25.fit([c["content"] for c in all_chunks])
+            self._fitted_docs_key = docs_key
 
-        # Merge results with RRF (Reciprocal Rank Fusion)
+        bm25_scores = self.bm25.batch_score(question, list(range(len(all_chunks))))
+        bm25_search_k = min(top_k * 2, len(all_chunks))
+        bm25_top = sorted(enumerate(bm25_scores), key=lambda x: x[1], reverse=True)[:bm25_search_k]
+
+        # Merge with Reciprocal Rank Fusion
         rrf_scores: dict[int, float] = {}
-        k = 60  # RRF constant
+        k = 60
 
         for rank, (idx, _) in enumerate(semantic_results):
             rrf_scores[idx] = rrf_scores.get(idx, 0) + 1.0 / (k + rank + 1)
@@ -133,7 +157,6 @@ class Retriever:
         for rank, (idx, _) in enumerate(bm25_top):
             rrf_scores[idx] = rrf_scores.get(idx, 0) + 1.0 / (k + rank + 1)
 
-        # Sort by combined score
         sorted_indices = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)[:top_k]
 
         results = []

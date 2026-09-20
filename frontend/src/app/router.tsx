@@ -11,10 +11,6 @@ export const router = createBrowserRouter([
         index: true,
         element: <Chat />,
       },
-      {
-        path: 'chat',
-        element: <Chat />,
-      },
     ],
   },
 ])

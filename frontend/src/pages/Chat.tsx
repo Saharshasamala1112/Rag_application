@@ -2,9 +2,23 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { toast } from 'sonner'
+import {
+  PanelLeft,
+  Send,
+  Trash2,
+  Plus,
+  Paperclip,
+  Loader2,
+  Sun,
+  Moon,
+  ChevronDown,
+  X,
+} from 'lucide-react'
 import { useChat } from '../hooks/useChat'
 import { useUpload } from '../hooks/useUpload'
 import { useDocumentStore } from '../store/document.store'
+import { deleteDocument } from '../services/upload.service'
 import type { ChatMessage as ChatMessageType } from '../types/chat'
 
 const quickPrompts = [
@@ -17,106 +31,206 @@ const quickPrompts = [
 ]
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return new Date(iso).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function FileIcon({ type }: { type: string }) {
   const ext = type.replace('.', '').toLowerCase()
-  const colors: Record<string, string> = {
-    pdf: 'bg-red-100 text-red-600',
-    doc: 'bg-blue-100 text-blue-600',
-    docx: 'bg-blue-100 text-blue-600',
-    txt: 'bg-slate-100 text-slate-600',
-    md: 'bg-purple-100 text-purple-600',
-    csv: 'bg-green-100 text-green-600',
-    json: 'bg-yellow-100 text-yellow-600',
-    html: 'bg-orange-100 text-orange-600',
+  const colors: Record<string, { light: string; dark: string }> = {
+    pdf: {
+      light: 'bg-red-100 text-red-600',
+      dark: 'dark:bg-red-900/30 dark:text-red-400',
+    },
+    doc: {
+      light: 'bg-blue-100 text-blue-600',
+      dark: 'dark:bg-blue-900/30 dark:text-blue-400',
+    },
+    docx: {
+      light: 'bg-blue-100 text-blue-600',
+      dark: 'dark:bg-blue-900/30 dark:text-blue-400',
+    },
+    txt: {
+      light: 'bg-slate-100 text-slate-600',
+      dark: 'dark:bg-slate-700 dark:text-slate-400',
+    },
+    md: {
+      light: 'bg-purple-100 text-purple-600',
+      dark: 'dark:bg-purple-900/30 dark:text-purple-400',
+    },
+    csv: {
+      light: 'bg-green-100 text-green-600',
+      dark: 'dark:bg-green-900/30 dark:text-green-400',
+    },
+    json: {
+      light: 'bg-yellow-100 text-yellow-600',
+      dark: 'dark:bg-yellow-900/30 dark:text-yellow-400',
+    },
+    html: {
+      light: 'bg-orange-100 text-orange-600',
+      dark: 'dark:bg-orange-900/30 dark:text-orange-400',
+    },
   }
-  const cls = colors[ext] || 'bg-slate-100 text-slate-500'
+  const color = colors[ext] || {
+    light: 'bg-slate-100 text-slate-500',
+    dark: 'dark:bg-slate-700 dark:text-slate-400',
+  }
   return (
-    <span className={`inline-flex items-center justify-center w-6 h-5 rounded text-[10px] font-bold uppercase ${cls}`}>
+    <span
+      className={`inline-flex items-center justify-center w-6 h-5 rounded text-[10px] font-bold uppercase ${color.light} ${color.dark}`}
+    >
       {ext.slice(0, 3)}
     </span>
   )
 }
 
+function ThemeToggle() {
+  const [dark, setDark] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const saved = localStorage.getItem('docuchat-theme')
+    if (saved) return saved === 'dark'
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+  })
+
+  useEffect(() => {
+    if (dark) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+    localStorage.setItem('docuchat-theme', dark ? 'dark' : 'light')
+  }, [dark])
+
+  return (
+    <button
+      type="button"
+      onClick={() => setDark((prev) => !prev)}
+      aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+      className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition"
+    >
+      {dark ? <Sun size={16} /> : <Moon size={16} />}
+    </button>
+  )
+}
+
 function MessageBubble({ message }: { message: ChatMessageType }) {
   const isUser = message.role === 'user'
+  const [sourcesExpanded, setSourcesExpanded] = useState(false)
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-[80%] ${isUser ? '' : 'w-full max-w-[80%]'}`}>
         {!isUser && (
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+            <div className="w-6 h-6 rounded-full bg-zinc-900 dark:bg-zinc-200 flex items-center justify-center text-white dark:text-zinc-900">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <path d="M12 2L2 7l10 5 10-5-10-5z" />
                 <path d="M2 17l10 5 10-5" />
                 <path d="M2 12l10 5 10-5" />
               </svg>
             </div>
-            <span className="text-xs font-medium text-slate-500">DocuChat</span>
-            <span className="text-[10px] text-slate-300">&middot;</span>
-            <span className="text-[10px] text-slate-400">{formatTime(message.createdAt)}</span>
+            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              DocuChat
+            </span>
+            <span className="text-[10px] text-zinc-300 dark:text-zinc-600">
+              &middot;
+            </span>
+            <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+              {formatTime(message.createdAt)}
+            </span>
             {message.isStreaming && (
               <>
-                <span className="text-[10px] text-slate-300">&middot;</span>
-                <span className="text-[10px] text-emerald-500 animate-pulse">streaming</span>
+                <span className="text-[10px] text-zinc-300 dark:text-zinc-600">
+                  &middot;
+                </span>
+                <span className="text-[10px] text-emerald-500 animate-pulse">
+                  streaming
+                </span>
               </>
             )}
           </div>
         )}
 
         {isUser ? (
-          <div className="rounded-2xl rounded-br-md bg-slate-900 text-white px-5 py-3.5 shadow-sm">
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+          <div className="rounded-3xl rounded-br-md bg-[#2f2f2f] text-white px-5 py-3.5 shadow-sm">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">
+              {message.content}
+            </p>
           </div>
         ) : (
-          <div className="rounded-2xl rounded-bl-md bg-white border border-slate-200 px-5 py-4 shadow-sm">
-            <div className="prose prose-sm prose-slate max-w-none prose-headings:mt-3 prose-headings:mb-1.5 prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-pre:bg-slate-50 prose-pre:border prose-pre:border-slate-200 prose-code:text-slate-800 prose-code:bg-slate-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-strong:text-slate-900 prose-a:text-sky-600">
+          <div className="px-1 py-1">
+            <div className="prose prose-sm prose-slate dark:prose-invert max-w-none prose-headings:mt-3 prose-headings:mb-1.5 prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-pre:bg-slate-50 dark:prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-200 dark:prose-pre:border-slate-700 prose-code:text-slate-800 dark:prose-code:text-slate-200 prose-code:bg-slate-100 dark:prose-code:bg-slate-700 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-a:text-sky-600 dark:prose-a:text-sky-400">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {message.content || (message.isStreaming ? '' : 'No response generated.')}
+                {message.content ||
+                  (message.isStreaming ? '' : 'No response generated.')}
               </ReactMarkdown>
               {message.isStreaming && (
-                <span className="inline-block h-4 w-0.5 bg-slate-900 animate-pulse ml-0.5" />
+                <span className="inline-block h-4 w-0.5 bg-zinc-900 dark:bg-zinc-200 animate-pulse ml-0.5" />
               )}
             </div>
           </div>
         )}
 
         {message.sources && message.sources.length > 0 && (
-          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-            <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Sources ({message.sources.length})
-            </p>
-            <div className="space-y-2">
-              {message.sources.map((source, idx) => (
-                <div
-                  key={`${source.source}-${source.chunk_id}-${idx}`}
-                  className="rounded-lg border border-slate-200 bg-white px-3.5 py-2.5"
-                >
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-xs font-medium text-slate-900 truncate">
-                      {source.source}
-                    </span>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {source.page_number && (
-                        <span className="text-[10px] text-slate-400">p.{source.page_number}</span>
-                      )}
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                        {(source.score * 100).toFixed(0)}%
+          <div className="mt-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/80 dark:bg-zinc-800/50 p-4">
+            <button
+              type="button"
+              onClick={() => setSourcesExpanded((prev) => !prev)}
+              className="flex items-center gap-1.5 mb-0 w-full text-left"
+            >
+              <ChevronDown
+                size={14}
+                className={`text-zinc-400 transition-transform duration-200 ${
+                  sourcesExpanded ? 'rotate-180' : ''
+                }`}
+              />
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                Sources ({message.sources.length})
+              </p>
+            </button>
+            {sourcesExpanded && (
+              <div className="space-y-2 mt-2.5">
+                {message.sources.map((source, idx) => (
+                  <div
+                    key={`${source.source}-${source.chunk_id}-${idx}`}
+                    className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3.5 py-2.5"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-xs font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                        {source.source}
                       </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {source.page_number && (
+                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                            p.{source.page_number}
+                          </span>
+                        )}
+                        {source.header && (
+                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                            {source.header}
+                          </span>
+                        )}
+                        <span className="rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                          {source.score}%
+                        </span>
+                      </div>
                     </div>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+                      {source.content}
+                    </p>
                   </div>
-                  {source.header && (
-                    <p className="text-[11px] font-medium text-sky-600 mb-1">{source.header}</p>
-                  )}
-                  <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
-                    {source.content}
-                  </p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -126,19 +240,30 @@ function MessageBubble({ message }: { message: ChatMessageType }) {
 
 export const Chat = () => {
   const {
-    messages, loading, ask, clearMessages, sessions,
-    activeSessionId, createSession, setActiveSession, deleteSession,
+    messages,
+    loading,
+    ask,
+    sessions,
+    activeSessionId,
+    createSession,
+    setActiveSession,
+    deleteSession,
   } = useChat()
 
   const { upload, loading: uploading, fetchDocuments } = useUpload()
   const documents = useDocumentStore((s) => s.documents)
   const activeDocumentId = useDocumentStore((s) => s.activeDocumentId)
   const setActiveDocument = useDocumentStore((s) => s.setActiveDocument)
+  const removeDocument = useDocumentStore((s) => s.removeDocument)
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [showSidebar, setShowSidebar] = useState(true)
   const [isDragOver, setIsDragOver] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [docsExpanded, setDocsExpanded] = useState(true)
+
   const chatEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -149,7 +274,7 @@ export const Chat = () => {
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading])
+  }, [messages])
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     setSelectedFile(e.target.files?.[0] ?? null)
@@ -195,120 +320,216 @@ export const Chat = () => {
     }
   }
 
+  const handleDeleteDocument = async (documentId: string) => {
+    setDeletingId(documentId)
+    try {
+      await deleteDocument(documentId)
+      removeDocument(documentId)
+      toast.success('Document deleted')
+    } catch {
+      toast.error('Failed to delete document')
+    } finally {
+      setDeletingId(null)
+      setDeleteConfirm(null)
+    }
+  }
+
   return (
-    <div className="flex h-[calc(100vh-1rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
+    <div className="flex h-screen overflow-hidden bg-white dark:bg-[#212121]">
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="rounded-2xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-2xl p-6 max-w-sm w-full mx-4">
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
+              Delete Document
+            </h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-5">
+              Are you sure you want to delete this document? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(null)}
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteDocument(deleteConfirm)}
+                disabled={deletingId !== null}
+                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500 disabled:opacity-50 transition"
+              >
+                {deletingId ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Drag overlay - full screen */}
+      {isDragOver && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+        >
+          <div className="rounded-2xl border-2 border-dashed border-sky-400 bg-white dark:bg-zinc-800 px-12 py-10 text-center shadow-xl">
+            <Paperclip
+              size={48}
+              className="mx-auto mb-3 text-sky-500 dark:text-sky-400"
+            />
+            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+              Drop your document here
+            </p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+              PDF, DOCX, TXT, MD, CSV, JSON, HTML, and more
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile sidebar backdrop */}
+      {showSidebar && (
+        <div
+          className="fixed inset-0 z-30 bg-black/30 backdrop-blur-sm lg:hidden"
+          onClick={() => setShowSidebar(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside
-        className={`${showSidebar ? 'w-80' : 'w-0'} shrink-0 transition-all duration-300 overflow-hidden flex flex-col border-r border-slate-100 bg-slate-50/50`}
+        className={`${
+          showSidebar ? 'w-[260px]' : 'w-0'
+        } shrink-0 transition-all duration-300 overflow-hidden flex flex-col bg-[#171717] fixed lg:relative inset-y-0 left-0 z-40`}
       >
-        <div className="p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">DocuChat</h2>
-            <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">v2.0</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => { createSession(); setActiveDocument(null) }}
-            className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 active:scale-[0.98]"
-          >
-            + New Conversation
-          </button>
-        </div>
-
-        <div className="px-3 pb-3">
-          <div className="flex items-center justify-between px-2 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Documents</span>
+        <div className="p-3 flex flex-col h-full">
+          {/* New chat button */}
+          <div className="flex items-center gap-2 mb-4">
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="text-[11px] font-medium text-sky-600 hover:text-sky-700"
+              onClick={() => {
+                createSession()
+                setActiveDocument(null)
+              }}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-zinc-700 px-4 py-2.5 text-sm font-medium text-zinc-100 transition hover:bg-zinc-800 active:scale-[0.98]"
             >
-              + Upload
+              <Plus size={16} />
+              New chat
             </button>
-          </div>
-          <div className="space-y-0.5 max-h-48 overflow-y-auto">
             <button
               type="button"
-              onClick={() => setActiveDocument(null)}
-              className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition ${
-                !activeDocumentId
-                  ? 'bg-slate-900 font-medium text-white'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
+              aria-label="Toggle sidebar"
+              onClick={() => setShowSidebar(false)}
+              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition"
             >
-              <span className="w-5 text-center text-xs">All</span>
-              <span className="truncate">All Documents</span>
-              <span className="ml-auto text-[10px] opacity-50">{documents.length}</span>
+              <PanelLeft size={18} />
             </button>
-            {documents.map((doc) => (
-              <button
-                key={doc.document_id}
-                type="button"
-                onClick={() => setActiveDocument(doc.document_id)}
-                className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition ${
-                  activeDocumentId === doc.document_id
-                    ? 'bg-slate-900 font-medium text-white'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <FileIcon type={doc.file_type} />
-                <span className="truncate flex-1">{doc.filename}</span>
-                {activeDocumentId === doc.document_id && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                )}
-              </button>
-            ))}
-            {documents.length === 0 && (
-              <p className="px-3 py-4 text-xs text-slate-400 text-center">
-                No documents uploaded yet
-              </p>
-            )}
           </div>
-        </div>
 
-        <div className="border-t border-slate-100" />
-
-        <div className="flex-1 overflow-y-auto p-3">
-          <p className="px-2 mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            Conversations
-          </p>
-          <div className="space-y-0.5">
+          {/* Sessions list */}
+          <div className="flex-1 overflow-y-auto space-y-0.5">
             {sessions.map((session) => (
               <div
                 key={session.id}
                 className={`group flex items-center rounded-lg transition ${
-                  session.id === activeSessionId ? 'bg-slate-100' : 'hover:bg-slate-50'
+                  session.id === activeSessionId
+                    ? 'bg-zinc-800'
+                    : 'hover:bg-zinc-800/60'
                 }`}
               >
                 <button
                   type="button"
                   onClick={() => setActiveSession(session.id)}
-                  className="flex-1 px-3 py-2 text-left text-sm truncate text-slate-700"
+                  className="flex-1 px-3 py-2 text-left text-sm truncate text-zinc-300"
                 >
                   {session.title}
                 </button>
-                {sessions.length > 1 ? (
+                {sessions.length > 1 && (
                   <button
                     type="button"
+                    aria-label={`Delete ${session.title}`}
                     onClick={() => deleteSession(session.id)}
-                    className="mr-2 p-1 rounded opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition text-xs"
+                    className="mr-2 p-1 rounded opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 transition"
                   >
-                    x
+                    <Trash2 size={14} />
                   </button>
-                ) : null}
+                )}
               </div>
             ))}
           </div>
-        </div>
 
-        <div className="p-3 border-t border-slate-100">
-          <button
-            type="button"
-            onClick={clearMessages}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-          >
-            Clear Conversation
-          </button>
+          {/* Documents section */}
+          <div className="mt-2 border-t border-zinc-800 pt-2">
+            <button
+              type="button"
+              onClick={() => setDocsExpanded((prev) => !prev)}
+              className="flex items-center gap-1.5 w-full px-2 mb-1 text-left"
+            >
+              <ChevronDown
+                size={14}
+                className={`text-zinc-500 transition-transform duration-200 ${
+                  docsExpanded ? 'rotate-0' : '-rotate-90'
+                }`}
+              />
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                Documents
+              </span>
+              <span className="ml-auto text-[10px] text-zinc-600">
+                {documents.length}
+              </span>
+            </button>
+            {docsExpanded && (
+              <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                {documents.map((doc) => (
+                  <div
+                    key={doc.document_id}
+                    className={`group flex items-center rounded-lg transition ${
+                      activeDocumentId === doc.document_id
+                        ? 'bg-zinc-800'
+                        : 'hover:bg-zinc-800/60'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setActiveDocument(doc.document_id)}
+                      className={`flex-1 flex items-center gap-2 px-3 py-2 text-left text-sm ${
+                        activeDocumentId === doc.document_id
+                          ? 'font-medium text-zinc-100'
+                          : 'text-zinc-400'
+                      }`}
+                    >
+                      <FileIcon type={doc.file_type} />
+                      <span className="truncate flex-1">{doc.filename}</span>
+                      {activeDocumentId === doc.document_id && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Delete ${doc.filename}`}
+                      onClick={() => setDeleteConfirm(doc.document_id)}
+                      className="mr-2 p-1 rounded opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 transition"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+                {documents.length === 0 && (
+                  <p className="px-3 py-4 text-xs text-zinc-600 text-center">
+                    No documents uploaded yet
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Theme toggle at bottom */}
+          <div className="mt-2 border-t border-zinc-800 pt-2 flex items-center justify-between">
+            <span className="text-xs text-zinc-500 px-2">Theme</span>
+            <ThemeToggle />
+          </div>
         </div>
       </aside>
 
@@ -319,78 +540,55 @@ export const Chat = () => {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100">
-          <div className="flex items-center gap-3">
+        {/* Top bar */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-200 dark:border-zinc-700">
+          {!showSidebar && (
             <button
               type="button"
-              onClick={() => setShowSidebar(!showSidebar)}
-              className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+              aria-label="Toggle sidebar"
+              onClick={() => setShowSidebar(true)}
+              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-600 dark:hover:text-zinc-300 transition"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
+              <PanelLeft size={18} />
             </button>
-            <div>
-              <h1 className="text-sm font-semibold text-slate-900">
-                {activeDocumentId
-                  ? documents.find((d) => d.document_id === activeDocumentId)?.filename || 'Document'
-                  : 'All Documents'}
-              </h1>
-              <p className="text-[11px] text-slate-400">
-                {activeDocumentId ? 'Querying specific document' : `Querying ${documents.length} document${documents.length !== 1 ? 's' : ''}`}
-              </p>
-            </div>
-          </div>
+          )}
+          <p className="text-xs text-zinc-400 dark:text-zinc-500">
+            {activeDocumentId
+              ? `Querying: ${documents.find((d) => d.document_id === activeDocumentId)?.filename || 'Document'}`
+              : `${documents.length} document${documents.length !== 1 ? 's' : ''} available`}
+          </p>
           {loading && (
-            <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="ml-auto flex items-center gap-2 rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+              <Loader2 size={12} className="animate-spin" />
               Analyzing...
             </div>
           )}
         </div>
 
-        {/* Drag overlay */}
-        {isDragOver && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/10 backdrop-blur-sm rounded-2xl">
-            <div className="rounded-2xl border-2 border-dashed border-sky-400 bg-white px-12 py-10 text-center shadow-xl">
-              <div className="text-4xl mb-3">&#128196;</div>
-              <p className="text-sm font-medium text-slate-900">Drop your document here</p>
-              <p className="text-xs text-slate-500 mt-1">PDF, DOCX, TXT, MD, CSV, JSON, HTML, and more</p>
-            </div>
-          </div>
-        )}
-
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div
+          className="flex-1 overflow-y-auto px-4 py-6"
+          role="log"
+          aria-live="polite"
+        >
           {messages.length > 0 ? (
-            <div className="space-y-6 max-w-4xl mx-auto">
+            <div className="space-y-6 max-w-[48rem] mx-auto">
               {messages.map((msg) => (
                 <MessageBubble key={msg.id} message={msg} />
               ))}
             </div>
           ) : (
             <div className="flex h-full flex-col items-center justify-center text-center max-w-lg mx-auto">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center mb-6 shadow-lg">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                  <path d="M2 17l10 5 10-5" />
-                  <path d="M2 12l10 5 10-5" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2">DocuChat Assistant</h2>
-              <p className="text-sm text-slate-500 leading-relaxed mb-8">
-                Upload any document and ask questions. I will find the exact information you need with source citations.
-              </p>
+              <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-6">
+                How can I help you today?
+              </h2>
               <div className="grid grid-cols-2 gap-2 w-full">
                 {quickPrompts.map((prompt) => (
                   <button
                     key={prompt}
                     type="button"
                     onClick={() => setInputValue(prompt)}
-                    className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-600 transition hover:border-slate-900 hover:bg-slate-900 hover:text-white active:scale-[0.98]"
+                    className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-3 text-left text-sm text-zinc-600 dark:text-zinc-400 transition hover:border-zinc-900 dark:hover:border-zinc-300 hover:bg-zinc-900 dark:hover:bg-zinc-200 hover:text-white dark:hover:text-zinc-900 active:scale-[0.98]"
                   >
                     {prompt}
                   </button>
@@ -401,78 +599,88 @@ export const Chat = () => {
           <div ref={chatEndRef} />
         </div>
 
-        {/* Upload preview */}
-        {selectedFile && (
-          <div className="mx-6 mb-2 flex items-center justify-between rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
-            <div className="flex items-center gap-3">
-              <FileIcon type={selectedFile.name.split('.').pop() || ''} />
-              <div>
-                <p className="text-sm font-medium text-sky-900">{selectedFile.name}</p>
-                <p className="text-xs text-sky-500">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+        {/* Input area */}
+        <div className="px-4 pb-4 pt-2">
+          <div className="max-w-[48rem] mx-auto">
+            {/* Upload preview chip */}
+            {selectedFile && (
+              <div className="mb-2 flex items-center gap-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3 py-2">
+                <FileIcon
+                  type={selectedFile.name.split('.').pop() || ''}
+                />
+                <span className="text-sm text-zinc-700 dark:text-zinc-300 truncate flex-1">
+                  {selectedFile.name}
+                </span>
+                <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">
+                  {(selectedFile.size / 1024).toFixed(1)} KB
+                </span>
+                <button
+                  type="button"
+                  aria-label="Cancel upload"
+                  onClick={() => {
+                    setSelectedFile(null)
+                    if (fileInputRef.current) fileInputRef.current.value = ''
+                  }}
+                  className="p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition"
+                >
+                  <X size={14} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Upload and index document"
+                  onClick={() => void handleUpload()}
+                  disabled={uploading}
+                  className="rounded-lg bg-zinc-900 dark:bg-zinc-200 px-3 py-1.5 text-xs font-medium text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-300 disabled:opacity-50 transition"
+                >
+                  {uploading ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    'Upload'
+                  )}
+                </button>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
-                className="rounded-lg px-3 py-1.5 text-xs text-sky-600 hover:bg-sky-100 transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleUpload()}
-                disabled={uploading}
-                className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-500 disabled:opacity-50 transition"
-              >
-                {uploading ? 'Processing...' : 'Upload & Index'}
-              </button>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Input */}
-        <div className="px-6 pb-6 pt-2">
-          <div className="flex items-end gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm focus-within:border-slate-900 focus-within:shadow-md transition-all">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
-              title="Upload document"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-              </svg>
-            </button>
-            <textarea
-              ref={textareaRef}
-              value={inputValue}
-              onChange={(e) => {
-                setInputValue(e.target.value)
-                e.target.style.height = 'auto'
-                e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px'
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask anything about your documents..."
-              rows={1}
-              className="flex-1 resize-none rounded-xl border-0 bg-transparent px-2 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400"
-            />
-            <button
-              type="button"
-              onClick={() => void handleSubmit()}
-              disabled={loading || !inputValue.trim()}
-              className="shrink-0 rounded-xl bg-slate-900 p-2.5 text-white transition hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13" />
-                <polygon points="22 2 15 22 11 13 2 9 22 2" />
-              </svg>
-            </button>
+            {/* Input box */}
+            <div className="flex items-end gap-2 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-2 shadow-sm focus-within:border-zinc-400 dark:focus-within:border-zinc-500 focus-within:shadow-md transition-all">
+              <button
+                type="button"
+                aria-label="Upload document"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="shrink-0 rounded-xl p-2 text-zinc-400 transition hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:text-zinc-600 dark:hover:text-zinc-300 disabled:opacity-50"
+              >
+                <Paperclip size={18} />
+              </button>
+              <textarea
+                ref={textareaRef}
+                value={inputValue}
+                onChange={(e) => {
+                  setInputValue(e.target.value)
+                  e.target.style.height = 'auto'
+                  e.target.style.height =
+                    Math.min(e.target.scrollHeight, 200) + 'px'
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Message DocuChat..."
+                rows={1}
+                className="flex-1 resize-none border-0 bg-transparent px-2 py-2 text-sm text-zinc-900 dark:text-zinc-100 outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+              />
+              <button
+                type="button"
+                aria-label="Send message"
+                onClick={() => void handleSubmit()}
+                disabled={loading || !inputValue.trim()}
+                className="shrink-0 rounded-xl bg-zinc-900 dark:bg-zinc-200 p-2 text-white dark:text-zinc-900 transition hover:bg-zinc-800 dark:hover:bg-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
+              >
+                <Send size={18} />
+              </button>
+            </div>
+            <p className="text-center text-[10px] text-zinc-300 dark:text-zinc-600 mt-2">
+              Enter to send &middot; Shift+Enter for new line &middot; Drag &
+              drop documents to upload
+            </p>
           </div>
-          <p className="text-center text-[10px] text-slate-300 mt-2">
-            Enter to send &middot; Shift+Enter for new line &middot; Drag & drop documents to upload
-          </p>
         </div>
 
         <input

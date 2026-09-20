@@ -2,24 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
-  height: 100%;
+@layer base {
+  html, body, #root {
+    @apply h-full;
+  }
+
+  body {
+    @apply m-0 bg-white text-zinc-900 antialiased;
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+  }
+
+  .dark body,
+  .dark #root {
+    @apply bg-[#212121] text-zinc-100;
+  }
+
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-emerald-500;
+  }
 }
 
-body {
-  margin: 0;
-  font-family: Inter, system-ui, -apple-system, sans-serif;
-  background: #f8fafc;
-  color: #0f172a;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -30,28 +32,54 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #d4d4d8;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #a1a1aa;
 }
 
-/* Prose overrides for markdown */
+.dark ::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
 .prose pre {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.75rem;
-  padding: 1rem;
-  overflow-x: auto;
+  @apply overflow-x-auto rounded-xl border border-zinc-200 bg-zinc-50 p-4;
+}
+
+.dark .prose pre {
+  @apply border-zinc-700 bg-zinc-800;
 }
 
 .prose code {
-  font-size: 0.8125rem;
+  @apply text-[0.8125rem];
 }
 
 .prose code::before,
 .prose code::after {
   content: none;
+}
+
+.dark .prose {
+  --tw-prose-body: theme('colors.zinc.300');
+  --tw-prose-headings: theme('colors.zinc.100');
+  --tw-prose-lead: theme('colors.zinc.400');
+  --tw-prose-links: theme('colors.emerald.400');
+  --tw-prose-bold: theme('colors.zinc.100');
+  --tw-prose-counters: theme('colors.zinc.400');
+  --tw-prose-bullets: theme('colors.zinc.500');
+  --tw-prose-hr: theme('colors.zinc.700');
+  --tw-prose-quotes: theme('colors.zinc.100');
+  --tw-prose-quote-borders: theme('colors.emerald.500');
+  --tw-prose-captions: theme('colors.zinc.400');
+  --tw-prose-code: theme('colors.zinc.200');
+  --tw-prose-pre-code: theme('colors.zinc.200');
+  --tw-prose-pre-bg: theme('colors.zinc.800');
+  --tw-prose-th-borders: theme('colors.zinc.600');
+  --tw-prose-td-borders: theme('colors.zinc.700');
 }

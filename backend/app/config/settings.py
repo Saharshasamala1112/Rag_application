@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -17,9 +20,9 @@ class Settings(BaseSettings):
 
     # Ollama
     ollama_host: str = "http://localhost:11434"
-    ollama_model: str = "phi3:mini"
+    ollama_model: str = "llama3.2:latest"
     ollama_temperature: float = 0.1
-    ollama_num_predict: int = 1024
+    ollama_num_predict: int = 2048
 
     # Embeddings
     embedding_model: str = "BAAI/bge-small-en-v1.5"
@@ -41,9 +44,44 @@ class Settings(BaseSettings):
     upload_dir: Path = Path("data/uploads")
     max_file_size_mb: int = 50
 
-    # Query expansion
-    use_query_expansion: bool = True
-    use_hyde: bool = True
+    def get_available_ollama_models(self) -> list[str]:
+        """Query Ollama for available model names."""
+        try:
+            from ollama import Client
+
+            client = Client(host=self.ollama_host)
+            response = client.list()
+            return [m.model for m in response.models]
+        except Exception as e:
+            logger.warning("Could not list Ollama models: %s", e)
+            return []
+
+    def resolve_model(self) -> str:
+        """Return the configured model if available, else fall back to the first available model."""
+        available = self.get_available_ollama_models()
+        if not available:
+            logger.warning("No Ollama models found. LLM queries will fail.")
+            return self.ollama_model
+
+        # Exact match
+        if self.ollama_model in available:
+            return self.ollama_model
+
+        # Partial match (e.g. config has "llama3.2" but Ollama has "llama3.2:latest")
+        for model in available:
+            if self.ollama_model in model or model in self.ollama_model:
+                logger.info("Model '%s' not found, using '%s' instead.", self.ollama_model, model)
+                return model
+
+        # Fallback to first available
+        fallback = available[0]
+        logger.warning(
+            "Model '%s' not found. Available: %s. Falling back to '%s'.",
+            self.ollama_model,
+            ", ".join(available),
+            fallback,
+        )
+        return fallback
 
 
 settings = Settings()

@@ -34,7 +34,7 @@ class UploadService:
 
         import uuid
 
-        document_id = str(uuid.uuid4())[:8]
+        document_id = str(uuid.uuid4())[:12]
         output_dir = settings.upload_dir / document_id
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -43,7 +43,17 @@ class UploadService:
         file_path = output_dir / f"original{ext}"
         file_path.write_bytes(file_content)
 
-        result = self.pipeline.process(file_path)
+        try:
+            result = self.pipeline.process(file_path)
+        except Exception:
+            # Clean up on pipeline failure
+            import shutil
+
+            try:
+                shutil.rmtree(output_dir)
+            except OSError:
+                pass
+            raise
 
         doc_info = {
             "document_id": document_id,
@@ -99,7 +109,12 @@ class UploadService:
         if not doc_dir.exists():
             return False
 
-        shutil.rmtree(doc_dir)
+        try:
+            shutil.rmtree(doc_dir)
+        except OSError as e:
+            logger.error("Failed to delete document %s: %s", document_id, e)
+            return False
+
         return True
 
     def get_document_preview(self, document_id: str, max_chars: int = 2000) -> str | None:

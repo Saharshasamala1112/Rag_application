@@ -1,5 +1,5 @@
 import api from '../lib/axios'
-import type { UploadResponse, DocumentListResponse, DocumentInfo } from '../types/document'
+import type { UploadResponse, DocumentListResponse } from '../types/document'
 
 export const uploadDocument = async (file: File): Promise<UploadResponse> => {
   const formData = new FormData()
@@ -15,11 +15,6 @@ export const uploadDocument = async (file: File): Promise<UploadResponse> => {
 
 export const listDocuments = async (): Promise<DocumentListResponse> => {
   const res = await api.get<DocumentListResponse>('/documents')
-  return res.data
-}
-
-export const getDocument = async (documentId: string): Promise<DocumentInfo> => {
-  const res = await api.get<DocumentInfo>(`/documents/${documentId}`)
   return res.data
 }
 

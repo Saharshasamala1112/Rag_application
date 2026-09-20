@@ -42,11 +42,11 @@ class VectorStore:
 
     @staticmethod
     def get_embeddings(index: faiss.Index) -> np.ndarray:
-        """Extract stored embeddings from a FAISS index."""
+        """Extract stored embeddings from a FAISS index using bulk reconstruction."""
         if index.ntotal == 0:
             return np.empty((0, index.d), dtype=np.float32)
-        embeddings = np.array([index.reconstruct(i) for i in range(index.ntotal)])
-        return embeddings.astype(np.float32)
+        embeddings = index.reconstruct_n(0, index.ntotal)
+        return np.array(embeddings, dtype=np.float32)
 
     @staticmethod
     def build_index(embeddings: np.ndarray) -> faiss.Index:

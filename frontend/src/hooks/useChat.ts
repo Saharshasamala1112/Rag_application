@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
+import { toast } from 'sonner'
 import { queryDocumentsStream } from '../services/query.service'
 import { useChatStore } from '../store/chat.store'
 import { useDocumentStore } from '../store/document.store'
@@ -20,14 +21,13 @@ export const useChat = () => {
   const activeDocumentId = useDocumentStore((state) => state.activeDocumentId)
 
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  const getMessages = useCallback(() => {
+  const messages = useMemo(() => {
     const active = sessions.find((s) => s.id === activeSessionId)
     return active?.messages ?? []
   }, [sessions, activeSessionId])
 
-  const ask = async (question: string) => {
+  const ask = useCallback(async (question: string) => {
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -36,9 +36,7 @@ export const useChat = () => {
     }
     addUserMessage(userMessage)
     setLoading(true)
-    setError(null)
 
-    // Create placeholder for streaming response
     const assistantId = `assistant-${Date.now()}`
     const assistantMessage: ChatMessage = {
       id: assistantId,
@@ -55,28 +53,23 @@ export const useChat = () => {
         {
           question,
           document_id: activeDocumentId,
-          use_expansion: true,
           use_reranking: true,
         },
-        // onToken
         (token: string) => {
           const current = useChatStore.getState().getMessages()
           const msg = current.find((m) => m.id === assistantId)
           const newContent = (msg?.content || '') + token
           updateAssistantMessage(assistantId, newContent)
         },
-        // onSources
         (sources: ChatSource[]) => {
           setStreamingSources(assistantId, sources)
         },
-        // onDone
         () => {
           finishStreaming(assistantId)
           setLoading(false)
         },
-        // onError
         (errorMsg: string) => {
-          setError(errorMsg)
+          toast.error(errorMsg)
           updateAssistantMessage(assistantId, `Error: ${errorMsg}`)
           finishStreaming(assistantId)
           setLoading(false)
@@ -84,17 +77,16 @@ export const useChat = () => {
       )
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to answer right now'
-      setError(message)
+      toast.error(message)
       updateAssistantMessage(assistantId, `Error: ${message}`)
       finishStreaming(assistantId)
       setLoading(false)
     }
-  }
+  }, [activeDocumentId, addUserMessage, addAssistantMessage, updateAssistantMessage, setStreamingSources, finishStreaming])
 
   return {
-    messages: getMessages(),
+    messages,
     loading,
-    error,
     ask,
     clearMessages,
     activeSessionId,

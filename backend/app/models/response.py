@@ -19,7 +19,6 @@ class QueryResponse(BaseModel):
 
     answer: str
     sources: list[SourceChunk]
-    query_expanded: str | None = None
     retrieval_time_ms: float = 0
     generation_time_ms: float = 0
     total_time_ms: float = 0

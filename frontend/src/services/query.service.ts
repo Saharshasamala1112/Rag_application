@@ -13,10 +13,13 @@ export const queryDocumentsStream = async (
   onDone: () => void,
   onError: (error: string) => void,
 ): Promise<void> => {
+  const controller = new AbortController()
+
   const response = await fetch(`${api.defaults.baseURL}/query/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
+    signal: controller.signal,
   })
 
   if (!response.ok) {
@@ -32,33 +35,41 @@ export const queryDocumentsStream = async (
 
   const decoder = new TextDecoder()
   let buffer = ''
+  let done = false
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
+  try {
+    while (!done) {
+      const result = await reader.read()
+      done = result.done
+      if (done) break
 
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || ''
+      buffer += decoder.decode(result.value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
 
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        try {
-          const event = JSON.parse(line.slice(6))
-          if (event.type === 'token') {
-            onToken(event.content)
-          } else if (event.type === 'sources') {
-            onSources(event.content)
-          } else if (event.type === 'done') {
-            onDone()
-          } else if (event.type === 'error') {
-            onError(event.content)
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const event = JSON.parse(line.slice(6))
+            if (event.type === 'token') {
+              onToken(event.content)
+            } else if (event.type === 'sources') {
+              onSources(event.content)
+            } else if (event.type === 'done') {
+              onDone()
+              return
+            } else if (event.type === 'error') {
+              onError(event.content)
+              return
+            }
+          } catch {
+            // Skip malformed JSON
           }
-        } catch {
-          // Skip malformed JSON
         }
       }
     }
+  } finally {
+    reader.releaseLock()
   }
 
   onDone()

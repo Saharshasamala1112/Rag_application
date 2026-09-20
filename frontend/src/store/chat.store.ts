@@ -14,7 +14,6 @@ type ChatSession = {
 type ChatState = {
   sessions: ChatSession[]
   activeSessionId: string
-  messages: ChatMessage[]
   addUserMessage: (message: ChatMessage) => void
   addAssistantMessage: (message: ChatMessage) => void
   updateAssistantMessage: (messageId: string, content: string) => void
@@ -39,16 +38,27 @@ const loadSessions = (): ChatSession[] => {
   }
 }
 
-const saveSessions = (sessions: ChatSession[]) => {
+let saveTimeout: ReturnType<typeof setTimeout> | null = null
+
+const saveSessionsDebounced = (sessions: ChatSession[]) => {
   if (typeof window === 'undefined') return
+  if (saveTimeout) clearTimeout(saveTimeout)
+  saveTimeout = setTimeout(() => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions))
+  }, 500)
+}
+
+const saveSessionsImmediate = (sessions: ChatSession[]) => {
+  if (typeof window === 'undefined') return
+  if (saveTimeout) clearTimeout(saveTimeout)
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions))
 }
 
-const createSessionData = (): ChatSession => {
+const createSessionData = (title?: string): ChatSession => {
   const now = new Date().toISOString()
   return {
     id: `session-${Date.now()}`,
-    title: `Session ${new Date().toLocaleString([], { hour: 'numeric', minute: '2-digit' })}`,
+    title: title || `Session ${new Date().toLocaleString([], { hour: 'numeric', minute: '2-digit' })}`,
     messages: [],
     createdAt: now,
     updatedAt: now,
@@ -70,16 +80,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   addUserMessage: (message) => {
     const { sessions, activeSessionId } = get()
-    const updated = sessions.map((session) =>
-      session.id === activeSessionId
-        ? {
-            ...session,
-            messages: [...session.messages, message],
-            updatedAt: new Date().toISOString(),
-          }
-        : session,
-    )
-    saveSessions(updated)
+    const updated = sessions.map((session) => {
+      if (session.id !== activeSessionId) return session
+      const newMessages = [...session.messages, message]
+      // Auto-title from first user message
+      const title = session.messages.length === 0
+        ? message.content.slice(0, 50) + (message.content.length > 50 ? '...' : '')
+        : session.title
+      return {
+        ...session,
+        title,
+        messages: newMessages,
+        updatedAt: new Date().toISOString(),
+      }
+    })
+    saveSessionsDebounced(updated)
     set({ sessions: updated })
   },
 
@@ -94,7 +109,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
         : session,
     )
-    saveSessions(updated)
+    saveSessionsDebounced(updated)
     set({ sessions: updated })
   },
 
@@ -110,7 +125,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
         : session,
     )
-    saveSessions(updated)
+    saveSessionsDebounced(updated)
     set({ sessions: updated })
   },
 
@@ -126,7 +141,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
         : session,
     )
-    saveSessions(updated)
+    saveSessionsDebounced(updated)
     set({ sessions: updated })
   },
 
@@ -143,7 +158,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
         : session,
     )
-    saveSessions(updated)
+    saveSessionsImmediate(updated)
     set({ sessions: updated })
   },
 
@@ -154,7 +169,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ? { ...session, messages: [], updatedAt: new Date().toISOString() }
         : session,
     )
-    saveSessions(updated)
+    saveSessionsImmediate(updated)
     set({ sessions: updated })
   },
 
@@ -162,7 +177,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { sessions } = get()
     const nextSession = createSessionData()
     const updated = [nextSession, ...sessions]
-    saveSessions(updated)
+    saveSessionsImmediate(updated)
     set({ sessions: updated, activeSessionId: nextSession.id })
   },
 
@@ -173,8 +188,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
   deleteSession: (sessionId) => {
     const { sessions, activeSessionId } = get()
     const updated = sessions.filter((session) => session.id !== sessionId)
-    const nextActive = sessionId === activeSessionId ? updated[0]?.id ?? '' : activeSessionId
-    saveSessions(updated)
+
+    // Handle empty sessions — create a new one if all deleted
+    if (updated.length === 0) {
+      const newSession = createSessionData()
+      saveSessionsImmediate([newSession])
+      set({ sessions: [newSession], activeSessionId: newSession.id })
+      return
+    }
+
+    const nextActive = sessionId === activeSessionId
+      ? updated[0].id
+      : activeSessionId
+    saveSessionsImmediate(updated)
     set({ sessions: updated, activeSessionId: nextActive })
   },
 }))

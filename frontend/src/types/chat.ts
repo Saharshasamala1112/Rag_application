@@ -22,14 +22,12 @@ export type QueryRequest = {
   question: string
   document_id?: string | null
   top_k?: number
-  use_expansion?: boolean
   use_reranking?: boolean
 }
 
 export type QueryResponse = {
   answer: string
   sources: ChatSource[]
-  query_expanded: string | null
   retrieval_time_ms: number
   generation_time_ms: number
   total_time_ms: number

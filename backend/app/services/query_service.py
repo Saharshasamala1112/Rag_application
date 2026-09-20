@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 from app.config.settings import settings
+from app.exceptions import LLMError
 from app.models.request import QueryRequest
 from app.models.response import QueryResponse, SourceChunk
 from app.rag.llm import LocalLLM
@@ -22,7 +23,7 @@ class QueryService:
         self.llm = LocalLLM()
         self.reranker = Reranker()
 
-    def _resolve_document_dirs(self, document_id: str | None) -> list[Path]:
+    def resolve_document_dirs(self, document_id: str | None) -> list[Path]:
         """Resolve which document directories to search."""
         upload_dir = settings.upload_dir
 
@@ -32,12 +33,50 @@ class QueryService:
                 return [doc_dir]
             return []
 
-        # Search all documents
         dirs = []
         for child in sorted(upload_dir.iterdir()):
             if child.is_dir() and (child / "chunks.json").exists():
                 dirs.append(child)
         return dirs
+
+    def _build_context(self, context_chunks: list[dict]) -> str:
+        """Build context string with source metadata for the LLM."""
+        parts = []
+        for i, chunk in enumerate(context_chunks):
+            source = chunk.get("source", "unknown")
+            page = chunk.get("page_number")
+            header = chunk.get("header")
+            meta = f"[Source {i+1}] {source}"
+            if page:
+                meta += f" (Page {page})"
+            if header:
+                meta += f" — {header}"
+            parts.append(f"{meta}\n{chunk['content']}")
+        return "\n\n---\n\n".join(parts)
+
+    def _build_sources(self, context_chunks: list[dict]) -> list[SourceChunk]:
+        """Build SourceChunk list with normalized scores."""
+        if not context_chunks:
+            return []
+
+        scores = [c.get("score", 0.0) for c in context_chunks]
+        max_score = max(scores) if scores else 1.0
+
+        sources = []
+        for chunk in context_chunks:
+            raw_score = chunk.get("score", 0.0)
+            normalized = round((raw_score / max_score) * 100) if max_score > 0 else 0
+            sources.append(
+                SourceChunk(
+                    chunk_id=chunk.get("chunk_id", 0),
+                    content=chunk["content"][:500],
+                    source=chunk.get("source", "unknown"),
+                    score=normalized,
+                    page_number=chunk.get("page_number"),
+                    header=chunk.get("header"),
+                )
+            )
+        return sources
 
     def query(
         self,
@@ -47,7 +86,7 @@ class QueryService:
 
         total_start = time.perf_counter()
 
-        document_dirs = self._resolve_document_dirs(request.document_id)
+        document_dirs = self.resolve_document_dirs(request.document_id)
         if not document_dirs:
             return QueryResponse(
                 answer="No documents found. Please upload a document first.",
@@ -57,6 +96,7 @@ class QueryService:
 
         # Retrieval
         retrieval_start = time.perf_counter()
+        top_k = request.top_k or settings.final_top_k
 
         results = self.retriever.retrieve(
             question=request.question,
@@ -75,45 +115,38 @@ class QueryService:
             )
 
         # Reranking
-        if request.use_reranking and len(results) > settings.final_top_k:
+        if request.use_reranking and len(results) > top_k:
             results = self.reranker.rerank(
                 query=request.question,
                 chunks=results,
-                top_k=settings.final_top_k,
+                top_k=top_k,
             )
 
-        # Build context from top results
-        context_chunks = results[: settings.final_top_k]
-        context = "\n\n---\n\n".join(
-            f"[Source {i+1}] {chunk.get('source', 'unknown')}\n{chunk['content']}"
-            for i, chunk in enumerate(context_chunks)
-        )
+        context_chunks = results[:top_k]
+        context = self._build_context(context_chunks)
 
         logger.info("Context length: %d chars from %d chunks.", len(context), len(context_chunks))
 
         # Generation
         llm_start = time.perf_counter()
 
-        answer = self.llm.generate(
-            question=request.question,
-            context=context,
-        )
+        try:
+            answer = self.llm.generate(
+                question=request.question,
+                context=context,
+            )
+        except LLMError as e:
+            return QueryResponse(
+                answer=f"LLM error: {e}",
+                sources=[],
+                retrieval_time_ms=round(retrieval_time, 2),
+                total_time_ms=round((time.perf_counter() - total_start) * 1000, 2),
+            )
 
         generation_time = (time.perf_counter() - llm_start) * 1000
         total_time = (time.perf_counter() - total_start) * 1000
 
-        # Build sources
-        sources = [
-            SourceChunk(
-                chunk_id=chunk.get("chunk_id", 0),
-                content=chunk["content"][:500],
-                source=chunk.get("source", "unknown"),
-                score=chunk.get("score", 0.0),
-                page_number=chunk.get("page_number"),
-                header=chunk.get("header"),
-            )
-            for chunk in context_chunks
-        ]
+        sources = self._build_sources(context_chunks)
 
         return QueryResponse(
             answer=answer,
@@ -129,10 +162,12 @@ class QueryService:
     ):
         """Stream response chunks for SSE."""
 
-        document_dirs = self._resolve_document_dirs(request.document_id)
+        document_dirs = self.resolve_document_dirs(request.document_id)
         if not document_dirs:
             yield {"type": "error", "content": "No documents found."}
             return
+
+        top_k = request.top_k or settings.final_top_k
 
         results = self.retriever.retrieve(
             question=request.question,
@@ -144,30 +179,16 @@ class QueryService:
             yield {"type": "error", "content": "No relevant information found."}
             return
 
-        if request.use_reranking and len(results) > settings.final_top_k:
+        if request.use_reranking and len(results) > top_k:
             results = self.reranker.rerank(
                 query=request.question,
                 chunks=results,
-                top_k=settings.final_top_k,
+                top_k=top_k,
             )
 
-        context_chunks = results[: settings.final_top_k]
-        context = "\n\n---\n\n".join(
-            f"[Source {i+1}] {chunk.get('source', 'unknown')}\n{chunk['content']}"
-            for i, chunk in enumerate(context_chunks)
-        )
-
-        sources = [
-            SourceChunk(
-                chunk_id=chunk.get("chunk_id", 0),
-                content=chunk["content"][:500],
-                source=chunk.get("source", "unknown"),
-                score=chunk.get("score", 0.0),
-                page_number=chunk.get("page_number"),
-                header=chunk.get("header"),
-            )
-            for chunk in context_chunks
-        ]
+        context_chunks = results[:top_k]
+        context = self._build_context(context_chunks)
+        sources = self._build_sources(context_chunks)
 
         # Send sources first
         yield {
@@ -176,10 +197,14 @@ class QueryService:
         }
 
         # Stream answer
-        for chunk_text in self.llm.generate_stream(
-            question=request.question,
-            context=context,
-        ):
-            yield {"type": "token", "content": chunk_text}
+        try:
+            for chunk_text in self.llm.generate_stream(
+                question=request.question,
+                context=context,
+            ):
+                yield {"type": "token", "content": chunk_text}
+        except LLMError as e:
+            yield {"type": "error", "content": str(e)}
+            return
 
         yield {"type": "done", "content": ""}
