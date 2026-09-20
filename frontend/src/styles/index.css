@@ -8,23 +8,35 @@
   }
 
   body {
-    @apply m-0 bg-white text-zinc-900 antialiased;
+    @apply m-0 bg-surface text-zinc-800 antialiased;
     font-family: Inter, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   .dark body,
   .dark #root {
-    @apply bg-[#212121] text-zinc-100;
+    @apply bg-surface-dark-tertiary text-zinc-200;
   }
 
   *:focus-visible {
-    @apply outline-2 outline-offset-2 outline-emerald-500;
+    @apply outline-2 outline-offset-2 outline-emerald-500 rounded-sm;
+  }
+
+  /* Reduce motion for users who prefer it */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -33,7 +45,7 @@
 
 ::-webkit-scrollbar-thumb {
   background: #d4d4d8;
-  border-radius: 3px;
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -48,16 +60,114 @@
   background: #52525b;
 }
 
-.prose pre {
-  @apply overflow-x-auto rounded-xl border border-zinc-200 bg-zinc-50 p-4;
+/* Markdown prose */
+.prose {
+  @apply text-[0.9375rem] leading-[1.7] text-zinc-700;
 }
 
-.dark .prose pre {
-  @apply border-zinc-700 bg-zinc-800;
+.dark .prose {
+  @apply text-zinc-300;
+}
+
+.prose h1 {
+  @apply text-xl font-semibold text-zinc-900 mt-6 mb-3;
+}
+.prose h2 {
+  @apply text-lg font-semibold text-zinc-900 mt-5 mb-2;
+}
+.prose h3 {
+  @apply text-base font-semibold text-zinc-900 mt-4 mb-2;
+}
+.prose h4, .prose h5, .prose h6 {
+  @apply text-sm font-semibold text-zinc-900 mt-3 mb-1;
+}
+.dark .prose h1,
+.dark .prose h2,
+.dark .prose h3,
+.dark .prose h4,
+.dark .prose h5,
+.dark .prose h6 {
+  @apply text-zinc-100;
+}
+
+.prose p {
+  @apply my-2;
+}
+
+.prose ul, .prose ol {
+  @apply my-2 pl-5;
+}
+
+.prose ul {
+  @apply list-disc;
+}
+
+.prose ol {
+  @apply list-decimal;
+}
+
+.prose li {
+  @apply my-0.5;
+}
+
+.prose blockquote {
+  @apply border-l-[3px] border-emerald-400 pl-4 italic text-zinc-500 my-3;
+}
+
+.dark .prose blockquote {
+  @apply border-emerald-500 text-zinc-400;
+}
+
+.prose a {
+  @apply text-emerald-600 underline underline-offset-2 decoration-emerald-300 hover:decoration-emerald-500 transition-colors;
+}
+
+.dark .prose a {
+  @apply text-emerald-400 decoration-emerald-700 hover:decoration-emerald-400;
+}
+
+.prose strong {
+  @apply text-zinc-900 font-semibold;
+}
+
+.dark .prose strong {
+  @apply text-zinc-100;
+}
+
+.prose hr {
+  @apply my-4 border-zinc-200;
+}
+
+.dark .prose hr {
+  @apply border-zinc-700;
+}
+
+.prose table {
+  @apply w-full text-sm my-3;
+}
+
+.prose th {
+  @apply text-left font-semibold text-zinc-900 pb-2 border-b border-zinc-200;
+}
+
+.dark .prose th {
+  @apply text-zinc-100 border-zinc-700;
+}
+
+.prose td {
+  @apply py-1.5 border-b border-zinc-100;
+}
+
+.dark .prose td {
+  @apply border-zinc-800;
 }
 
 .prose code {
-  @apply text-[0.8125rem];
+  @apply text-[0.8125rem] bg-zinc-100 text-zinc-800 px-1.5 py-0.5 rounded font-normal;
+}
+
+.dark .prose code {
+  @apply bg-zinc-800 text-zinc-200;
 }
 
 .prose code::before,
@@ -65,21 +175,14 @@
   content: none;
 }
 
-.dark .prose {
-  --tw-prose-body: theme('colors.zinc.300');
-  --tw-prose-headings: theme('colors.zinc.100');
-  --tw-prose-lead: theme('colors.zinc.400');
-  --tw-prose-links: theme('colors.emerald.400');
-  --tw-prose-bold: theme('colors.zinc.100');
-  --tw-prose-counters: theme('colors.zinc.400');
-  --tw-prose-bullets: theme('colors.zinc.500');
-  --tw-prose-hr: theme('colors.zinc.700');
-  --tw-prose-quotes: theme('colors.zinc.100');
-  --tw-prose-quote-borders: theme('colors.emerald.500');
-  --tw-prose-captions: theme('colors.zinc.400');
-  --tw-prose-code: theme('colors.zinc.200');
-  --tw-prose-pre-code: theme('colors.zinc.200');
-  --tw-prose-pre-bg: theme('colors.zinc.800');
-  --tw-prose-th-borders: theme('colors.zinc.600');
-  --tw-prose-td-borders: theme('colors.zinc.700');
+.prose pre {
+  @apply overflow-x-auto rounded-lg border border-zinc-200 bg-zinc-50 p-4 my-3;
+}
+
+.dark .prose pre {
+  @apply border-zinc-700 bg-zinc-800/80;
+}
+
+.prose pre code {
+  @apply bg-transparent p-0 text-inherit;
 }
