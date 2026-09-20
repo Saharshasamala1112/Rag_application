@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     max_file_size_mb: int = 50
 
     def get_available_ollama_models(self) -> list[str]:
-        """Query Ollama for available model names."""
+        """Query Ollama for available model names (cached for 60s)."""
         try:
             from ollama import Client
 

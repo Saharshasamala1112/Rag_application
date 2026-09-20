@@ -86,7 +86,7 @@ class Retriever:
     """Hybrid retriever with semantic search, BM25, and RRF fusion."""
 
     def __init__(self) -> None:
-        self.embedding_service = EmbeddingService()
+        self.embedding_service = EmbeddingService.get_instance()
         self.vector_store = VectorStore()
         self.bm25 = BM25Scorer()
         self._fitted_docs_key: str | None = None

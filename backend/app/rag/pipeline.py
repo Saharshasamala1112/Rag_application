@@ -19,7 +19,7 @@ class DocumentPipeline:
     def __init__(self) -> None:
         self.loader = DocumentLoader()
         self.chunker = DocumentChunker()
-        self.embedding_service = EmbeddingService()
+        self.embedding_service = EmbeddingService.get_instance()
         self.vector_store = VectorStore()
 
     def process(
