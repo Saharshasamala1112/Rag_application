@@ -13,6 +13,11 @@ export const uploadDocument = async (file: File): Promise<UploadResponse> => {
   return res.data
 }
 
+export const uploadText = async (content: string, filename: string): Promise<UploadResponse> => {
+  const res = await api.post<UploadResponse>('/upload/text', { content, filename })
+  return res.data
+}
+
 export const listDocuments = async (): Promise<DocumentListResponse> => {
   const res = await api.get<DocumentListResponse>('/documents')
   return res.data

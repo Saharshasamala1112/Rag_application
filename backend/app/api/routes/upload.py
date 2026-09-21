@@ -1,4 +1,5 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from pydantic import BaseModel
 
 from app.config.settings import settings
 from app.rag.document_loader import SUPPORTED_EXTENSIONS
@@ -9,6 +10,11 @@ router = APIRouter(tags=["Upload"])
 upload_service = UploadService()
 
 ALLOWED_EXTENSIONS = set(SUPPORTED_EXTENSIONS.keys())
+
+
+class TextUploadRequest(BaseModel):
+    content: str
+    filename: str
 
 
 @router.post("/upload")
@@ -55,6 +61,36 @@ async def upload_document(
 
     return {
         "message": "Document uploaded and processed successfully.",
+        "document_id": doc_info["document_id"],
+        "filename": doc_info["filename"],
+        "chunk_count": doc_info["chunk_count"],
+    }
+
+
+@router.post("/upload/text")
+async def upload_text(request: TextUploadRequest) -> dict:
+    """Create a document from typed text content."""
+
+    if not request.content.strip():
+        raise HTTPException(status_code=400, detail="Content is empty.")
+
+    filename = request.filename or "typed-note.txt"
+    if not filename.endswith(".txt"):
+        filename += ".txt"
+
+    try:
+        doc_info = upload_service.process_upload(
+            file_content=request.content.encode("utf-8"),
+            filename=filename,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process text: {e}",
+        )
+
+    return {
+        "message": "Document created from text.",
         "document_id": doc_info["document_id"],
         "filename": doc_info["filename"],
         "chunk_count": doc_info["chunk_count"],
