@@ -1,10 +1,12 @@
 import { create } from 'zustand'
 import type { ChatMessage, ChatSource } from '../types/chat'
+import * as conversationService from '../services/conversation.service'
 
 const STORAGE_KEY = 'rag-chat-sessions'
 
 type ChatSession = {
   id: string
+  serverConversationId: string | null
   title: string
   messages: ChatMessage[]
   createdAt: string
@@ -24,6 +26,9 @@ type ChatState = {
   setActiveSession: (sessionId: string) => void
   deleteSession: (sessionId: string) => void
   getMessages: () => ChatMessage[]
+  getServerConversationId: () => string | null
+  loadServerConversations: () => Promise<void>
+  syncSessionFromServer: (sessionId: string) => Promise<void>
 }
 
 const loadSessions = (): ChatSession[] => {
@@ -54,10 +59,11 @@ const saveSessionsImmediate = (sessions: ChatSession[]) => {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions))
 }
 
-const createSessionData = (title?: string): ChatSession => {
+const createSessionData = (title?: string, serverId?: string): ChatSession => {
   const now = new Date().toISOString()
   return {
     id: `session-${Date.now()}`,
+    serverConversationId: serverId ?? null,
     title: title || `Session ${new Date().toLocaleString([], { hour: 'numeric', minute: '2-digit' })}`,
     messages: [],
     createdAt: now,
@@ -78,12 +84,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return active?.messages ?? []
   },
 
+  getServerConversationId: () => {
+    const active = get().sessions.find((session) => session.id === get().activeSessionId)
+    return active?.serverConversationId ?? null
+  },
+
   addUserMessage: (message) => {
     const { sessions, activeSessionId } = get()
     const updated = sessions.map((session) => {
       if (session.id !== activeSessionId) return session
       const newMessages = [...session.messages, message]
-      // Auto-title from first user message
       const title = session.messages.length === 0
         ? message.content.slice(0, 50) + (message.content.length > 50 ? '...' : '')
         : session.title
@@ -179,6 +189,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const updated = [nextSession, ...sessions]
     saveSessionsImmediate(updated)
     set({ sessions: updated, activeSessionId: nextSession.id })
+
+    // Create server conversation in background
+    conversationService.createConversation().then((conv) => {
+      set((state) => ({
+        sessions: state.sessions.map((s) =>
+          s.id === nextSession.id ? { ...s, serverConversationId: conv.conversation_id } : s,
+        ),
+      }))
+    }).catch(() => {
+      // Server unavailable — local-only mode still works
+    })
   },
 
   setActiveSession: (sessionId) => {
@@ -187,20 +208,87 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   deleteSession: (sessionId) => {
     const { sessions, activeSessionId } = get()
+    const session = sessions.find((s) => s.id === sessionId)
     const updated = sessions.filter((session) => session.id !== sessionId)
 
-    // Handle empty sessions — create a new one if all deleted
+    // Delete from server in background
+    if (session?.serverConversationId) {
+      conversationService.deleteConversation(session.serverConversationId).catch(() => {})
+    }
+
     if (updated.length === 0) {
       const newSession = createSessionData()
       saveSessionsImmediate([newSession])
       set({ sessions: [newSession], activeSessionId: newSession.id })
+      // Create server conversation
+      conversationService.createConversation().then((conv) => {
+        set((state) => ({
+          sessions: state.sessions.map((s) =>
+            s.id === newSession.id ? { ...s, serverConversationId: conv.conversation_id } : s,
+          ),
+        }))
+      }).catch(() => {})
       return
     }
 
-    const nextActive = sessionId === activeSessionId
-      ? updated[0].id
-      : activeSessionId
+    const nextActive = sessionId === activeSessionId ? updated[0].id : activeSessionId
     saveSessionsImmediate(updated)
     set({ sessions: updated, activeSessionId: nextActive })
+  },
+
+  loadServerConversations: async () => {
+    try {
+      const { conversations } = await conversationService.listConversations()
+      const { sessions } = get()
+
+      const existingServerIds = new Set(
+        sessions.filter((s) => s.serverConversationId).map((s) => s.serverConversationId),
+      )
+
+      const newSessions: ChatSession[] = []
+      for (const conv of conversations) {
+        if (!existingServerIds.has(conv.conversation_id)) {
+          newSessions.push({
+            id: `session-${conv.conversation_id}`,
+            serverConversationId: conv.conversation_id,
+            title: conv.title,
+            messages: [],
+            createdAt: conv.created_at,
+            updatedAt: conv.updated_at,
+          })
+        }
+      }
+
+      if (newSessions.length > 0) {
+        const merged = [...newSessions, ...sessions]
+        saveSessionsImmediate(merged)
+        set({ sessions: merged })
+      }
+    } catch {
+      // Server unavailable — local-only mode
+    }
+  },
+
+  syncSessionFromServer: async (sessionId: string) => {
+    const session = get().sessions.find((s) => s.id === sessionId)
+    if (!session?.serverConversationId) return
+
+    try {
+      const detail = await conversationService.getConversation(session.serverConversationId)
+      const messages: ChatMessage[] = detail.messages.map((m, i) => ({
+        id: `server-${sessionId}-${i}`,
+        role: m.role,
+        content: m.content,
+        sources: m.sources as ChatSource[] | undefined,
+        createdAt: m.created_at,
+      }))
+      const updated = get().sessions.map((s) =>
+        s.id === sessionId ? { ...s, messages, title: detail.title } : s,
+      )
+      saveSessionsDebounced(updated)
+      set({ sessions: updated })
+    } catch {
+      // Ignore — use local messages
+    }
   },
 }))

@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.models.request import QueryRequest
+from app.services import conversation_service
 from app.services.query_service import QueryService
 
 router = APIRouter(tags=["Query"])
@@ -22,7 +23,24 @@ def query(request: QueryRequest):
             detail="Document not found.",
         )
 
-    return query_service.query(request)
+    # Save user message to conversation
+    if request.conversation_id:
+        conversation_service.add_message(
+            request.conversation_id, "user", request.question
+        )
+
+    result = query_service.query(request)
+
+    # Save assistant response to conversation
+    if request.conversation_id:
+        conversation_service.add_message(
+            request.conversation_id,
+            "assistant",
+            result.answer,
+            sources=[s.model_dump() for s in result.sources],
+        )
+
+    return result
 
 
 @router.post("/query/stream")
@@ -36,9 +54,40 @@ async def query_stream(request: QueryRequest):
             detail="Document not found.",
         )
 
+    # Save user message to conversation
+    if request.conversation_id:
+        conversation_service.add_message(
+            request.conversation_id, "user", request.question
+        )
+
+    full_answer = ""
+    saved_sources: list[dict] = []  # type: ignore[type-arg]
+
     async def event_generator():
+        nonlocal full_answer, saved_sources
+
         for event in query_service.query_stream(request):
             yield f"data: {json.dumps(event)}\n\n"
+
+            if event["type"] == "token":
+                full_answer += str(event["content"])
+            elif event["type"] == "sources":
+                saved_sources = event["content"]  # type: ignore[assignment]
+            elif event["type"] == "done":
+                if request.conversation_id and full_answer:
+                    conversation_service.add_message(
+                        request.conversation_id,
+                        "assistant",
+                        full_answer,
+                        sources=saved_sources if saved_sources else None,
+                    )
+            elif event["type"] == "error":
+                if request.conversation_id:
+                    conversation_service.add_message(
+                        request.conversation_id,
+                        "assistant",
+                        str(event["content"]),
+                    )
 
     return StreamingResponse(
         event_generator(),

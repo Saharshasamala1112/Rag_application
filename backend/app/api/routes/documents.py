@@ -1,5 +1,8 @@
+"""Document management routes."""
+
 from fastapi import APIRouter, HTTPException
 
+from app.models.response import DocumentInfo, DocumentListResponse
 from app.services.upload_service import UploadService
 
 router = APIRouter(tags=["Documents"])
@@ -8,27 +11,46 @@ upload_service = UploadService()
 
 
 @router.get("/documents")
-def list_documents() -> dict:
-    """List all uploaded documents."""
+def list_documents() -> DocumentListResponse:
     documents = upload_service.list_documents()
-    return {
-        "documents": documents,
-        "total": len(documents),
-    }
+    return DocumentListResponse(
+        documents=[DocumentInfo(**d) for d in documents],
+        total=len(documents),
+    )
 
 
 @router.get("/documents/{document_id}")
 def get_document(document_id: str) -> dict:
-    """Get document details."""
     doc = upload_service.get_document(document_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
     return doc
 
 
+@router.get("/documents/{document_id}/status")
+def get_document_status(document_id: str) -> dict:
+    """Get document processing status."""
+    doc = upload_service.get_document(document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    status = "ready"
+    chunks_file = upload_service.get_document_chunks_path(document_id)
+    if chunks_file is None:
+        status = "failed"
+    elif doc.get("chunk_count", 0) == 0:
+        status = "parsing"
+
+    return {
+        "document_id": document_id,
+        "status": status,
+        "chunk_count": doc.get("chunk_count", 0),
+        "filename": doc.get("filename", "unknown"),
+    }
+
+
 @router.delete("/documents/{document_id}")
 def delete_document(document_id: str) -> dict:
-    """Delete a document."""
     deleted = upload_service.delete_document(document_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Document not found.")
@@ -37,7 +59,6 @@ def delete_document(document_id: str) -> dict:
 
 @router.get("/documents/{document_id}/preview")
 def document_preview(document_id: str) -> dict:
-    """Get document text preview."""
     preview = upload_service.get_document_preview(document_id)
     if preview is None:
         raise HTTPException(status_code=404, detail="Document not found.")

@@ -33,3 +33,22 @@ class HealthResponse(BaseModel):
     embedding_model: str
     ollama_available: bool
     document_count: int = 0
+
+
+class DocumentInfo(BaseModel):
+    """Document metadata."""
+
+    document_id: str
+    filename: str
+    file_type: str = ""
+    chunk_count: int = 0
+    total_chars: int = 0
+    file_size: int = 0
+    uploaded_at: str = ""
+
+
+class DocumentListResponse(BaseModel):
+    """Response for listing documents."""
+
+    documents: list[DocumentInfo]
+    total: int

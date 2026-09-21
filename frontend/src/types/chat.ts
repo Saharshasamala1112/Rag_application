@@ -21,6 +21,7 @@ export type ChatMessage = {
 export type QueryRequest = {
   question: string
   document_id?: string | null
+  conversation_id?: string | null
   top_k?: number
   use_reranking?: boolean
 }

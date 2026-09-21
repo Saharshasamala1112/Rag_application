@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="DocuChat RAG API",
     description="Production RAG with hybrid search, reranking, and streaming",
-    version="3.0.0",
+    version="3.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -92,4 +92,4 @@ def on_startup() -> None:
 
 @app.get("/")
 def root() -> dict:
-    return {"name": "DocuChat RAG API", "version": "3.0.0", "docs": "/docs"}
+    return {"name": "DocuChat RAG API", "version": "3.1.0", "docs": "/docs"}

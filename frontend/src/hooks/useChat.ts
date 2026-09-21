@@ -17,6 +17,7 @@ export const useChat = () => {
   const createSession = useChatStore((state) => state.createSession)
   const setActiveSession = useChatStore((state) => state.setActiveSession)
   const deleteSession = useChatStore((state) => state.deleteSession)
+  const getServerConversationId = useChatStore((state) => state.getServerConversationId)
 
   const activeDocumentId = useDocumentStore((state) => state.activeDocumentId)
 
@@ -29,6 +30,8 @@ export const useChat = () => {
   }, [sessions, activeSessionId])
 
   const ask = useCallback(async (question: string) => {
+    const serverConversationId = getServerConversationId()
+
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -55,6 +58,7 @@ export const useChat = () => {
         {
           question,
           document_id: activeDocumentId,
+          conversation_id: serverConversationId,
           use_reranking: true,
         },
         (token: string) => {
@@ -91,7 +95,7 @@ export const useChat = () => {
       setLoading(false)
       setStatus(null)
     }
-  }, [activeDocumentId, addUserMessage, addAssistantMessage, updateAssistantMessage, setStreamingSources, finishStreaming])
+  }, [activeDocumentId, addUserMessage, addAssistantMessage, updateAssistantMessage, setStreamingSources, finishStreaming, getServerConversationId])
 
   return {
     messages,

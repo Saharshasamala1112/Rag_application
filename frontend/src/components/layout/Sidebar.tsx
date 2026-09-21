@@ -56,6 +56,8 @@ export function Sidebar({ open, onClose, onToggle }: SidebarProps) {
     createSession,
     setActiveSession,
     deleteSession,
+    loadServerConversations,
+    syncSessionFromServer,
   } = useChatStore()
 
   const documents = useDocumentStore((s) => s.documents)
@@ -76,6 +78,18 @@ export function Sidebar({ open, onClose, onToggle }: SidebarProps) {
   useEffect(() => {
     fetchDocuments()
   }, [fetchDocuments])
+
+  // Load server conversations on mount
+  useEffect(() => {
+    loadServerConversations()
+  }, [loadServerConversations])
+
+  // Sync messages from server when switching sessions
+  useEffect(() => {
+    if (activeSessionId) {
+      syncSessionFromServer(activeSessionId)
+    }
+  }, [activeSessionId, syncSessionFromServer])
 
   const filteredDocs = docSearch
     ? documents.filter((d) =>

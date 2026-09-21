@@ -117,6 +117,11 @@ class UploadService:
 
         return True
 
+    def get_document_chunks_path(self, document_id: str) -> Path | None:
+        """Return path to chunks.json if it exists, else None."""
+        chunks_file = settings.upload_dir / document_id / "chunks.json"
+        return chunks_file if chunks_file.exists() else None
+
     def get_document_preview(self, document_id: str, max_chars: int = 2000) -> str | None:
         """Get a text preview of the document."""
         doc_dir = settings.upload_dir / document_id

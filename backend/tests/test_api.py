@@ -51,7 +51,7 @@ class TestHealthEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "healthy"
-        assert "model_configured" in data
+        assert "model" in data
         assert "embedding_model" in data
 
 
@@ -199,3 +199,65 @@ class TestEndToEnd:
         # Verify gone
         list_resp = client.get("/api/v1/documents")
         assert list_resp.json()["total"] == 0
+
+
+class TestConversationsEndpoint:
+    def test_list_empty(self, client: TestClient):
+        resp = client.get("/api/v1/conversations")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["conversations"] == []
+        assert data["total"] == 0
+
+    def test_create_and_get(self, client: TestClient):
+        resp = client.post(
+            "/api/v1/conversations",
+            json={"title": "Test conversation"},
+        )
+        assert resp.status_code == 200
+        conv = resp.json()
+        assert conv["title"] == "Test conversation"
+        cid = conv["conversation_id"]
+
+        # Get
+        get_resp = client.get(f"/api/v1/conversations/{cid}")
+        assert get_resp.status_code == 200
+        assert get_resp.json()["conversation_id"] == cid
+
+    def test_create_default_title(self, client: TestClient):
+        resp = client.post("/api/v1/conversations")
+        assert resp.status_code == 200
+        assert resp.json()["title"] == "New conversation"
+
+    def test_update_title(self, client: TestClient):
+        resp = client.post(
+            "/api/v1/conversations",
+            json={"title": "Original"},
+        )
+        cid = resp.json()["conversation_id"]
+
+        update_resp = client.patch(
+            f"/api/v1/conversations/{cid}",
+            json={"title": "Updated"},
+        )
+        assert update_resp.status_code == 200
+        assert update_resp.json()["title"] == "Updated"
+
+    def test_delete(self, client: TestClient):
+        resp = client.post("/api/v1/conversations")
+        cid = resp.json()["conversation_id"]
+
+        del_resp = client.delete(f"/api/v1/conversations/{cid}")
+        assert del_resp.status_code == 200
+
+        # Verify gone
+        get_resp = client.get(f"/api/v1/conversations/{cid}")
+        assert get_resp.status_code == 404
+
+    def test_get_nonexistent(self, client: TestClient):
+        resp = client.get("/api/v1/conversations/conv-nonexistent")
+        assert resp.status_code == 404
+
+    def test_delete_nonexistent(self, client: TestClient):
+        resp = client.delete("/api/v1/conversations/conv-nonexistent")
+        assert resp.status_code == 404
