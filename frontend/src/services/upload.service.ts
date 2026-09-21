@@ -26,3 +26,17 @@ export const listDocuments = async (): Promise<DocumentListResponse> => {
 export const deleteDocument = async (documentId: string): Promise<void> => {
   await api.delete(`/documents/${documentId}`)
 }
+
+export interface DocumentChunk {
+  content: string
+  chunk_id?: string
+  source?: string
+  page_number?: number
+  header?: string
+  [key: string]: unknown
+}
+
+export const getDocumentChunks = async (documentId: string): Promise<{ chunks: DocumentChunk[]; total: number }> => {
+  const res = await api.get<{ chunks: DocumentChunk[]; total: number }>(`/documents/${documentId}/chunks`)
+  return res.data
+}

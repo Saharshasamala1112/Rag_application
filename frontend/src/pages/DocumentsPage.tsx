@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { FileText, Upload, Grid3X3, List, Trash2 } from 'lucide-react'
 import { useDocumentStore } from '../store/document.store'
 import { useUpload } from '../hooks/useUpload'
@@ -115,22 +116,25 @@ export function DocumentsPage() {
         ) : view === 'grid' ? (
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {documents.map((doc) => (
-              <div
+              <Link
                 key={doc.document_id}
-                className="group relative rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors"
+                to={`/documents/${doc.document_id}`}
+                className="group relative rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors block"
               >
                 <div className="flex items-start justify-between mb-3">
                   <FileIconLarge extension={doc.filename.split('.').pop() || ''} />
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(doc.document_id)}
-                      className="p-1 rounded text-zinc-300 hover:text-red-500 dark:text-zinc-600 dark:hover:text-red-400 transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setDeleteTarget(doc.document_id)
+                    }}
+                    className="p-1 rounded text-zinc-300 hover:text-red-500 dark:text-zinc-600 dark:hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                    title="Delete"
+                  >
+                    <Trash2 size={13} />
+                  </button>
                 </div>
                 <p className="text-xs font-medium text-zinc-900 dark:text-zinc-100 truncate mb-1" title={doc.filename}>
                   {doc.filename}
@@ -138,14 +142,15 @@ export function DocumentsPage() {
                 <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
                   {doc.chunk_count} chunks · {new Date(doc.uploaded_at).toLocaleDateString()}
                 </p>
-              </div>
+              </Link>
             ))}
           </div>
         ) : (
           <div className="space-y-1">
             {documents.map((doc) => (
-              <div
+              <Link
                 key={doc.document_id}
+                to={`/documents/${doc.document_id}`}
                 className="group flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
               >
                 <FileIconLarge extension={doc.filename.split('.').pop() || ''} />
@@ -159,13 +164,17 @@ export function DocumentsPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setDeleteTarget(doc.document_id)}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setDeleteTarget(doc.document_id)
+                  }}
                   className="p-1.5 rounded text-zinc-300 hover:text-red-500 dark:text-zinc-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
                   title="Delete"
                 >
                   <Trash2 size={14} />
                 </button>
-              </div>
+              </Link>
             ))}
           </div>
         )}

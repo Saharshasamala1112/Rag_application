@@ -63,3 +63,24 @@ def document_preview(document_id: str) -> dict:
     if preview is None:
         raise HTTPException(status_code=404, detail="Document not found.")
     return {"document_id": document_id, "preview": preview}
+
+
+@router.get("/documents/{document_id}/chunks")
+def document_chunks(document_id: str) -> dict:
+    """Return all chunks for a document."""
+    chunks_path = upload_service.get_document_chunks_path(document_id)
+    if chunks_path is None:
+        raise HTTPException(status_code=404, detail="Document not found or no chunks.")
+
+    import json
+
+    try:
+        chunks = json.loads(chunks_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        raise HTTPException(status_code=500, detail="Failed to read chunks.")
+
+    return {
+        "document_id": document_id,
+        "chunks": chunks,
+        "total": len(chunks),
+    }
