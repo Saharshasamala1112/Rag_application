@@ -1,18 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
-import type { ChangeEvent } from 'react'
+import { useEffect, useState } from 'react'
 import {
   PanelLeft,
   Plus,
   FileText,
   ChevronDown,
   Trash2,
-  Upload,
-  Loader2,
   Search,
 } from 'lucide-react'
 import { useChatStore } from '../../store/chat.store'
 import { useDocumentStore } from '../../store/document.store'
-import { useUpload } from '../../hooks/useUpload'
 import { ThemeToggle } from '../ui/ThemeToggle'
 import { FileIcon } from '../ui/FileIcon'
 import { ConfirmationDialog } from '../ui/ConfirmationDialog'
@@ -65,19 +61,10 @@ export function Sidebar({ open, onClose, onToggle }: SidebarProps) {
   const setActiveDocument = useDocumentStore((s) => s.setActiveDocument)
   const removeDocument = useDocumentStore((s) => s.removeDocument)
 
-  const { upload, fetchDocuments } = useUpload()
-
   const [docsExpanded, setDocsExpanded] = useState(true)
   const [docSearch, setDocSearch] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [uploadProgress, setUploadProgress] = useState(0)
-
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    fetchDocuments()
-  }, [fetchDocuments])
 
   // Load server conversations on mount
   useEffect(() => {
@@ -96,31 +83,6 @@ export function Sidebar({ open, onClose, onToggle }: SidebarProps) {
         d.filename.toLowerCase().includes(docSearch.toLowerCase())
       )
     : documents
-
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploadProgress(10)
-    const timer = setInterval(() => {
-      setUploadProgress((p) => Math.min(p + 5, 90))
-    }, 300)
-    try {
-      const doc = await upload(file)
-      setUploadProgress(100)
-      setTimeout(() => {
-        setUploadProgress(0)
-        if (fileInputRef.current) fileInputRef.current.value = ''
-        if (doc) setActiveDocument(doc.document_id)
-        fetchDocuments()
-        toast.success('Document uploaded')
-      }, 500)
-    } catch {
-      setUploadProgress(0)
-      toast.error('Upload failed')
-    } finally {
-      clearInterval(timer)
-    }
-  }
 
   const handleDeleteDocument = async (documentId: string) => {
     setDeletingId(documentId)
@@ -161,15 +123,6 @@ export function Sidebar({ open, onClose, onToggle }: SidebarProps) {
         loading={!!deletingId}
         onConfirm={() => deleteConfirm && void handleDeleteDocument(deleteConfirm)}
         onCancel={() => setDeleteConfirm(null)}
-      />
-
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pdf,.doc,.docx,.txt,.md,.csv,.json,.html,.htm,.xml,.log,.py,.js,.ts,.java,.c,.cpp,.go,.rs,.rb,.php,.sh,.yaml,.yml,.toml,.ini,.cfg,.conf,.sql,.r,.swift,.kt,.scala,.tex,.bib,.rtf"
-        className="hidden"
-        onChange={handleFileChange}
       />
 
       {/* Sidebar panel */}
@@ -311,17 +264,6 @@ export function Sidebar({ open, onClose, onToggle }: SidebarProps) {
             <span className="text-[10px] text-zinc-300 dark:text-zinc-600 ml-auto mr-1">
               {documents.length}
             </span>
-            <button
-              type="button"
-              aria-label="Upload document"
-              onClick={(e) => {
-                e.stopPropagation()
-                fileInputRef.current?.click()
-              }}
-              className="p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-            >
-              <Upload size={12} />
-            </button>
           </button>
 
           {docsExpanded && (
@@ -337,24 +279,6 @@ export function Sidebar({ open, onClose, onToggle }: SidebarProps) {
                     placeholder="Search documents..."
                     className="w-full pl-6 pr-2 py-1.5 text-[11px] bg-zinc-100 dark:bg-zinc-800 border-0 rounded-md text-zinc-700 dark:text-zinc-300 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:ring-1 focus:ring-zinc-300 dark:focus:ring-zinc-600 transition-shadow"
                   />
-                </div>
-              )}
-
-              {/* Upload progress */}
-              {uploadProgress > 0 && (
-                <div className="px-2 py-1.5 mb-1">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Loader2 size={10} className="text-emerald-500 animate-spin" />
-                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400">
-                      {uploadProgress < 100 ? `Uploading... ${uploadProgress}%` : 'Processing...'}
-                    </span>
-                  </div>
-                  <div className="w-full h-1 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
-                  </div>
                 </div>
               )}
 
@@ -398,14 +322,7 @@ export function Sidebar({ open, onClose, onToggle }: SidebarProps) {
               {documents.length === 0 && (
                 <div className="px-2 py-4 text-center">
                   <FileText size={20} className="mx-auto mb-1.5 text-zinc-300 dark:text-zinc-600" />
-                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mb-2">No documents yet</p>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline"
-                  >
-                    Upload a document
-                  </button>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500">No documents yet</p>
                 </div>
               )}
             </div>
