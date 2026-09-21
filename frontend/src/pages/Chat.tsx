@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { DragEvent } from 'react'
+import { toast } from 'sonner'
+import { Paperclip } from 'lucide-react'
 import { useChat } from '../hooks/useChat'
 import { useUpload } from '../hooks/useUpload'
 import { useDocumentStore } from '../store/document.store'
@@ -18,14 +21,17 @@ export const Chat = () => {
     ask,
   } = useChat()
 
-  const { uploadTextContent, fetchDocuments } = useUpload()
+  const { upload, uploadTextContent, loading: uploading, fetchDocuments } = useUpload()
   const setActiveDocument = useDocumentStore((s) => s.setActiveDocument)
 
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [showSidebar, setShowSidebar] = useState(true)
+  const [isDragOver, setIsDragOver] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const [panelSources, setPanelSources] = useState<ChatSource[] | null>(null)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetchDocuments()
@@ -34,6 +40,45 @@ export const Chat = () => {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  const handleUpload = async () => {
+    if (!selectedFile) return
+    try {
+      const doc = await upload(selectedFile)
+      setSelectedFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      if (doc) {
+        setActiveDocument(doc.document_id)
+        toast.success(`Uploaded "${doc.filename}"`)
+      }
+      fetchDocuments()
+    } catch {
+      toast.error('Upload failed')
+    }
+  }
+
+  const handleDrop = useCallback(
+    (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragOver(false)
+      const file = e.dataTransfer.files[0]
+      if (file) setSelectedFile(file)
+    },
+    [],
+  )
+
+  const handleDragOver = useCallback((e: DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }, [])
 
   const handleSubmit = async () => {
     const q = inputValue.trim()
@@ -66,18 +111,57 @@ export const Chat = () => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-zinc-900">
+      {/* Drag overlay */}
+      {isDragOver && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-fade-in"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          role="region"
+          aria-label="Drop zone"
+        >
+          <div className="rounded-xl border-2 border-dashed border-emerald-400 bg-white dark:bg-zinc-800 px-12 py-10 text-center shadow-lg animate-scale-in">
+            <Paperclip size={36} className="mx-auto mb-3 text-emerald-500" />
+            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+              Drop your document here
+            </p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+              PDF, DOCX, TXT, MD, CSV, JSON, HTML, and more
+            </p>
+          </div>
+        </div>
+      )}
+
       <Sidebar
         open={showSidebar}
         onClose={() => setShowSidebar(false)}
         onToggle={() => setShowSidebar((prev) => !prev)}
       />
 
-      <main className="flex flex-1 flex-col min-w-0 relative">
+      <main
+        className="flex flex-1 flex-col min-w-0 relative"
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+      >
         <TopBar
           sidebarOpen={showSidebar}
           onToggleSidebar={() => setShowSidebar(true)}
           loading={loading}
           status={status}
+        />
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.doc,.docx,.txt,.md,.csv,.json,.html,.htm,.xml,.log,.py,.js,.ts,.java,.c,.cpp,.go,.rs,.rb,.php,.sh,.yaml,.yml,.toml,.ini,.cfg,.conf,.sql,.r,.swift,.kt,.scala,.tex,.bib,.rtf"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) setSelectedFile(file)
+          }}
         />
 
         <div
@@ -108,6 +192,11 @@ export const Chat = () => {
           onSubmit={handleSubmit}
           onKeyDown={handleKeyDown}
           loading={loading}
+          selectedFile={selectedFile}
+          onFileSelect={setSelectedFile}
+          uploading={uploading}
+          onUpload={handleUpload}
+          fileInputRef={fileInputRef}
         />
       </main>
 
