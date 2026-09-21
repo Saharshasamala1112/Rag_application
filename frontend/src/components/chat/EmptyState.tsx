@@ -16,7 +16,9 @@ const QUICK_PROMPTS = [
 
 export function EmptyState({ onSelectPrompt }: EmptyStateProps) {
   const documents = useDocumentStore((s) => s.documents)
+  const activeDocumentId = useDocumentStore((s) => s.activeDocumentId)
   const hasDocs = documents.length > 0
+  const activeDoc = documents.find((d) => d.document_id === activeDocumentId)
 
   return (
     <div className="flex h-full flex-col items-center justify-center text-center px-4 max-w-lg mx-auto">
@@ -24,12 +26,14 @@ export function EmptyState({ onSelectPrompt }: EmptyStateProps) {
         <MessageSquare size={22} className="text-zinc-400 dark:text-zinc-500" />
       </div>
       <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-1.5">
-        How can I help you today?
+        {activeDoc ? `Ask about "${activeDoc.filename}"` : 'How can I help you today?'}
       </h2>
       <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
-        {hasDocs
-          ? `Ask questions about your ${documents.length} document${documents.length !== 1 ? 's' : ''}`
-          : 'Upload documents to start asking questions'}
+        {activeDoc
+          ? `This document is selected — ask anything about it`
+          : hasDocs
+            ? `Ask questions about your ${documents.length} document${documents.length !== 1 ? 's' : ''}`
+            : 'Upload documents to start asking questions'}
       </p>
 
       {hasDocs ? (

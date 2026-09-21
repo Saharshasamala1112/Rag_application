@@ -47,9 +47,11 @@ export const Chat = () => {
       const doc = await upload(selectedFile)
       setSelectedFile(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
-      if (doc) setActiveDocument(doc.document_id)
+      if (doc) {
+        setActiveDocument(doc.document_id)
+        toast.success(`Uploaded "${doc.filename}" — ask a question about it`)
+      }
       fetchDocuments()
-      toast.success('Document uploaded')
     } catch {
       toast.error('Upload failed')
     }
