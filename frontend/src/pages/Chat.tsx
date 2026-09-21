@@ -132,6 +132,18 @@ export const Chat = () => {
         onToggle={() => setShowSidebar((prev) => !prev)}
       />
 
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.txt,.md,.csv,.json,.html,.htm,.xml,.log,.py,.js,.ts,.java,.c,.cpp,.go,.rs,.rb,.php,.sh,.yaml,.yml,.toml,.ini,.cfg,.conf,.sql,.r,.swift,.kt,.scala,.tex,.bib,.rtf"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) setSelectedFile(file)
+        }}
+      />
+
       {/* Main chat area */}
       <main
         className="flex flex-1 flex-col min-w-0 relative"
