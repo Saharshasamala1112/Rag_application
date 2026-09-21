@@ -6,27 +6,87 @@ export default {
   theme: {
     extend: {
       colors: {
-        surface: {
-          DEFAULT: '#ffffff',
-          secondary: '#f4f4f5',
-          tertiary: '#fafafa',
-          dark: '#27272a',
-          'dark-secondary': '#1f1f23',
-          'dark-tertiary': '#18181b',
+        // Application background
+        app: {
+          DEFAULT: '#F8F7F4',       // warm off-white light
+          dark: '#0A0A0A',          // near-black dark
         },
-        border: {
-          DEFAULT: '#e4e4e7',
-          dark: '#3f3f46',
-          'dark-strong': '#52525b',
+        // Surface (cards, panels)
+        surface: {
+          DEFAULT: '#FFFFFF',       // white light
+          secondary: '#F5F5F4',     // stone-100 light
+          elevated: '#FAFAF9',      // stone-50 light
+          dark: '#111111',          // dark surface
+          'dark-elevated': '#181818', // dark elevated
+          'dark-hover': '#1F1F1F',  // dark hover
+        },
+        // Borders
+        edge: {
+          DEFAULT: '#E7E5E4',       // stone-200 light
+          strong: '#D6D3D1',        // stone-300 light
+          dark: '#262626',          // dark border
+          'dark-strong': '#333333', // dark strong border
+        },
+        // Text
+        fg: {
+          DEFAULT: '#1C1917',       // stone-900 light
+          secondary: '#78716C',     // stone-500 light
+          tertiary: '#A8A29E',      // stone-400 light
+          muted: '#D6D3D1',         // stone-300 light
+          dark: '#F5F5F5',          // light text dark
+          'dark-secondary': '#A1A1AA', // zinc-400 dark
+          'dark-tertiary': '#71717A', // zinc-500 dark
+        },
+        // Accent — restrained teal/slate
+        accent: {
+          DEFAULT: '#0F766E',       // teal-700
+          hover: '#115E59',         // teal-800
+          subtle: '#F0FDFA',        // teal-50
+          'dark': '#2DD4BF',        // teal-400 dark
+          'dark-hover': '#5EEAD4',  // teal-300 dark
+          'dark-subtle': '#042F2E', // teal-950 dark
+        },
+        // Status
+        danger: {
+          DEFAULT: '#DC2626',
+          hover: '#B91C1C',
+          subtle: '#FEF2F2',
+          dark: '#F87171',
+          'dark-subtle': '#450A0A',
+        },
+        success: {
+          DEFAULT: '#16A34A',
+          subtle: '#F0FDF4',
+          dark: '#4ADE80',
+          'dark-subtle': '#052E16',
+        },
+        warning: {
+          DEFAULT: '#D97706',
+          subtle: '#FFFBEB',
+          dark: '#FBBF24',
+          'dark-subtle': '#451A03',
         },
       },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+      },
+      fontSize: {
+        '2xs': ['0.6875rem', { lineHeight: '1rem' }],
+      },
       boxShadow: {
-        xs: '0 1px 2px rgba(0,0,0,0.04)',
-        sm: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
-        md: '0 4px 6px -1px rgba(0,0,0,0.06), 0 2px 4px -2px rgba(0,0,0,0.04)',
-        lg: '0 10px 15px -3px rgba(0,0,0,0.06), 0 4px 6px -4px rgba(0,0,0,0.04)',
-        'dark-sm': '0 1px 3px rgba(0,0,0,0.2)',
-        'dark-md': '0 4px 6px -1px rgba(0,0,0,0.3)',
+        'xs': '0 1px 2px rgba(0,0,0,0.03)',
+        'sm': '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)',
+        'md': '0 4px 6px -1px rgba(0,0,0,0.04), 0 2px 4px -2px rgba(0,0,0,0.03)',
+        'lg': '0 10px 15px -3px rgba(0,0,0,0.04), 0 4px 6px -4px rgba(0,0,0,0.03)',
+        'panel': '0 1px 3px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.02)',
+        'dark-sm': '0 1px 3px rgba(0,0,0,0.3)',
+        'dark-md': '0 4px 6px -1px rgba(0,0,0,0.4)',
+        'dark-lg': '0 10px 15px -3px rgba(0,0,0,0.5)',
+      },
+      borderRadius: {
+        'xl': '0.75rem',
+        '2xl': '1rem',
       },
       animation: {
         'fade-in': 'fade-in 0.15s ease-out',

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Sun, Moon, Monitor } from 'lucide-react'
+import { cn } from '../../lib/utils'
+import { Tooltip } from './Tooltip'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -22,11 +24,17 @@ function resolveDark(mode: ThemeMode): boolean {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
+const MODE_LABELS: Record<ThemeMode, string> = {
+  light: 'Light mode',
+  dark: 'Dark mode',
+  system: 'System theme',
+}
+
 interface ThemeToggleProps {
   collapsed?: boolean
 }
 
-export function ThemeToggle({ collapsed = false }: ThemeToggleProps) {
+export function ThemeToggle({ collapsed }: ThemeToggleProps) {
   const [mode, setMode] = useState<ThemeMode>(getInitialMode)
 
   useEffect(() => {
@@ -47,37 +55,35 @@ export function ThemeToggle({ collapsed = false }: ThemeToggleProps) {
   }
 
   const icon = mode === 'system' ? (
-    <Monitor size={15} />
+    <Monitor size={14} />
   ) : mode === 'dark' ? (
-    <Sun size={15} />
+    <Sun size={14} />
   ) : (
-    <Moon size={15} />
+    <Moon size={14} />
   )
 
-  if (collapsed) {
-    return (
-      <button
-        type="button"
-        onClick={cycle}
-        aria-label={`Theme: ${mode}. Click to cycle.`}
-        className="flex items-center justify-center w-8 h-8 rounded-md text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-        title={`Theme: ${mode}`}
-      >
-        {icon}
-      </button>
-    )
-  }
-
-  return (
+  const button = (
     <button
       type="button"
       onClick={cycle}
-      aria-label={`Theme: ${mode}. Click to cycle.`}
-      className="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-md text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-      title={`Theme: ${mode}`}
+      aria-label={MODE_LABELS[mode]}
+      className={cn(
+        'flex items-center justify-center rounded-md transition-colors',
+        'text-fg-tertiary hover:text-fg hover:bg-surface-secondary',
+        'dark:text-fg-dark-tertiary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated',
+        collapsed ? 'w-8 h-8' : 'w-full h-8 px-2.5 gap-2 justify-start',
+      )}
     >
       {icon}
-      <span className="capitalize">{mode}</span>
+      {!collapsed && (
+        <span className="text-xs capitalize">{mode}</span>
+      )}
     </button>
   )
+
+  if (collapsed) {
+    return <Tooltip content={MODE_LABELS[mode]} side="right">{button}</Tooltip>
+  }
+
+  return button
 }

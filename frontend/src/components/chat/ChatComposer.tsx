@@ -40,14 +40,13 @@ export function ChatComposer({
   return (
     <div className="px-4 pb-4 pt-2">
       <div className="max-w-[800px] mx-auto">
-        {/* File preview chip */}
         {selectedFile && (
-          <div className="mb-2 flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 px-3 py-2 animate-scale-in">
+          <div className="mb-2 flex items-center gap-2 rounded-lg border border-edge dark:border-edge-dark bg-surface-secondary dark:bg-surface-dark-elevated px-3 py-2 animate-scale-in">
             <FileIcon type={selectedFile.name.split('.').pop() || ''} />
-            <span className="text-xs text-zinc-700 dark:text-zinc-300 truncate flex-1">
+            <span className="text-xs text-fg-secondary dark:text-fg-dark-secondary truncate flex-1">
               {selectedFile.name}
             </span>
-            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 shrink-0">
+            <span className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary shrink-0">
               {(selectedFile.size / 1024).toFixed(1)} KB
             </span>
             <button
@@ -57,7 +56,7 @@ export function ChatComposer({
                 onFileSelect(null)
                 if (fileInputRef.current) fileInputRef.current.value = ''
               }}
-              className="p-0.5 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+              className="p-0.5 rounded text-fg-tertiary hover:text-fg dark:hover:text-fg-dark-secondary transition-colors"
             >
               <X size={12} />
             </button>
@@ -66,21 +65,20 @@ export function ChatComposer({
               aria-label="Upload document"
               onClick={onUpload}
               disabled={uploading}
-              className="rounded-md bg-zinc-900 dark:bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-40 transition-colors"
+              className="rounded-md bg-fg dark:bg-fg-dark px-2.5 py-1 text-[11px] font-medium text-app dark:text-app-dark hover:opacity-90 disabled:opacity-40 transition-opacity"
             >
               {uploading ? <Loader2 size={11} className="animate-spin" /> : 'Upload'}
             </button>
           </div>
         )}
 
-        {/* Composer input */}
-        <div className="flex items-end gap-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/80 p-1.5 focus-within:border-zinc-400 dark:focus-within:border-zinc-500 focus-within:shadow-sm transition-all">
+        <div className="flex items-end gap-1.5 rounded-xl border border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark p-1.5 focus-within:border-fg-muted dark:focus-within:border-fg-dark-tertiary focus-within:shadow-sm transition-all">
           <button
             type="button"
             aria-label="Attach file"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="shrink-0 p-2 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 disabled:opacity-40 transition-colors"
+            className="shrink-0 p-2 rounded-lg text-fg-tertiary hover:text-fg hover:bg-surface-secondary dark:text-fg-dark-tertiary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated disabled:opacity-40 transition-colors"
           >
             <Paperclip size={16} />
           </button>
@@ -91,7 +89,7 @@ export function ChatComposer({
             onKeyDown={onKeyDown}
             placeholder="Type your message..."
             rows={1}
-            className="flex-1 resize-none border-0 bg-transparent px-1 py-2 text-sm text-zinc-900 dark:text-zinc-100 outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500 min-h-[36px] max-h-[200px]"
+            className="flex-1 resize-none border-0 bg-transparent px-1 py-2 text-sm text-fg dark:text-fg-dark outline-none placeholder:text-fg-tertiary dark:placeholder:text-fg-dark-tertiary min-h-[36px] max-h-[200px]"
             aria-label="Message input"
           />
           <button
@@ -101,14 +99,14 @@ export function ChatComposer({
             disabled={!canSend}
             className={`shrink-0 p-2 rounded-lg transition-all ${
               canSend
-                ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 active:scale-95'
-                : 'text-zinc-300 dark:text-zinc-600 cursor-not-allowed'
+                ? 'bg-fg dark:bg-fg-dark text-app dark:text-app-dark hover:opacity-90 active:scale-95'
+                : 'text-fg-muted dark:text-fg-dark-tertiary cursor-not-allowed'
             }`}
           >
             <Send size={16} />
           </button>
         </div>
-        <p className="text-center text-[10px] text-zinc-300 dark:text-zinc-600 mt-1.5">
+        <p className="text-center text-2xs text-fg-muted dark:text-fg-dark-tertiary mt-1.5">
           Enter to send · Shift+Enter for new line · Attach files with paperclip
         </p>
       </div>

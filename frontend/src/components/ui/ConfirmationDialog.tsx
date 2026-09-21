@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
+import { cn } from '../../lib/utils'
 
 interface ConfirmationDialogProps {
   open: boolean
@@ -55,21 +56,25 @@ export function ConfirmationDialog({
         aria-modal="true"
         aria-labelledby="dialog-title"
         aria-describedby="dialog-desc"
-        className="relative z-10 w-full max-w-sm mx-4 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg animate-scale-in"
+        className={cn(
+          'relative z-10 w-full max-w-sm mx-4 rounded-xl shadow-lg animate-scale-in',
+          'bg-surface border border-edge',
+          'dark:bg-surface-dark dark:border-edge-dark',
+        )}
       >
         <div className="flex items-start justify-between p-5 pb-0">
           <div className="flex-1">
-            <h3 id="dialog-title" className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            <h3 id="dialog-title" className="text-sm font-semibold text-fg dark:text-fg-dark">
               {title}
             </h3>
-            <p id="dialog-desc" className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+            <p id="dialog-desc" className="mt-1.5 text-xs text-fg-secondary dark:text-fg-dark-secondary leading-relaxed">
               {description}
             </p>
           </div>
           <button
             type="button"
             onClick={onCancel}
-            className="p-1 -mt-0.5 -mr-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+            className="p-1 -mt-0.5 -mr-1 rounded-md text-fg-tertiary hover:text-fg hover:bg-surface-secondary dark:text-fg-dark-tertiary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated transition-colors"
             aria-label="Close dialog"
           >
             <X size={14} />
@@ -80,7 +85,7 @@ export function ConfirmationDialog({
             ref={cancelRef}
             type="button"
             onClick={onCancel}
-            className="px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+            className="px-3 py-1.5 text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary rounded-md hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated transition-colors"
           >
             {cancelLabel}
           </button>
@@ -88,11 +93,12 @@ export function ConfirmationDialog({
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            className={`px-3 py-1.5 text-xs font-medium text-white rounded-md transition-colors disabled:opacity-50 ${
+            className={cn(
+              'px-3 py-1.5 text-xs font-medium text-white rounded-md transition-colors disabled:opacity-50',
               variant === 'danger'
-                ? 'bg-red-600 hover:bg-red-500'
-                : 'bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-zinc-300'
-            }`}
+                ? 'bg-danger hover:bg-danger-hover dark:bg-danger dark:hover:bg-danger-hover'
+                : 'bg-fg hover:opacity-90 dark:bg-fg-dark dark:text-app-dark',
+            )}
           >
             {loading ? 'Deleting...' : confirmLabel}
           </button>

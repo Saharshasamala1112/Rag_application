@@ -1,17 +1,17 @@
 import { FileText } from 'lucide-react'
 
-const TYPE_COLORS: Record<string, { bg: string; text: string; darkBg: string; darkText: string }> = {
-  pdf:  { bg: 'bg-red-50', text: 'text-red-600', darkBg: 'dark:bg-red-950/40', darkText: 'dark:text-red-400' },
-  doc:  { bg: 'bg-blue-50', text: 'text-blue-600', darkBg: 'dark:bg-blue-950/40', darkText: 'dark:text-blue-400' },
-  docx: { bg: 'bg-blue-50', text: 'text-blue-600', darkBg: 'dark:bg-blue-950/40', darkText: 'dark:text-blue-400' },
-  txt:  { bg: 'bg-zinc-100', text: 'text-zinc-600', darkBg: 'dark:bg-zinc-800', darkText: 'dark:text-zinc-400' },
-  md:   { bg: 'bg-violet-50', text: 'text-violet-600', darkBg: 'dark:bg-violet-950/40', darkText: 'dark:text-violet-400' },
-  csv:  { bg: 'bg-emerald-50', text: 'text-emerald-600', darkBg: 'dark:bg-emerald-950/40', darkText: 'dark:text-emerald-400' },
-  json: { bg: 'bg-amber-50', text: 'text-amber-600', darkBg: 'dark:bg-amber-950/40', darkText: 'dark:text-amber-400' },
-  html: { bg: 'bg-orange-50', text: 'text-orange-600', darkBg: 'dark:bg-orange-950/40', darkText: 'dark:text-orange-400' },
+const TYPE_COLORS: Record<string, { bg: string; text: string }> = {
+  pdf:  { bg: 'bg-danger-subtle dark:bg-danger-dark-subtle', text: 'text-danger dark:text-danger-dark' },
+  doc:  { bg: 'bg-accent-subtle dark:bg-accent-dark-subtle', text: 'text-accent dark:text-accent-dark' },
+  docx: { bg: 'bg-accent-subtle dark:bg-accent-dark-subtle', text: 'text-accent dark:text-accent-dark' },
+  txt:  { bg: 'bg-surface-secondary dark:bg-surface-dark-elevated', text: 'text-fg-secondary dark:text-fg-dark-secondary' },
+  md:   { bg: 'bg-surface-secondary dark:bg-surface-dark-elevated', text: 'text-accent dark:text-accent-dark' },
+  csv:  { bg: 'bg-success-subtle dark:bg-success-dark-subtle', text: 'text-success dark:text-success-dark' },
+  json: { bg: 'bg-warning-subtle dark:bg-warning-dark-subtle', text: 'text-warning dark:text-warning-dark' },
+  html: { bg: 'bg-surface-secondary dark:bg-surface-dark-elevated', text: 'text-fg-secondary dark:text-fg-dark-secondary' },
 }
 
-const DEFAULT_COLOR = { bg: 'bg-zinc-100', text: 'text-zinc-500', darkBg: 'dark:bg-zinc-800', darkText: 'dark:text-zinc-400' }
+const DEFAULT_COLOR = { bg: 'bg-surface-secondary dark:bg-surface-dark-elevated', text: 'text-fg-tertiary dark:text-fg-dark-tertiary' }
 
 function getColor(type: string) {
   const ext = type.replace('.', '').toLowerCase()
@@ -33,19 +33,25 @@ export function FileIcon({ type, size = 'sm' }: FileIconProps) {
 
   return (
     <span
-      className={`inline-flex items-center justify-center rounded font-bold uppercase ${sizeClasses} ${color.bg} ${color.text} ${color.darkBg} ${color.darkText}`}
+      className={`inline-flex items-center justify-center rounded font-bold uppercase ${sizeClasses} ${color.bg} ${color.text}`}
     >
       {getExtLabel(type)}
     </span>
   )
 }
 
-export function FileIconLarge({ type }: { type: string }) {
-  const color = getColor(type)
+interface FileIconLargeProps {
+  type?: string
+  extension?: string
+}
+
+export function FileIconLarge({ type, extension }: FileIconLargeProps) {
+  const ext = extension || type || ''
+  const color = getColor(ext)
 
   return (
-    <div className={`inline-flex items-center justify-center w-10 h-10 rounded-lg ${color.bg} ${color.darkBg}`}>
-      <FileText size={18} className={`${color.text} ${color.darkText}`} />
+    <div className={`inline-flex items-center justify-center w-10 h-10 rounded-lg ${color.bg}`}>
+      <FileText size={18} className={color.text} />
     </div>
   )
 }

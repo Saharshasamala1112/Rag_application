@@ -1,7 +1,9 @@
+import { cn } from '../../lib/utils'
+
 export function Skeleton({ className = '' }: { className?: string }) {
   return (
     <div
-      className={`animate-pulse rounded-md bg-zinc-200 dark:bg-zinc-700 ${className}`}
+      className={cn('animate-pulse rounded-md bg-surface-secondary dark:bg-surface-dark-elevated', className)}
       aria-hidden="true"
     />
   )
@@ -36,7 +38,7 @@ export function MessageSkeleton() {
 
 export function SourceCardSkeleton() {
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3 space-y-2">
+    <div className="rounded-lg border border-edge dark:border-edge-dark p-3 space-y-2">
       <Skeleton className="h-3.5 w-2/3" />
       <Skeleton className="h-3 w-1/3" />
       <Skeleton className="h-3 w-full" />

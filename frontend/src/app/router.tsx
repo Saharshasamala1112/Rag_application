@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { App } from '../App'
-import { AppLayout } from './AppLayout'
+import { AppShell } from './AppShell'
 import { Chat } from '../pages/Chat'
 import { DocumentsPage } from '../pages/DocumentsPage'
 import { DocumentDetailPage } from '../pages/DocumentDetailPage'
@@ -15,7 +15,7 @@ export const router = createBrowserRouter([
     element: <App />,
     children: [
       {
-        element: <AppLayout />,
+        element: <AppShell />,
         children: [
           { index: true, element: <Chat /> },
           { path: 'documents', element: <DocumentsPage /> },

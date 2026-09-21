@@ -6,7 +6,7 @@ const STEP_CONFIG: Record<string, { icon: typeof Search; label: string; color: s
   retrieval: { icon: Search, label: 'Retrieval', color: 'text-blue-500 dark:text-blue-400' },
   reranking: { icon: ArrowUpDown, label: 'Reranking', color: 'text-purple-500 dark:text-purple-400' },
   context: { icon: LayoutGrid, label: 'Context Assembly', color: 'text-amber-500 dark:text-amber-400' },
-  generation: { icon: MessageSquare, label: 'Generation', color: 'text-emerald-500 dark:text-emerald-400' },
+  generation: { icon: MessageSquare, label: 'Generation', color: 'text-emerald-600 dark:text-emerald-400' },
 }
 
 function StepCard({ step }: { step: RagTraceStep }) {
@@ -14,48 +14,48 @@ function StepCard({ step }: { step: RagTraceStep }) {
   const Icon = config.icon
 
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-3">
+    <div className="rounded-lg border border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark p-3">
       <div className="flex items-center gap-2 mb-2">
-        <div className="flex items-center justify-center w-5 h-5 rounded bg-zinc-100 dark:bg-zinc-700">
+        <div className="flex items-center justify-center w-5 h-5 rounded bg-surface-secondary dark:bg-surface-dark-elevated">
           <Icon size={11} className={config.color} />
         </div>
-        <span className="text-[10px] font-semibold text-zinc-700 dark:text-zinc-300">
+        <span className="text-2xs font-semibold text-fg-secondary dark:text-fg-dark-secondary">
           {config.label}
         </span>
-        <span className="ml-auto flex items-center gap-1 text-[10px] text-zinc-400 dark:text-zinc-500">
+        <span className="ml-auto flex items-center gap-1 text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
           <Clock size={9} />
           {step.timing_ms.toFixed(0)}ms
         </span>
       </div>
       <div className="space-y-1">
         {step.chunks_found != null && (
-          <div className="flex justify-between text-[10px]">
-            <span className="text-zinc-400 dark:text-zinc-500">Chunks found</span>
-            <span className="text-zinc-600 dark:text-zinc-300 font-medium">{step.chunks_found}</span>
+          <div className="flex justify-between text-2xs">
+            <span className="text-fg-tertiary dark:text-fg-dark-tertiary">Chunks found</span>
+            <span className="text-fg-secondary dark:text-fg-dark-secondary font-medium">{step.chunks_found}</span>
           </div>
         )}
         {step.documents_searched != null && (
-          <div className="flex justify-between text-[10px]">
-            <span className="text-zinc-400 dark:text-zinc-500">Documents</span>
-            <span className="text-zinc-600 dark:text-zinc-300 font-medium">{step.documents_searched}</span>
+          <div className="flex justify-between text-2xs">
+            <span className="text-fg-tertiary dark:text-fg-dark-tertiary">Documents</span>
+            <span className="text-fg-secondary dark:text-fg-dark-secondary font-medium">{step.documents_searched}</span>
           </div>
         )}
         {step.chunks_after_rerank != null && (
-          <div className="flex justify-between text-[10px]">
-            <span className="text-zinc-400 dark:text-zinc-500">After rerank</span>
-            <span className="text-zinc-600 dark:text-zinc-300 font-medium">{step.chunks_after_rerank}</span>
+          <div className="flex justify-between text-2xs">
+            <span className="text-fg-tertiary dark:text-fg-dark-tertiary">After rerank</span>
+            <span className="text-fg-secondary dark:text-fg-dark-secondary font-medium">{step.chunks_after_rerank}</span>
           </div>
         )}
         {step.context_chars != null && (
-          <div className="flex justify-between text-[10px]">
-            <span className="text-zinc-400 dark:text-zinc-500">Context size</span>
-            <span className="text-zinc-600 dark:text-zinc-300 font-medium">{step.context_chars.toLocaleString()} chars</span>
+          <div className="flex justify-between text-2xs">
+            <span className="text-fg-tertiary dark:text-fg-dark-tertiary">Context size</span>
+            <span className="text-fg-secondary dark:text-fg-dark-secondary font-medium">{step.context_chars.toLocaleString()} chars</span>
           </div>
         )}
         {step.sources_count != null && (
-          <div className="flex justify-between text-[10px]">
-            <span className="text-zinc-400 dark:text-zinc-500">Sources used</span>
-            <span className="text-zinc-600 dark:text-zinc-300 font-medium">{step.sources_count}</span>
+          <div className="flex justify-between text-2xs">
+            <span className="text-fg-tertiary dark:text-fg-dark-tertiary">Sources used</span>
+            <span className="text-fg-secondary dark:text-fg-dark-secondary font-medium">{step.sources_count}</span>
           </div>
         )}
       </div>
@@ -70,10 +70,10 @@ export function RagTracePanel() {
   if (!lastAssistant) {
     return (
       <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800">
-          <Layers size={18} className="text-zinc-400" />
+        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-surface-secondary dark:bg-surface-dark-elevated">
+          <Layers size={18} className="text-fg-tertiary dark:text-fg-dark-tertiary" />
         </div>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="text-xs text-fg-secondary dark:text-fg-dark-secondary">
           Send a message to see the RAG retrieval trace
         </p>
       </div>
@@ -88,18 +88,18 @@ export function RagTracePanel() {
       {/* Trace steps */}
       {trace && trace.steps.length > 0 && (
         <div>
-          <h4 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2">
+          <h4 className="text-2xs font-semibold uppercase tracking-wider text-fg-tertiary dark:text-fg-dark-tertiary mb-2">
             Pipeline
           </h4>
           <div className="space-y-2">
             {trace.steps.map((step, i) => (
-              <StepCard key={`${step.step}-${i}`} step={step} index={i} />
+              <StepCard key={`${step.step}-${i}`} step={step} />
             ))}
           </div>
           {trace.total_time_ms != null && (
             <div className="flex items-center justify-between mt-2 px-1">
-              <span className="text-[10px] text-zinc-400 dark:text-zinc-500">Total</span>
-              <span className="text-[10px] font-medium text-zinc-600 dark:text-zinc-300">
+              <span className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">Total</span>
+              <span className="text-2xs font-medium text-fg-secondary dark:text-fg-dark-secondary">
                 {trace.total_time_ms.toFixed(0)}ms
               </span>
             </div>
@@ -109,39 +109,39 @@ export function RagTracePanel() {
 
       {/* Sources */}
       <div>
-        <h4 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2">
+        <h4 className="text-2xs font-semibold uppercase tracking-wider text-fg-tertiary dark:text-fg-dark-tertiary mb-2">
           Sources ({sources.length})
         </h4>
         {sources.length === 0 ? (
-          <p className="text-xs text-zinc-400 dark:text-zinc-500 italic">No sources retrieved</p>
+          <p className="text-xs text-fg-tertiary dark:text-fg-dark-tertiary italic">No sources retrieved</p>
         ) : (
           <div className="space-y-2">
             {sources.map((src, i) => (
               <div
                 key={`${src.chunk_id}-${i}`}
-                className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-3"
+                className="rounded-lg border border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark p-3"
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                  <span className="text-2xs font-medium text-accent dark:text-accent-dark">
                     #{i + 1}
                   </span>
                   {src.score != null && (
                     <div className="flex items-center gap-1.5">
-                      <div className="w-12 h-1 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
+                      <div className="w-12 h-1 rounded-full bg-surface-secondary dark:bg-surface-dark-elevated overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-emerald-500"
+                          className="h-full rounded-full bg-accent dark:bg-accent-dark"
                           style={{ width: `${Math.min(src.score, 100)}%` }}
                         />
                       </div>
-                      <span className="text-[10px] text-zinc-400">{src.score.toFixed(0)}%</span>
+                      <span className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">{src.score.toFixed(0)}%</span>
                     </div>
                   )}
                 </div>
-                <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed line-clamp-3">
+                <p className="text-xs text-fg-secondary dark:text-fg-dark-secondary leading-relaxed line-clamp-3">
                   {src.content}
                 </p>
                 {src.source && (
-                  <p className="mt-1.5 text-[10px] text-zinc-400 dark:text-zinc-500 truncate">
+                  <p className="mt-1.5 text-2xs text-fg-tertiary dark:text-fg-dark-tertiary truncate">
                     {src.source}
                     {src.page_number != null ? ` · p.${src.page_number}` : ''}
                   </p>

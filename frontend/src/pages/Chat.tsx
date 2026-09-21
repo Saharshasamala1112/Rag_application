@@ -9,14 +9,15 @@ import { useDocumentStore } from '../store/document.store'
 import { MessageBubble } from '../components/chat/MessageBubble'
 import { EmptyState } from '../components/chat/EmptyState'
 import { ChatComposer } from '../components/chat/ChatComposer'
+import { Badge } from '../components/ui/Badge'
 
 interface LayoutContext {
-  rightPanelOpen: boolean
-  toggleRightPanel: () => void
+  contextPanelOpen: boolean
+  toggleContextPanel: () => void
 }
 
 export const Chat = () => {
-  const { rightPanelOpen, toggleRightPanel } = useOutletContext<LayoutContext>()
+  const { contextPanelOpen, toggleContextPanel } = useOutletContext<LayoutContext>()
 
   const {
     messages,
@@ -119,12 +120,12 @@ export const Chat = () => {
           role="region"
           aria-label="Drop zone"
         >
-          <div className="rounded-xl border-2 border-dashed border-emerald-400 bg-white dark:bg-zinc-800 px-12 py-10 text-center shadow-lg animate-scale-in">
-            <Paperclip size={36} className="mx-auto mb-3 text-emerald-500" />
-            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+          <div className="rounded-xl border-2 border-dashed border-accent bg-surface dark:bg-surface-dark px-12 py-10 text-center shadow-lg animate-scale-in">
+            <Paperclip size={36} className="mx-auto mb-3 text-accent dark:text-accent-dark" />
+            <p className="text-sm font-medium text-fg dark:text-fg-dark">
               Drop your document here
             </p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            <p className="text-xs text-fg-secondary dark:text-fg-dark-secondary mt-1">
               PDF, DOCX, TXT, MD, CSV, JSON, HTML, and more
             </p>
           </div>
@@ -132,31 +133,31 @@ export const Chat = () => {
       )}
 
       {/* Chat header */}
-      <div className="flex items-center justify-between px-4 h-12 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+      <div className="flex items-center justify-between px-4 h-12 border-b border-edge dark:border-edge-dark shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           {activeDoc ? (
             <>
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[10px] font-medium truncate max-w-[200px]">
+              <Badge variant="accent" className="max-w-[200px] truncate">
                 <span className="truncate">{activeDoc.filename}</span>
-              </span>
+              </Badge>
               {loading && status && (
-                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 animate-pulse">
+                <span className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary animate-pulse">
                   {status}
                 </span>
               )}
             </>
           ) : (
-            <span className="text-xs text-zinc-400 dark:text-zinc-500">New conversation</span>
+            <span className="text-xs text-fg-tertiary dark:text-fg-dark-tertiary">New conversation</span>
           )}
         </div>
         <button
           type="button"
-          onClick={toggleRightPanel}
-          className="flex items-center justify-center w-7 h-7 rounded-md text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-          aria-label={rightPanelOpen ? 'Close trace panel' : 'Open trace panel'}
+          onClick={toggleContextPanel}
+          className="flex items-center justify-center w-7 h-7 rounded-md text-fg-tertiary hover:text-fg hover:bg-surface-secondary dark:text-fg-dark-tertiary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated transition-colors"
+          aria-label={contextPanelOpen ? 'Close trace panel' : 'Open trace panel'}
           title="RAG Trace"
         >
-          {rightPanelOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+          {contextPanelOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
         </button>
       </div>
 
