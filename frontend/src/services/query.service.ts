@@ -1,5 +1,5 @@
 import api from '../lib/axios'
-import type { QueryRequest, QueryResponse } from '../types/chat'
+import type { QueryRequest, QueryResponse, RagTraceStep } from '../types/chat'
 
 export const queryDocuments = async (payload: QueryRequest): Promise<QueryResponse> => {
   const res = await api.post<QueryResponse>('/query', payload)
@@ -11,7 +11,8 @@ export const queryDocumentsStream = async (
   onToken: (token: string) => void,
   onSources: (sources: QueryResponse['sources']) => void,
   onStatus: (status: string) => void,
-  onDone: () => void,
+  onTrace: (step: RagTraceStep) => void,
+  onDone: (totalTimeMs?: number) => void,
   onError: (error: string) => void,
 ): Promise<void> => {
   const controller = new AbortController()
@@ -65,8 +66,10 @@ export const queryDocumentsStream = async (
               onSources(event.content)
             } else if (event.type === 'status') {
               onStatus(event.content)
+            } else if (event.type === 'trace') {
+              onTrace(event.content)
             } else if (event.type === 'done') {
-              onDone()
+              onDone(event.total_time_ms)
               return
             } else if (event.type === 'error') {
               onError(event.content)

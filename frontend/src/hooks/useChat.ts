@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { queryDocumentsStream } from '../services/query.service'
 import { useChatStore } from '../store/chat.store'
 import { useDocumentStore } from '../store/document.store'
-import type { ChatMessage, ChatSource } from '../types/chat'
+import type { ChatMessage, ChatSource, RagTraceStep } from '../types/chat'
 
 export const useChat = () => {
   const sessions = useChatStore((state) => state.sessions)
@@ -12,6 +12,7 @@ export const useChat = () => {
   const addAssistantMessage = useChatStore((state) => state.addAssistantMessage)
   const updateAssistantMessage = useChatStore((state) => state.updateAssistantMessage)
   const setStreamingSources = useChatStore((state) => state.setStreamingSources)
+  const setTrace = useChatStore((state) => state.setTrace)
   const finishStreaming = useChatStore((state) => state.finishStreaming)
   const clearMessages = useChatStore((state) => state.clearMessages)
   const createSession = useChatStore((state) => state.createSession)
@@ -53,6 +54,8 @@ export const useChat = () => {
     }
     addAssistantMessage(assistantMessage)
 
+    const traceSteps: RagTraceStep[] = []
+
     try {
       await queryDocumentsStream(
         {
@@ -74,7 +77,14 @@ export const useChat = () => {
         (statusMsg: string) => {
           setStatus(statusMsg)
         },
-        () => {
+        (step: RagTraceStep) => {
+          traceSteps.push(step)
+          setTrace(assistantId, { steps: [...traceSteps] })
+        },
+        (totalTimeMs?: number) => {
+          if (traceSteps.length > 0) {
+            setTrace(assistantId, { steps: [...traceSteps], total_time_ms: totalTimeMs })
+          }
           finishStreaming(assistantId)
           setLoading(false)
           setStatus(null)
@@ -95,7 +105,7 @@ export const useChat = () => {
       setLoading(false)
       setStatus(null)
     }
-  }, [activeDocumentId, addUserMessage, addAssistantMessage, updateAssistantMessage, setStreamingSources, finishStreaming, getServerConversationId])
+  }, [activeDocumentId, addUserMessage, addAssistantMessage, updateAssistantMessage, setStreamingSources, setTrace, finishStreaming, getServerConversationId])
 
   return {
     messages,

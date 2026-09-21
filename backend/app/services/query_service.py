@@ -216,15 +216,30 @@ class QueryService:
 
         top_k = request.top_k or settings.final_top_k
 
+        retrieval_start = time.perf_counter()
+
         results = self.retriever.retrieve(
             question=request.question,
             document_dirs=document_dirs,
             top_k=settings.retrieval_top_k,
         )
 
+        retrieval_time_ms = round((time.perf_counter() - retrieval_start) * 1000, 1)
+
         if not results:
             yield {"type": "error", "content": "No relevant information found in the documents."}
             return
+
+        # Trace: retrieval complete
+        yield {
+            "type": "trace",
+            "content": {
+                "step": "retrieval",
+                "timing_ms": retrieval_time_ms,
+                "chunks_found": len(results),
+                "documents_searched": len(document_dirs),
+            },
+        }
 
         # Progress: processing
         yield {"type": "status", "content": "Processing and ranking results..."}
@@ -232,16 +247,40 @@ class QueryService:
         # Deduplicate
         results = self._deduplicate_chunks(results)
 
+        rerank_time_ms = 0.0
         if request.use_reranking and len(results) > top_k:
+            rerank_start = time.perf_counter()
             results = self.reranker.rerank(
                 query=request.question,
                 chunks=results,
                 top_k=top_k,
             )
+            rerank_time_ms = round((time.perf_counter() - rerank_start) * 1000, 1)
+
+            # Trace: reranking complete
+            yield {
+                "type": "trace",
+                "content": {
+                    "step": "reranking",
+                    "timing_ms": rerank_time_ms,
+                    "chunks_after_rerank": len(results),
+                },
+            }
 
         context_chunks = results[:top_k]
         context = self._build_context(context_chunks)
         sources = self._build_sources(context_chunks)
+
+        # Trace: context built
+        yield {
+            "type": "trace",
+            "content": {
+                "step": "context",
+                "context_chars": len(context),
+                "context_chunks": len(context_chunks),
+                "sources_count": len(sources),
+            },
+        }
 
         logger.info("[%s] Streaming query with %d sources.", request_id, len(sources))
 
@@ -254,6 +293,8 @@ class QueryService:
         # Progress: generating
         yield {"type": "status", "content": "Generating answer..."}
 
+        generation_start = time.perf_counter()
+
         # Stream answer
         try:
             for chunk_text in self.llm.generate_stream(
@@ -265,4 +306,20 @@ class QueryService:
             yield {"type": "error", "content": str(e)}
             return
 
-        yield {"type": "done", "content": ""}
+        generation_time_ms = round((time.perf_counter() - generation_start) * 1000, 1)
+        total_time_ms = round(retrieval_time_ms + rerank_time_ms + generation_time_ms, 1)
+
+        # Trace: generation complete
+        yield {
+            "type": "trace",
+            "content": {
+                "step": "generation",
+                "timing_ms": generation_time_ms,
+            },
+        }
+
+        yield {
+            "type": "done",
+            "content": "",
+            "total_time_ms": total_time_ms,
+        }

@@ -9,11 +9,28 @@ export type ChatSource = {
   header: string | null
 }
 
+export type RagTraceStep = {
+  step: 'retrieval' | 'reranking' | 'context' | 'generation'
+  timing_ms: number
+  chunks_found?: number
+  documents_searched?: number
+  chunks_after_rerank?: number
+  context_chars?: number
+  context_chunks?: number
+  sources_count?: number
+}
+
+export type RagTrace = {
+  steps: RagTraceStep[]
+  total_time_ms?: number
+}
+
 export type ChatMessage = {
   id: string
   role: ChatRole
   content: string
   sources?: ChatSource[]
+  trace?: RagTrace
   createdAt: string
   isStreaming?: boolean
 }
@@ -35,6 +52,6 @@ export type QueryResponse = {
 }
 
 export type SSEEvent = {
-  type: 'sources' | 'token' | 'done' | 'error'
-  content: string | ChatSource[]
+  type: 'sources' | 'token' | 'done' | 'error' | 'trace'
+  content: string | ChatSource[] | RagTraceStep
 }

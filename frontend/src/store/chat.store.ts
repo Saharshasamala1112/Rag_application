@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ChatMessage, ChatSource } from '../types/chat'
+import type { ChatMessage, ChatSource, RagTrace } from '../types/chat'
 import * as conversationService from '../services/conversation.service'
 
 const STORAGE_KEY = 'rag-chat-sessions'
@@ -20,6 +20,7 @@ type ChatState = {
   addAssistantMessage: (message: ChatMessage) => void
   updateAssistantMessage: (messageId: string, content: string) => void
   setStreamingSources: (messageId: string, sources: ChatSource[]) => void
+  setTrace: (messageId: string, trace: RagTrace) => void
   finishStreaming: (messageId: string) => void
   clearMessages: () => void
   createSession: () => void
@@ -147,6 +148,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
             ...session,
             messages: session.messages.map((msg) =>
               msg.id === messageId ? { ...msg, sources } : msg,
+            ),
+          }
+        : session,
+    )
+    saveSessionsDebounced(updated)
+    set({ sessions: updated })
+  },
+
+  setTrace: (messageId, trace) => {
+    const { sessions, activeSessionId } = get()
+    const updated = sessions.map((session) =>
+      session.id === activeSessionId
+        ? {
+            ...session,
+            messages: session.messages.map((msg) =>
+              msg.id === messageId ? { ...msg, trace } : msg,
             ),
           }
         : session,
