@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import { Send, Paperclip, X, Loader2 } from 'lucide-react'
 import { FileIcon } from '../ui/FileIcon'
 
@@ -34,6 +34,12 @@ export function ChatComposer({
     e.target.style.height = 'auto'
     e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px'
   }
+
+  useEffect(() => {
+    if (!loading && textareaRef.current) {
+      textareaRef.current.focus()
+    }
+  }, [loading])
 
   const canSend = inputValue.trim().length > 0 && !loading
 
@@ -87,7 +93,7 @@ export function ChatComposer({
             value={inputValue}
             onChange={handleInput}
             onKeyDown={onKeyDown}
-            placeholder="Type your message..."
+            placeholder={loading ? 'Waiting for response... (Esc to stop)' : 'Type your message...'}
             rows={1}
             className="flex-1 resize-none border-0 bg-transparent px-1 py-2 text-sm text-fg dark:text-fg-dark outline-none placeholder:text-fg-tertiary dark:placeholder:text-fg-dark-tertiary min-h-[36px] max-h-[200px]"
             aria-label="Message input"
@@ -107,7 +113,7 @@ export function ChatComposer({
           </button>
         </div>
         <p className="text-center text-2xs text-fg-muted dark:text-fg-dark-tertiary mt-1.5">
-          Enter to send · Shift+Enter for new line · Attach files with paperclip
+          Enter to send · Shift+Enter for new line{loading ? ' · Esc to stop' : ''}
         </p>
       </div>
     </div>

@@ -1,6 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useChatStore } from '../../store/chat.store'
+
+let helpOpenSetter: ((v: boolean) => void) | null = null
 
 export function useKeyboardShortcuts() {
   const navigate = useNavigate()
@@ -24,9 +26,26 @@ export function useKeyboardShortcuts() {
         setActiveSession(id)
         navigate('/')
       }
+
+      // Ctrl+/ → Keyboard shortcuts help
+      if (mod && e.key === '/') {
+        e.preventDefault()
+        helpOpenSetter?.(true)
+      }
     }
 
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [navigate, createSession, setActiveSession])
+}
+
+export function useHelpDialog() {
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    helpOpenSetter = setOpen
+    return () => { helpOpenSetter = null }
+  }, [])
+
+  return { open, setOpen }
 }

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { FolderOpen, Plus, Trash2, FileText } from 'lucide-react'
+import { useEffect, useState, useCallback } from 'react'
+import { FolderOpen, Plus, Trash2, FileText, Check, X } from 'lucide-react'
 import { useDocumentStore } from '../store/document.store'
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog'
 import * as collectionService from '../services/collection.service'
@@ -7,6 +7,7 @@ import type { Collection } from '../services/collection.service'
 import { toast } from 'sonner'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
+import { cn } from '../lib/utils'
 
 export function CollectionsPage() {
   const documents = useDocumentStore((s) => s.documents)
@@ -19,6 +20,13 @@ export function CollectionsPage() {
   const [creating, setCreating] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editField, setEditField] = useState<'name' | 'description'>('name')
+  const [editValue, setEditValue] = useState('')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -70,11 +78,91 @@ export function CollectionsPage() {
     }
   }
 
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true)
+    try {
+      for (const id of selectedIds) {
+        await collectionService.deleteCollection(id)
+      }
+      setCollections((prev) => prev.filter((c) => !selectedIds.includes(c.collection_id)))
+      setSelectedIds([])
+      setBulkDeleteOpen(false)
+      toast.success(`Deleted ${selectedIds.length} collection${selectedIds.length !== 1 ? 's' : ''}`)
+    } catch {
+      toast.error('Failed to delete some collections')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  const handleRename = async (colId: string) => {
+    if (!editValue.trim()) {
+      setEditingId(null)
+      return
+    }
+    try {
+      const field = editField === 'name' ? { name: editValue.trim() } : { description: editValue.trim() }
+      await collectionService.updateCollection(colId, field)
+      setCollections((prev) =>
+        prev.map((c) =>
+          c.collection_id === colId ? { ...c, ...field, updated_at: new Date().toISOString() } : c,
+        ),
+      )
+      toast.success(editField === 'name' ? 'Collection renamed' : 'Description updated')
+    } catch {
+      toast.error('Failed to update collection')
+    } finally {
+      setEditingId(null)
+    }
+  }
+
+  const handleAddDocumentToCollection = useCallback(async (colId: string, docId: string) => {
+    setCollections((prev) => {
+      const col = prev.find((c) => c.collection_id === colId)
+      if (!col || col.document_ids.includes(docId)) return prev
+      const updatedIds = [...col.document_ids, docId]
+      collectionService.updateCollection(colId, { document_ids: updatedIds }).then((updated) => {
+        setCollections((p) => p.map((c) => (c.collection_id === colId ? updated : c)))
+        const doc = documents.find((d) => d.document_id === docId)
+        toast.success(`Added "${doc?.filename}" to "${col.name}"`)
+      }).catch(() => {
+        toast.error('Failed to add document')
+      })
+      return prev.map((c) => (c.collection_id === colId ? { ...c, document_ids: updatedIds } : c))
+    })
+  }, [documents])
+
   const toggleDoc = (docId: string) => {
     setSelectedDocs((prev) =>
-      prev.includes(docId) ? prev.filter((id) => id !== docId) : [...prev, docId]
+      prev.includes(docId) ? prev.filter((id) => id !== docId) : [...prev, docId],
     )
   }
+
+  const toggleSelect = (colId: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(colId) ? prev.filter((id) => id !== colId) : [...prev, colId],
+    )
+  }
+
+  const handleDragOver = useCallback((e: React.DragEvent, colId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOverId(colId)
+  }, [])
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverId(null)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent, colId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOverId(null)
+    const docId = e.dataTransfer.getData('text/doc-id')
+    if (docId) {
+      handleAddDocumentToCollection(colId, docId)
+    }
+  }, [handleAddDocumentToCollection])
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -83,12 +171,35 @@ export function CollectionsPage() {
           <h1 className="text-sm font-semibold text-fg dark:text-fg-dark">Collections</h1>
           <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
             {collections.length} collection{collections.length !== 1 ? 's' : ''}
+            {selectedIds.length > 0 && ` · ${selectedIds.length} selected`}
           </p>
         </div>
-        <Button variant="primary" size="md" onClick={() => setCreateOpen(true)}>
-          <Plus size={13} />
-          New Collection
-        </Button>
+        <div className="flex items-center gap-2">
+          {selectedIds.length > 0 ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setSelectedIds([])}
+                className="px-2.5 py-1.5 text-xs text-fg-secondary dark:text-fg-dark-secondary hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated rounded-md transition-colors"
+              >
+                Clear selection
+              </button>
+              <button
+                type="button"
+                onClick={() => setBulkDeleteOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger-subtle dark:text-danger-dark dark:hover:bg-danger-dark-subtle rounded-md transition-colors"
+              >
+                <Trash2 size={13} />
+                Delete ({selectedIds.length})
+              </button>
+            </>
+          ) : (
+            <Button variant="primary" size="md" onClick={() => setCreateOpen(true)}>
+              <Plus size={13} />
+              New Collection
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
@@ -114,37 +225,140 @@ export function CollectionsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {collections.map((col) => (
-              <div
-                key={col.collection_id}
-                className="group rounded-xl border border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark p-4 hover:border-edge-strong dark:hover:border-edge-dark-strong transition-colors"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <FolderOpen size={16} className="text-warning dark:text-warning-dark" />
-                    <h3 className="text-xs font-semibold text-fg dark:text-fg-dark truncate">
-                      {col.name}
-                    </h3>
+            {collections.map((col) => {
+              const isSelected = selectedIds.includes(col.collection_id)
+              const isEditing = editingId === col.collection_id
+              const isDragOverTarget = dragOverId === col.collection_id
+
+              return (
+                <div
+                  key={col.collection_id}
+                  className={cn(
+                    'group rounded-xl border bg-surface dark:bg-surface-dark p-4 transition-all',
+                    isSelected
+                      ? 'border-accent/50 dark:border-accent-dark/50 ring-1 ring-accent/20 dark:ring-accent-dark/20'
+                      : isDragOverTarget
+                        ? 'border-accent dark:border-accent-dark bg-accent-subtle/50 dark:bg-accent-dark-subtle/50 scale-[1.02]'
+                        : 'border-edge dark:border-edge-dark hover:border-edge-strong dark:hover:border-edge-dark-strong',
+                  )}
+                  onDragOver={(e) => handleDragOver(e, col.collection_id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, col.collection_id)}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelect(col.collection_id)}
+                        className="rounded border-edge dark:border-edge-dark text-accent focus:ring-accent/40 opacity-0 group-hover:opacity-100 transition-opacity"
+                      />
+                      <FolderOpen size={16} className="text-warning dark:text-warning-dark shrink-0" />
+                      {isEditing && editField === 'name' ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleRename(col.collection_id)
+                              if (e.key === 'Escape') setEditingId(null)
+                            }}
+                            autoFocus
+                            className="w-full min-w-0 px-1.5 py-0.5 text-xs font-semibold bg-surface-secondary dark:bg-surface-dark-elevated border border-accent dark:border-accent-dark rounded text-fg dark:text-fg-dark focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRename(col.collection_id)}
+                            className="p-0.5 text-success dark:text-success-dark shrink-0"
+                          >
+                            <Check size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(null)}
+                            className="p-0.5 text-fg-tertiary dark:text-fg-dark-tertiary shrink-0"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ) : (
+                        <h3
+                          className="text-xs font-semibold text-fg dark:text-fg-dark truncate cursor-pointer hover:text-accent dark:hover:text-accent-dark transition-colors"
+                          onClick={() => {
+                            setEditingId(col.collection_id)
+                            setEditField('name')
+                            setEditValue(col.name)
+                          }}
+                          title="Click to rename"
+                        >
+                          {col.name}
+                        </h3>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(col.collection_id)}
+                      className="p-1 rounded text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark opacity-0 group-hover:opacity-100 transition-all"
+                      title="Delete"
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTarget(col.collection_id)}
-                    className="p-1 rounded text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark opacity-0 group-hover:opacity-100 transition-all"
-                    title="Delete"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+
+                  {isEditing && editField === 'description' ? (
+                    <div className="mb-2">
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleRename(col.collection_id)
+                          if (e.key === 'Escape') setEditingId(null)
+                        }}
+                        autoFocus
+                        placeholder="Add description..."
+                        className="w-full px-1.5 py-0.5 text-2xs bg-surface-secondary dark:bg-surface-dark-elevated border border-accent dark:border-accent-dark rounded text-fg-secondary dark:text-fg-dark-secondary focus:outline-none"
+                      />
+                    </div>
+                  ) : col.description ? (
+                    <p
+                      className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary mb-2 line-clamp-2 cursor-pointer hover:text-fg-secondary dark:hover:text-fg-dark-secondary transition-colors"
+                      onClick={() => {
+                        setEditingId(col.collection_id)
+                        setEditField('description')
+                        setEditValue(col.description)
+                      }}
+                      title="Click to edit description"
+                    >
+                      {col.description}
+                    </p>
+                  ) : (
+                    <p
+                      className="text-2xs text-fg-muted dark:text-fg-dark-tertiary mb-2 italic cursor-pointer hover:text-fg-tertiary dark:hover:text-fg-dark-tertiary transition-colors"
+                      onClick={() => {
+                        setEditingId(col.collection_id)
+                        setEditField('description')
+                        setEditValue('')
+                      }}
+                    >
+                      + Add description
+                    </p>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
+                      {col.document_ids.length} document{col.document_ids.length !== 1 ? 's' : ''} · {new Date(col.updated_at).toLocaleDateString()}
+                    </p>
+                    {isDragOverTarget && (
+                      <span className="text-2xs text-accent dark:text-accent-dark font-medium animate-pulse">
+                        Drop to add
+                      </span>
+                    )}
+                  </div>
                 </div>
-                {col.description && (
-                  <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary mb-2 line-clamp-2">
-                    {col.description}
-                  </p>
-                )}
-                <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
-                  {col.document_ids.length} document{col.document_ids.length !== 1 ? 's' : ''} · {new Date(col.updated_at).toLocaleDateString()}
-                </p>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -225,6 +439,16 @@ export function CollectionsPage() {
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
         loading={deleting}
+      />
+
+      <ConfirmationDialog
+        open={bulkDeleteOpen}
+        title={`Delete ${selectedIds.length} collections`}
+        description={`This will permanently remove ${selectedIds.length} collections. Documents will not be deleted.`}
+        confirmLabel={`Delete ${selectedIds.length} collections`}
+        onConfirm={handleBulkDelete}
+        onCancel={() => setBulkDeleteOpen(false)}
+        loading={bulkDeleting}
       />
     </div>
   )

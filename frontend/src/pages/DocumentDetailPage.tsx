@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Trash2, FileText } from 'lucide-react'
+import { Trash2, FileText } from 'lucide-react'
 import { getDocumentChunks } from '../services/upload.service'
 import type { DocumentChunk } from '../services/upload.service'
 import { useDocumentStore } from '../store/document.store'
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog'
 import { FileIconLarge } from '../components/ui/FileIcon'
+import { Breadcrumbs } from '../components/ui/Breadcrumbs'
 import axiosInstance from '../lib/axios'
 
 export function DocumentDetailPage() {
@@ -64,32 +65,33 @@ export function DocumentDetailPage() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex items-center gap-3 px-6 h-12 border-b border-edge dark:border-edge-dark shrink-0">
-        <button
-          type="button"
-          onClick={() => navigate('/documents')}
-          className="p-1.5 rounded-md text-fg-tertiary hover:text-fg hover:bg-surface-secondary dark:text-fg-dark-tertiary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated transition-colors"
-        >
-          <ArrowLeft size={15} />
-        </button>
-        <FileIconLarge extension={doc?.filename.split('.').pop() || ''} />
-        <div className="flex-1 min-w-0">
-          <h1 className="text-sm font-semibold text-fg dark:text-fg-dark truncate">
-            {doc?.filename || 'Document'}
-          </h1>
-          <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
-            {total} chunks
-            {doc?.file_size ? ` · ${(doc.file_size / 1024).toFixed(1)} KB` : ''}
-          </p>
+      <div className="px-6 h-12 border-b border-edge dark:border-edge-dark shrink-0 flex flex-col justify-center gap-1">
+        <Breadcrumbs
+          items={[
+            { label: 'Documents', to: '/documents' },
+            { label: doc?.filename || 'Document' },
+          ]}
+        />
+        <div className="flex items-center gap-3">
+          <FileIconLarge extension={doc?.filename.split('.').pop() || ''} />
+          <div className="flex-1 min-w-0">
+            <h1 className="text-sm font-semibold text-fg dark:text-fg-dark truncate">
+              {doc?.filename || 'Document'}
+            </h1>
+            <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
+              {total} chunks
+              {doc?.file_size ? ` · ${(doc.file_size / 1024).toFixed(1)} KB` : ''}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDeleteOpen(true)}
+            className="p-2 rounded-md text-fg-tertiary hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated transition-colors"
+            title="Delete document"
+          >
+            <Trash2 size={15} />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => setDeleteOpen(true)}
-          className="p-2 rounded-md text-fg-tertiary hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated transition-colors"
-          title="Delete document"
-        >
-          <Trash2 size={15} />
-        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">

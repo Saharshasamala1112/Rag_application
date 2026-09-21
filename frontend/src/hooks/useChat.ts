@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
 import { queryDocumentsStream } from '../services/query.service'
 import { useChatStore } from '../store/chat.store'
@@ -24,11 +24,19 @@ export const useChat = () => {
 
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   const messages = useMemo(() => {
     const active = sessions.find((s) => s.id === activeSessionId)
     return active?.messages ?? []
   }, [sessions, activeSessionId])
+
+  const cancel = useCallback(() => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setLoading(false)
+    setStatus(null)
+  }, [])
 
   const ask = useCallback(async (question: string) => {
     const serverConversationId = getServerConversationId()
@@ -55,6 +63,8 @@ export const useChat = () => {
     addAssistantMessage(assistantMessage)
 
     const traceSteps: RagTraceStep[] = []
+    const controller = new AbortController()
+    abortRef.current = controller
 
     try {
       await queryDocumentsStream(
@@ -65,6 +75,7 @@ export const useChat = () => {
           use_reranking: true,
         },
         (token: string) => {
+          if (controller.signal.aborted) return
           setStatus(null)
           const current = useChatStore.getState().getMessages()
           const msg = current.find((m) => m.id === assistantId)
@@ -72,12 +83,15 @@ export const useChat = () => {
           updateAssistantMessage(assistantId, newContent)
         },
         (sources: ChatSource[]) => {
+          if (controller.signal.aborted) return
           setStreamingSources(assistantId, sources)
         },
         (statusMsg: string) => {
+          if (controller.signal.aborted) return
           setStatus(statusMsg)
         },
         (step: RagTraceStep) => {
+          if (controller.signal.aborted) return
           traceSteps.push(step)
           setTrace(assistantId, { steps: [...traceSteps] })
         },
@@ -88,22 +102,27 @@ export const useChat = () => {
           finishStreaming(assistantId)
           setLoading(false)
           setStatus(null)
+          abortRef.current = null
         },
         (errorMsg: string) => {
+          if (controller.signal.aborted) return
           toast.error(errorMsg)
           updateAssistantMessage(assistantId, `Error: ${errorMsg}`)
           finishStreaming(assistantId)
           setLoading(false)
           setStatus(null)
+          abortRef.current = null
         },
       )
     } catch (err) {
+      if (controller.signal.aborted) return
       const message = err instanceof Error ? err.message : 'Unable to answer right now'
       toast.error(message)
       updateAssistantMessage(assistantId, `Error: ${message}`)
       finishStreaming(assistantId)
       setLoading(false)
       setStatus(null)
+      abortRef.current = null
     }
   }, [activeDocumentId, addUserMessage, addAssistantMessage, updateAssistantMessage, setStreamingSources, setTrace, finishStreaming, getServerConversationId])
 
@@ -112,6 +131,7 @@ export const useChat = () => {
     loading,
     status,
     ask,
+    cancel,
     clearMessages,
     activeSessionId,
     createSession,

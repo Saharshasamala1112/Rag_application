@@ -1,6 +1,7 @@
 """Document management routes."""
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from app.models.response import DocumentInfo, DocumentListResponse
 from app.services.upload_service import UploadService
@@ -8,6 +9,10 @@ from app.services.upload_service import UploadService
 router = APIRouter(tags=["Documents"])
 
 upload_service = UploadService()
+
+
+class DocumentUpdate(BaseModel):
+    filename: str | None = None
 
 
 @router.get("/documents")
@@ -24,6 +29,17 @@ def get_document(document_id: str) -> dict:
     doc = upload_service.get_document(document_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
+    return doc
+
+
+@router.patch("/documents/{document_id}")
+def update_document(document_id: str, body: DocumentUpdate) -> dict:
+    doc = upload_service.get_document(document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    if body.filename is not None:
+        doc["filename"] = body.filename
+        upload_service.save_document(document_id, doc)
     return doc
 
 

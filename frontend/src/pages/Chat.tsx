@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DragEvent } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Paperclip, PanelRightOpen, PanelRightClose } from 'lucide-react'
+import { Paperclip, PanelRightOpen, PanelRightClose, ArrowDown, StopCircle } from 'lucide-react'
 import { useChat } from '../hooks/useChat'
 import { useUpload } from '../hooks/useUpload'
 import { useDocumentStore } from '../store/document.store'
@@ -10,6 +10,7 @@ import { MessageBubble } from '../components/chat/MessageBubble'
 import { EmptyState } from '../components/chat/EmptyState'
 import { ChatComposer } from '../components/chat/ChatComposer'
 import { Badge } from '../components/ui/Badge'
+import { Tooltip } from '../components/ui/Tooltip'
 
 interface LayoutContext {
   contextPanelOpen: boolean
@@ -24,6 +25,7 @@ export const Chat = () => {
     loading,
     status,
     ask,
+    cancel,
   } = useChat()
 
   const { upload, uploadTextContent, loading: uploading, fetchDocuments } = useUpload()
@@ -34,8 +36,10 @@ export const Chat = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [isAtBottom, setIsAtBottom] = useState(true)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -43,8 +47,29 @@ export const Chat = () => {
   }, [fetchDocuments])
 
   useEffect(() => {
+    if (isAtBottom) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, isAtBottom])
+
+  useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = el
+      const atBottom = scrollHeight - scrollTop - clientHeight < 60
+      setIsAtBottom(atBottom)
+    }
+
+    el.addEventListener('scroll', handleScroll, { passive: true })
+    return () => el.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const scrollToBottom = useCallback(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    setIsAtBottom(true)
+  }, [])
 
   const handleUpload = async () => {
     if (!selectedFile) return
@@ -104,6 +129,10 @@ export const Chat = () => {
       e.preventDefault()
       void handleSubmit()
     }
+    if (e.key === 'Escape' && loading) {
+      cancel()
+      toast.info('Generation cancelled')
+    }
   }
 
   const activeDoc = documents.find((d) => d.document_id === activeDocument)
@@ -150,15 +179,29 @@ export const Chat = () => {
             <span className="text-xs text-fg-tertiary dark:text-fg-dark-tertiary">New conversation</span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={toggleContextPanel}
-          className="flex items-center justify-center w-7 h-7 rounded-md text-fg-tertiary hover:text-fg hover:bg-surface-secondary dark:text-fg-dark-tertiary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated transition-colors"
-          aria-label={contextPanelOpen ? 'Close trace panel' : 'Open trace panel'}
-          title="RAG Trace"
-        >
-          {contextPanelOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
-        </button>
+        <div className="flex items-center gap-1">
+          {loading && (
+            <Tooltip content="Stop generating (Esc)" side="bottom">
+              <button
+                type="button"
+                onClick={cancel}
+                className="flex items-center justify-center w-7 h-7 rounded-md text-danger hover:text-danger-hover hover:bg-danger-subtle dark:text-danger-dark dark:hover:bg-danger-dark-subtle transition-colors"
+                aria-label="Stop generating"
+              >
+                <StopCircle size={15} />
+              </button>
+            </Tooltip>
+          )}
+          <button
+            type="button"
+            onClick={toggleContextPanel}
+            className="flex items-center justify-center w-7 h-7 rounded-md text-fg-tertiary hover:text-fg hover:bg-surface-secondary dark:text-fg-dark-tertiary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated transition-colors"
+            aria-label={contextPanelOpen ? 'Close trace panel' : 'Open trace panel'}
+            title="RAG Trace"
+          >
+            {contextPanelOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+          </button>
+        </div>
       </div>
 
       {/* Hidden file input */}
@@ -175,7 +218,8 @@ export const Chat = () => {
 
       {/* Messages */}
       <div
-        className="flex-1 overflow-y-auto"
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto relative"
         role="log"
         aria-live="polite"
         aria-label="Chat messages"
@@ -196,6 +240,21 @@ export const Chat = () => {
           <EmptyState onSelectPrompt={(p) => setInputValue(p)} />
         )}
         <div ref={chatEndRef} />
+
+        {/* Scroll to bottom button */}
+        {!isAtBottom && messages.length > 0 && (
+          <div className="sticky bottom-4 flex justify-center pointer-events-none">
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              className="pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark shadow-md hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated transition-colors text-xs text-fg-secondary dark:text-fg-dark-secondary"
+              aria-label="Scroll to bottom"
+            >
+              <ArrowDown size={13} />
+              <span>Scroll to bottom</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Composer */}

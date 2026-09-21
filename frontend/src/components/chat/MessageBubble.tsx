@@ -67,7 +67,14 @@ export function MessageBubble({ message, onSelectSource }: MessageBubbleProps) {
           {message.isStreaming && (
             <>
               <span className="text-2xs text-fg-muted dark:text-fg-dark-tertiary">·</span>
-              <span className="text-2xs text-accent dark:text-accent-dark animate-pulse">streaming</span>
+              <span className="inline-flex items-center gap-1 text-2xs text-accent dark:text-accent-dark">
+                <span className="flex gap-[3px]">
+                  <span className="w-[3px] h-[3px] rounded-full bg-current animate-bounce [animation-delay:-0.3s]" />
+                  <span className="w-[3px] h-[3px] rounded-full bg-current animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-[3px] h-[3px] rounded-full bg-current animate-bounce" />
+                </span>
+                <span className="ml-0.5">thinking</span>
+              </span>
             </>
           )}
         </div>
@@ -77,8 +84,17 @@ export function MessageBubble({ message, onSelectSource }: MessageBubbleProps) {
             {message.content ||
               (message.isStreaming ? '' : 'No response generated.')}
           </ReactMarkdown>
-          {message.isStreaming && (
-            <span className="inline-block h-4 w-[2px] bg-fg dark:bg-fg-dark animate-pulse ml-0.5 align-middle" />
+          {message.isStreaming && message.content && (
+            <span className="inline-block h-[14px] w-[2px] bg-accent dark:bg-accent-dark animate-pulse ml-0.5 align-middle rounded-full" />
+          )}
+          {message.isStreaming && !message.content && (
+            <div className="flex items-center gap-2 py-2">
+              <div className="flex gap-1">
+                <span className="w-2 h-2 rounded-full bg-fg-muted dark:bg-fg-dark-tertiary animate-bounce [animation-delay:-0.3s]" />
+                <span className="w-2 h-2 rounded-full bg-fg-muted dark:bg-fg-dark-tertiary animate-bounce [animation-delay:-0.15s]" />
+                <span className="w-2 h-2 rounded-full bg-fg-muted dark:bg-fg-dark-tertiary animate-bounce" />
+              </div>
+            </div>
           )}
         </div>
 

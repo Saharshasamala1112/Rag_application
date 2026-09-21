@@ -101,6 +101,20 @@ class UploadService:
         except (json.JSONDecodeError, OSError):
             return None
 
+    def save_document(self, document_id: str, data: dict) -> bool:
+        """Save document info."""
+        doc_dir = settings.upload_dir / document_id
+        if not doc_dir.exists():
+            return False
+
+        info_file = doc_dir / "document_info.json"
+        try:
+            info_file.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            return True
+        except OSError as e:
+            logger.error("Failed to save document %s: %s", document_id, e)
+            return False
+
     def delete_document(self, document_id: str) -> bool:
         """Delete a document and its data."""
         import shutil

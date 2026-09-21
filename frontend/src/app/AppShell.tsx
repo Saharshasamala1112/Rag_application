@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from '../components/layout/Sidebar'
 import { ContextPanel } from '../components/layout/ContextPanel'
-import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { KeyboardShortcutsHelp } from '../components/ui/KeyboardShortcutsHelp'
+import { useKeyboardShortcuts, useHelpDialog } from '../hooks/useKeyboardShortcuts'
 
 export function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [contextPanelOpen, setContextPanelOpen] = useState(false)
+  const { open: helpOpen, setOpen: setHelpOpen } = useHelpDialog()
 
   useKeyboardShortcuts()
 
@@ -25,6 +27,8 @@ export function AppShell() {
         open={contextPanelOpen}
         onClose={() => setContextPanelOpen(false)}
       />
+
+      <KeyboardShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   )
 }
