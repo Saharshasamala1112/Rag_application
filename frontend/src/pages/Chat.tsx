@@ -2,13 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DragEvent } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Paperclip, PanelRightOpen, PanelRightClose, ArrowDown, StopCircle } from 'lucide-react'
+import { Paperclip, PanelRightOpen, PanelRightClose, ArrowDown, Square, Sparkles } from 'lucide-react'
 import { useChat } from '../hooks/useChat'
 import { useUpload } from '../hooks/useUpload'
 import { useDocumentStore } from '../store/document.store'
 import { MessageBubble } from '../components/chat/MessageBubble'
 import { EmptyState } from '../components/chat/EmptyState'
 import { ChatComposer } from '../components/chat/ChatComposer'
+import { RagLoadingIndicator } from '../components/chat/RagLoadingIndicator'
 import { Badge } from '../components/ui/Badge'
 import { Tooltip } from '../components/ui/Tooltip'
 
@@ -24,6 +25,7 @@ export const Chat = () => {
     messages,
     loading,
     status,
+    traceSteps,
     ask,
     cancel,
   } = useChat()
@@ -124,6 +126,15 @@ export const Chat = () => {
     await ask(q)
   }
 
+  const handleStopOrSubmit = () => {
+    if (loading) {
+      cancel()
+      toast.info('Generation cancelled')
+    } else {
+      void handleSubmit()
+    }
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -149,7 +160,7 @@ export const Chat = () => {
           role="region"
           aria-label="Drop zone"
         >
-          <div className="rounded-xl border-2 border-dashed border-accent bg-surface dark:bg-surface-dark px-12 py-10 text-center shadow-lg animate-scale-in">
+          <div className="rounded-2xl border-2 border-dashed border-accent bg-surface dark:bg-surface-dark px-12 py-10 text-center shadow-lg animate-scale-in">
             <Paperclip size={36} className="mx-auto mb-3 text-accent dark:text-accent-dark" />
             <p className="text-sm font-medium text-fg dark:text-fg-dark">
               Drop your document here
@@ -164,21 +175,27 @@ export const Chat = () => {
       {/* Chat header */}
       <div className="flex items-center justify-between px-4 h-12 border-b border-edge dark:border-edge-dark shrink-0">
         <div className="flex items-center gap-2 min-w-0">
+          <Sparkles size={14} className="text-fg-tertiary dark:text-fg-dark-tertiary shrink-0" />
           {activeDoc ? (
             <>
               <Badge variant="accent" className="max-w-[200px] truncate">
                 <span className="truncate">{activeDoc.filename}</span>
               </Badge>
-              {loading && status && (
-                <span className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary animate-pulse">
-                  {status}
-                </span>
-              )}
             </>
           ) : (
-            <span className="text-xs text-fg-tertiary dark:text-fg-dark-tertiary">New conversation</span>
+            <span className="text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary">
+              New conversation
+            </span>
           )}
         </div>
+
+        {/* Loading indicator in header */}
+        {loading && (
+          <div className="hidden md:flex items-center">
+            <RagLoadingIndicator status={status} traceSteps={traceSteps} />
+          </div>
+        )}
+
         <div className="flex items-center gap-1">
           {loading && (
             <Tooltip content="Stop generating (Esc)" side="bottom">
@@ -188,7 +205,7 @@ export const Chat = () => {
                 className="flex items-center justify-center w-7 h-7 rounded-md text-danger hover:text-danger-hover hover:bg-danger-subtle dark:text-danger-dark dark:hover:bg-danger-dark-subtle transition-colors"
                 aria-label="Stop generating"
               >
-                <StopCircle size={15} />
+                <Square size={13} fill="currentColor" />
               </button>
             </Tooltip>
           )}
@@ -203,6 +220,13 @@ export const Chat = () => {
           </button>
         </div>
       </div>
+
+      {/* Mobile loading indicator */}
+      {loading && (
+        <div className="md:hidden border-b border-edge dark:border-edge-dark px-2 py-1">
+          <RagLoadingIndicator status={status} traceSteps={traceSteps} />
+        </div>
+      )}
 
       {/* Hidden file input */}
       <input
@@ -228,7 +252,7 @@ export const Chat = () => {
         onDragLeave={handleDragLeave}
       >
         {messages.length > 0 ? (
-          <div className="space-y-5 max-w-[800px] mx-auto px-4 py-6">
+          <div className="space-y-6 max-w-[800px] mx-auto px-4 sm:px-6 py-6">
             {messages.map((msg) => (
               <MessageBubble
                 key={msg.id}
@@ -261,7 +285,7 @@ export const Chat = () => {
       <ChatComposer
         inputValue={inputValue}
         onInputChange={setInputValue}
-        onSubmit={handleSubmit}
+        onSubmit={handleStopOrSubmit}
         onKeyDown={handleKeyDown}
         loading={loading}
         selectedFile={selectedFile}

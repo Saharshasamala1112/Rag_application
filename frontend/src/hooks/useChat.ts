@@ -24,6 +24,7 @@ export const useChat = () => {
 
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  const [traceSteps, setTraceSteps] = useState<string[]>([])
   const abortRef = useRef<AbortController | null>(null)
 
   const messages = useMemo(() => {
@@ -50,6 +51,7 @@ export const useChat = () => {
     addUserMessage(userMessage)
     setLoading(true)
     setStatus('Preparing...')
+    setTraceSteps([])
 
     const assistantId = `assistant-${Date.now()}`
     const assistantMessage: ChatMessage = {
@@ -93,6 +95,7 @@ export const useChat = () => {
         (step: RagTraceStep) => {
           if (controller.signal.aborted) return
           traceSteps.push(step)
+          setTraceSteps([...traceSteps.map((s) => s.step)])
           setTrace(assistantId, { steps: [...traceSteps] })
         },
         (totalTimeMs?: number) => {
@@ -130,6 +133,7 @@ export const useChat = () => {
     messages,
     loading,
     status,
+    traceSteps,
     ask,
     cancel,
     clearMessages,
