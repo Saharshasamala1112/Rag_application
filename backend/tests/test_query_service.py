@@ -363,7 +363,7 @@ def test_citation_filter_preserves_non_citation_source_wording():
     ) == "The term [Source reliability] is a heading; see [Source 1]."
 
 
-def test_rerank_threshold_returns_insufficient_context_without_generation(
+def test_rerank_threshold_keeps_top_candidates_when_all_scores_fall_below_it(
     tmp_path: Path,
 ):
     service = QueryService.__new__(QueryService)
@@ -382,14 +382,53 @@ def test_rerank_threshold_returns_insufficient_context_without_generation(
         {"chunk_id": 0, "content": "weak evidence", "rerank_score": 0.1}
     ]
     service.llm = MagicMock()
+    service.llm.generate.return_value = "Answer [Source 1]."
 
     response = service.query(
         QueryRequest(question="question", use_reranking=True)
     )
 
-    assert response.answer == INSUFFICIENT_CONTEXT_ANSWER
-    assert response.sources == []
-    service.llm.generate.assert_not_called()
+    assert response.answer == "Answer [Source 1]."
+    assert response.sources[0].score == 0.1
+    service.llm.generate.assert_called_once()
+
+
+def test_rerank_threshold_drops_weak_candidates_when_stronger_ones_pass(
+    tmp_path: Path,
+):
+    service = QueryService.__new__(QueryService)
+    service.resolve_document_dirs = lambda _document_id: [tmp_path]
+    service.retriever = MagicMock()
+    service.retriever.retrieve.return_value = [
+        {
+            "chunk_id": 0,
+            "content": "strong evidence",
+            "source": "doc.txt",
+            "score": 0.5,
+        },
+        {
+            "chunk_id": 1,
+            "content": "weak evidence",
+            "source": "doc.txt",
+            "score": 0.3,
+        },
+    ]
+    service.reranker = MagicMock()
+    service.reranker.rerank.return_value = [
+        {"chunk_id": 0, "content": "strong evidence", "rerank_score": 0.9},
+        {"chunk_id": 1, "content": "weak evidence", "rerank_score": 0.05},
+    ]
+    service.llm = MagicMock()
+    service.llm.generate.return_value = "Answer [Source 1]."
+
+    response = service.query(
+        QueryRequest(question="question", use_reranking=True)
+    )
+
+    assert [source.chunk_id for source in response.sources] == [0]
+    context = service.llm.generate.call_args.kwargs["context"]
+    assert "strong evidence" in context
+    assert "weak evidence" not in context
 
 
 def test_tiny_context_budget_returns_insufficient_context_without_generation(

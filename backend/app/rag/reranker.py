@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+import math
 import threading
-from typing import Any
+from typing import Any, Literal
 
 from app.config.settings import settings
 
@@ -13,7 +14,7 @@ class Reranker:
     """Cross-encoder reranker for improved relevance."""
 
     def __init__(self) -> None:
-        self._model: Any | bool | None = None
+        self._model: Any | Literal[False] | None = None
         self._model_lock = threading.Lock()
 
     def _load_model(self):
@@ -30,6 +31,18 @@ class Reranker:
             except Exception as e:
                 logger.warning("Failed to load reranker: %s. Using original scores.", e)
                 self._model = False
+
+    @staticmethod
+    def _to_probability(score: float) -> float:
+        """Map a raw cross-encoder logit to a (0, 1) relevance probability.
+
+        CrossEncoder.predict returns unbounded logits (Identity activation)
+        while RERANKER_MIN_SCORE and API source scores are 0-1 values.
+        """
+        if score >= 0:
+            return 1.0 / (1.0 + math.exp(-score))
+        exp_score = math.exp(score)
+        return exp_score / (1.0 + exp_score)
 
     def rerank(
         self,
@@ -51,7 +64,7 @@ class Reranker:
             scores = self._model.predict(pairs)
 
         for chunk, score in zip(chunks, scores):
-            chunk["rerank_score"] = float(score)
+            chunk["rerank_score"] = self._to_probability(float(score))
 
         reranked = sorted(chunks, key=lambda x: x.get("rerank_score", 0), reverse=True)
 
