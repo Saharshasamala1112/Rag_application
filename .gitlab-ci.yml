@@ -74,3 +74,14 @@ frontend-quality:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+
+docs-quality:
+  image: python:3.12-slim
+  stage: quality
+  # Validates README/ARCHITECTURE file-path references and the README API
+  # table against contracts/openapi.json (issue #49).
+  script:
+    - python scripts/check_docs.py
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH

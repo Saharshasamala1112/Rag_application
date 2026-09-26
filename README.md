@@ -23,15 +23,16 @@ The project follows a modular architecture, making it easy to extend, maintain, 
 
 # ✨ Features
 
-- 📄 Upload and process documents
-- 🤖 AI-powered question answering
-- 🔍 Semantic search using vector embeddings
-- 🧠 Retrieval-Augmented Generation (RAG)
+- 📄 Upload and process documents (PDF, Word, Markdown, CSV, JSON, HTML, source files;
+  full list at `GET /api/v1/upload/supported-types`)
+- 🤖 AI-powered question answering with streamed SSE responses
+- 🔍 Hybrid retrieval: FAISS vectors + BM25 with reciprocal rank fusion
+- 🧠 Retrieval-Augmented Generation (RAG) with cross-encoder reranking
+- 💬 Server-side conversation history and document collections
 - ⚡ FastAPI backend
 - 🎨 React + TypeScript frontend
 - 🔐 Environment-based configuration
 - 📦 Modular architecture
-- 🐳 Docker support
 - 🚀 Easy deployment
 
 ---
@@ -43,27 +44,35 @@ rag_application/
 │
 ├── backend/
 │   ├── app/
-│   │   ├── api/routes/       # Health, upload, query, documents
+│   │   ├── api/routes/       # Health, upload, query, documents, conversations, collections
 │   │   ├── config/           # Settings, logging
 │   │   ├── models/           # Pydantic models
 │   │   ├── rag/              # Core RAG: chunking, embeddings, retriever, reranker, LLM
 │   │   └── services/         # Business logic
-│   ├── data/uploads/         # Uploaded documents + indexes
+│   ├── scripts/              # Schema update + dead-code whitelist helpers
+│   ├── data/uploads/         # Uploaded documents + indexes (runtime, gitignored)
+│   ├── .env.example
 │   ├── requirements.txt
 │   └── pyproject.toml
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── components/       # Chat, upload, common UI
+│   │   ├── components/       # Chat, layout, navigation, and UI components
 │   │   ├── hooks/            # useChat, useUpload
-│   │   ├── pages/            # Chat page
+│   │   ├── lib/              # Breakpoints, media queries, shared utilities
+│   │   ├── pages/            # Chat, documents, collections, history, search, settings
 │   │   ├── services/         # API service layer
 │   │   ├── store/            # Zustand stores
-│   │   └── types/            # TypeScript types
+│   │   └── types/            # TypeScript types (incl. generated API types)
+│   ├── .env.example
 │   ├── package.json
 │   └── vite.config.ts
 │
-├── .env.example
+├── contracts/
+│   └── openapi.json          # Canonical OpenAPI schema (checked in CI)
+│
+├── .gitlab-ci.yml
+├── ARCHITECTURE.md
 ├── README.md
 └── .gitignore
 ```
@@ -87,17 +96,16 @@ rag_application/
 
 ## AI & Machine Learning
 
-- LangChain
-- Hugging Face Transformers
-- Sentence Transformers
-- FAISS / ChromaDB
+- langchain-text-splitters (chunking)
+- Sentence Transformers (`BAAI/bge-small-en-v1.5` embeddings)
+- FAISS (vector search)
+- BM25 + cross-encoder reranking (`cross-encoder/ms-marco-MiniLM-L-6-v2`)
+- Ollama (local LLM inference)
 
 ## DevOps
 
-- Docker
-- Docker Compose
 - Git
-- GitLab
+- GitLab CI/CD
 
 ---
 
@@ -105,11 +113,13 @@ rag_application/
 
 Before running the project, ensure the following are installed:
 
-- Python 3.11+
-- Node.js 20+
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) (recommended; `pip` also works)
+- Node.js 22+
 - npm
 - Git
-- Docker & Docker Compose (optional but recommended)
+- [Ollama](https://ollama.com/) with the default model (`llama3.2:latest`) for
+  answer generation
 
 ---
 
@@ -133,29 +143,17 @@ Navigate to the backend directory:
 cd backend
 ```
 
-Create a virtual environment:
+Install dependencies (with `uv`, same as CI):
+
+```bash
+uv sync --frozen --extra dev --extra models
+```
+
+Or with `pip`:
 
 ```bash
 python -m venv .venv
-```
-
-Activate the virtual environment:
-
-### Linux/macOS
-
-```bash
-source .venv/bin/activate
-```
-
-### Windows
-
-```bash
-.venv\Scripts\activate
-```
-
-Install dependencies:
-
-```bash
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
@@ -177,8 +175,10 @@ Do not commit either `.env` file.
 # 🚀 Run Backend
 
 ```bash
-uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload
 ```
+
+(`uvicorn app.main:app --reload` works the same inside an activated virtualenv.)
 
 Backend will be available at:
 
@@ -220,40 +220,6 @@ Frontend:
 
 ```
 http://localhost:5173
-```
-
----
-
-# 🐳 Docker Setup
-
-## Build Containers
-
-```bash
-docker compose build
-```
-
-## Start Containers
-
-```bash
-docker compose up
-```
-
-Run in detached mode:
-
-```bash
-docker compose up -d
-```
-
-## Stop Containers
-
-```bash
-docker compose down
-```
-
-## Rebuild After Changes
-
-```bash
-docker compose up --build
 ```
 
 ---
@@ -311,23 +277,22 @@ These files can be hosted on:
 Run the production server:
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Or using Gunicorn:
-
-```bash
-gunicorn -k uvicorn.workers.UvicornWorker app.main:app
-```
+Set `ENV=production` to disable the interactive API documentation, and bind to
+loopback unless you deliberately expose the service.
 
 The backend can be deployed on:
 
 - Ubuntu Server
-- Docker
 - Railway
 - Render
 - DigitalOcean
 - AWS EC2
+
+There are no Dockerfiles or Compose files in this repository; deployments run
+the process directly (systemd, a process supervisor, or a PaaS runtime).
 
 ---
 
@@ -346,41 +311,74 @@ The backend can be deployed on:
 
 # 🔌 API Endpoints
 
-All endpoints are prefixed with `/api/v1`.
+Unless noted otherwise, endpoints are prefixed with `/api/v1` and require the
+`X-API-Key` header (`/api/v1/health*` is exempt). The table below matches
+`contracts/openapi.json` and is verified by `scripts/check_docs.py` in CI.
 
 | Method | Endpoint | Description |
 |---------|----------|-------------|
 | GET | `/api/v1/health` | Health check |
-| POST | `/api/v1/upload` | Upload a PDF document |
+| GET | `/api/v1/health/live` | Liveness probe (no dependency checks) |
+| GET | `/api/v1/health/ready` | Readiness probe |
+| POST | `/api/v1/upload` | Upload and process a document |
+| POST | `/api/v1/upload/text` | Create a document from typed text |
+| GET | `/api/v1/upload/supported-types` | List supported file types |
 | POST | `/api/v1/query` | Query documents (returns full response) |
 | POST | `/api/v1/query/stream` | Query with SSE streaming |
 | GET | `/api/v1/documents` | List all uploaded documents |
 | GET | `/api/v1/documents/{id}` | Get document details |
+| PATCH | `/api/v1/documents/{id}` | Rename a document |
 | DELETE | `/api/v1/documents/{id}` | Delete a document |
+| GET | `/api/v1/documents/{id}/status` | Get processing status |
 | GET | `/api/v1/documents/{id}/preview` | Get document text preview |
-| GET | `/docs` | Swagger documentation |
+| GET | `/api/v1/documents/{id}/chunks` | Get extracted chunks |
+| GET | `/api/v1/conversations` | List conversations |
+| POST | `/api/v1/conversations` | Create a conversation |
+| GET | `/api/v1/conversations/{id}` | Get a conversation with messages |
+| PATCH | `/api/v1/conversations/{id}` | Update conversation title |
+| DELETE | `/api/v1/conversations/{id}` | Delete a conversation |
+| GET | `/api/v1/collections` | List collections |
+| POST | `/api/v1/collections` | Create a collection |
+| GET | `/api/v1/collections/{id}` | Get a collection |
+| PATCH | `/api/v1/collections/{id}` | Update a collection |
+| DELETE | `/api/v1/collections/{id}` | Delete a collection |
+| GET | `/` | Service root (no API key) |
+| GET | `/metrics` | Prometheus-style request metrics (no API key) |
+| GET | `/docs` | Swagger UI (disabled when `ENV=production`) |
 
 ---
 
 # 🧪 Testing
 
-Backend tests:
+Backend tests (from `backend/`):
 
 ```bash
-pytest
+uv run pytest
 ```
 
-Frontend tests:
+Frontend tests (from `frontend/`):
 
 ```bash
 npm test
 ```
 
-Lint frontend:
+Lint, type-check, and dead-code checks:
 
 ```bash
 npm run lint
+npm run typecheck
+npm run knip
 ```
+
+Verify the committed OpenAPI schema is up to date (from `backend/`):
+
+```bash
+uv run python -m scripts.update_openapi_schema --check
+```
+
+These same checks run in GitLab CI (`.gitlab-ci.yml`), together with
+`scripts/check_docs.py`, which validates file paths and the API table in this
+document against the code.
 
 ---
 
@@ -388,17 +386,21 @@ npm run lint
 
 ### Completed
 
-- Document upload and processing
+- Document upload and processing (file and text uploads)
 - Hybrid search (semantic FAISS + BM25 with RRF fusion)
 - Cross-encoder reranking for relevance
 - Streaming SSE responses
 - Multi-document support with document management
-- Session management with chat history
+- Document collections
+- Server-side conversation history with a localStorage session mirror
 - Markdown rendering for answers
 - Source citations with relevance scores
-- FastAPI backend with CORS and API versioning
+- FastAPI backend with CORS, API-key auth, and API versioning
+- Typed Pydantic request/response models with a contract-enforced OpenAPI schema
 - React + TypeScript frontend with Zustand state
 - Pydantic-settings configuration
+- CI quality gates: ruff, pytest coverage, vulture, knip, prettier, type-check,
+  generated-type drift, and doc checks
 
 ### Planned
 
@@ -501,12 +503,10 @@ Special thanks to:
 - TypeScript
 - Vite
 - Tailwind CSS
-- LangChain
-- Hugging Face
-- Sentence Transformers
+- langchain-text-splitters
+- Hugging Face Sentence Transformers
 - FAISS
-- ChromaDB
-- Docker
+- Ollama
 - Python
 
 Their outstanding work has greatly contributed to the development of this project.
@@ -515,9 +515,8 @@ Their outstanding work has greatly contributed to the development of this projec
 
 # 📄 License
 
-This project is licensed under the **MIT License**.
-
-You are free to use, modify, and distribute this project under the terms of the MIT License.
+No license file is published in this repository yet. Until the maintainers add
+one, all rights are reserved by the authors; reach out before redistributing.
 
 ---
 

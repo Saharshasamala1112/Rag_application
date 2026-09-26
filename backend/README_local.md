@@ -6,7 +6,7 @@ Production-ready Local Retrieval Augmented Generation backend built using FastAP
 
 ## Features
 
-- Local PDF ingestion
+- Local document ingestion (PDF, DOCX, TXT, Markdown, CSV, JSON, HTML, code files)
 - Markdown extraction
 - Smart chunking
 - SentenceTransformer embeddings
@@ -21,7 +21,7 @@ Production-ready Local Retrieval Augmented Generation backend built using FastAP
 
 - FastAPI
 - PyMuPDF4LLM
-- LangChain
+- langchain-text-splitters
 - Sentence Transformers
 - FAISS
 - Ollama
@@ -51,7 +51,8 @@ pip install -r requirements.txt
 ```
 
 The requirements file installs the development tools and model dependencies.
-For a locked environment, use `uv sync --locked --extra dev --extra models`.
+For a locked environment, use `uv sync --frozen --extra dev --extra models`
+(this is what CI runs, minus the `models` extra).
 
 Run
 
@@ -69,20 +70,25 @@ http://localhost:8002/docs
 
 ## API
 
-### Upload PDF
+Every route lives under `/api/v1` and requires the `X-API-Key` header set from
+`.env` (`API_KEY`); the health probes are exempt.
+
+### Upload a document
 
 ```
-POST /upload
+POST /api/v1/upload
 ```
 
 ### Query
 
 ```
-POST /query
+POST /api/v1/query
 ```
 
 ### Health
 
 ```
-GET /health
+GET /api/v1/health
 ```
+
+See the root `README.md` for the full endpoint table.
