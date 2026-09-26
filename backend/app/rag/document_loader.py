@@ -5,9 +5,24 @@ import io
 import json
 import re
 import subprocess
+import zipfile
 from pathlib import Path
 
+import pymupdf
 import pymupdf4llm
+
+from app.config.settings import settings
+
+
+class DocumentLimitError(ValueError):
+    """Raised when an upload exceeds a safe parser resource limit."""
+
+
+def _check_file_size(file_path: Path, limit_mb: int, kind: str) -> None:
+    if file_path.stat().st_size > limit_mb * 1024 * 1024:
+        raise DocumentLimitError(
+            f"{kind} exceeds the {limit_mb} MB processing limit."
+        )
 
 
 def normalize_text(text: str) -> str:
@@ -71,21 +86,37 @@ class DocumentLoader:
         suffix = file_path.suffix.lower()
 
         if suffix == ".pdf":
+            with pymupdf.open(file_path) as document:
+                if document.page_count > settings.max_pdf_pages:
+                    raise DocumentLimitError(
+                        f"PDF exceeds the {settings.max_pdf_pages} page limit."
+                    )
             raw = pymupdf4llm.to_markdown(str(file_path))
             if isinstance(raw, list):
                 raw = str(raw)
             return normalize_text(raw)
 
         if suffix == ".docx":
+            DocumentLoader._validate_docx_archive(file_path)
             return DocumentLoader._extract_docx(file_path)
 
         if suffix == ".doc":
             return DocumentLoader._extract_doc(file_path)
 
         if suffix == ".csv":
+            _check_file_size(
+                file_path,
+                settings.max_tabular_file_mb,
+                "CSV file",
+            )
             return DocumentLoader._extract_csv(file_path)
 
         if suffix == ".json":
+            _check_file_size(
+                file_path,
+                settings.max_tabular_file_mb,
+                "JSON file",
+            )
             return DocumentLoader._extract_json(file_path)
 
         if suffix in (".html", ".htm"):
@@ -168,6 +199,27 @@ class DocumentLoader:
             return DocumentLoader._extract_docx_fallback(file_path)
 
     @staticmethod
+    def _validate_docx_archive(file_path: Path) -> None:
+        max_archive_size = settings.max_document_archive_mb * 1024 * 1024
+        max_document_xml_size = settings.max_docx_xml_mb * 1024 * 1024
+        try:
+            with zipfile.ZipFile(file_path) as archive:
+                members = archive.infolist()
+                total_size = sum(member.file_size for member in members)
+                document_xml = archive.getinfo("word/document.xml")
+        except (OSError, zipfile.BadZipFile, KeyError) as error:
+            raise DocumentLimitError("DOCX archive is invalid.") from error
+
+        if total_size > max_archive_size:
+            raise DocumentLimitError(
+                "DOCX archive exceeds the configured uncompressed size limit."
+            )
+        if document_xml.file_size > max_document_xml_size:
+            raise DocumentLimitError(
+                "DOCX document XML exceeds the configured size limit."
+            )
+
+    @staticmethod
     def _extract_doc(file_path: Path) -> str:
         """Extract text from legacy .doc files using antiword or catdoc."""
         return DocumentLoader._extract_doc_antiword(file_path)
@@ -181,7 +233,7 @@ class DocumentLoader:
                 ["antiword", str(file_path)],
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=settings.external_parser_timeout_seconds,
             )
             if result.returncode == 0 and result.stdout.strip():
                 return result.stdout
@@ -194,7 +246,7 @@ class DocumentLoader:
                 ["catdoc", str(file_path)],
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=settings.external_parser_timeout_seconds,
             )
             if result.returncode == 0 and result.stdout.strip():
                 return result.stdout
@@ -223,16 +275,22 @@ class DocumentLoader:
     @staticmethod
     def _extract_docx_fallback(file_path: Path) -> str:
         """Fallback: extract raw XML text from docx (it's a zip)."""
-        import zipfile
-
         try:
             with zipfile.ZipFile(str(file_path), "r") as zf:
                 with zf.open("word/document.xml") as f:
-                    xml_content = f.read().decode("utf-8")
+                    xml_content = f.read(
+                        settings.max_docx_xml_mb * 1024 * 1024 + 1
+                    ).decode("utf-8")
+                    if len(xml_content.encode("utf-8")) > settings.max_docx_xml_mb * 1024 * 1024:
+                        raise DocumentLimitError(
+                            "DOCX document XML exceeds the configured size limit."
+                        )
                     # Strip XML tags
                     text = re.sub(r"<[^>]+>", " ", xml_content)
                     text = re.sub(r"\s+", " ", text)
                     return text.strip()
+        except DocumentLimitError:
+            raise
         except Exception:
             return ""
 

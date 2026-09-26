@@ -1,7 +1,7 @@
 """Document management routes."""
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.response import DocumentInfo, DocumentListResponse
 from app.services.upload_service import UploadService
@@ -12,7 +12,23 @@ upload_service = UploadService()
 
 
 class DocumentUpdate(BaseModel):
-    filename: str | None = None
+    filename: str | None = Field(default=None, min_length=1, max_length=255)
+
+    @field_validator("filename")
+    @classmethod
+    def validate_filename(cls, filename: str | None) -> str | None:
+        if filename is None:
+            return None
+        normalized = filename.strip()
+        if (
+            not normalized
+            or normalized in {".", ".."}
+            or "/" in normalized
+            or "\\" in normalized
+            or any(ord(character) < 32 or ord(character) == 127 for character in normalized)
+        ):
+            raise ValueError("Filename must be a plain display name.")
+        return normalized
 
 
 @router.get("/documents")

@@ -6,7 +6,7 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -267,6 +267,36 @@ class TestUploadEndpoint:
         )
         assert resp.status_code == 413
 
+    @pytest.mark.parametrize(
+        ("processing_error", "status_code"),
+        [
+            (RuntimeError("/srv/private/uploads/internal-parser-path"), 500),
+            (ValueError("/srv/private/uploads/internal-parser-path"), 400),
+        ],
+    )
+    def test_parser_errors_are_generic_to_clients_and_detailed_in_logs(
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+        processing_error: Exception,
+        status_code: int,
+    ):
+        from app.api.routes import upload
+
+        def fail_processing(**_kwargs):
+            raise processing_error
+
+        monkeypatch.setattr(upload.upload_service, "process_upload_stream", fail_processing)
+        response = client.post(
+            "/api/v1/upload",
+            files={"file": ("document.txt", b"content", "text/plain")},
+        )
+
+        assert response.status_code == status_code
+        assert "internal-parser-path" not in response.text
+        assert "internal-parser-path" in caplog.text
+
 
 class TestUploadSupportedTypesEndpoint:
     def test_returns_supported_types(self, client: TestClient):
@@ -448,6 +478,58 @@ class TestEndToEnd:
         # Verify gone
         list_resp = client.get("/api/v1/documents")
         assert list_resp.json()["total"] == 0
+
+    def test_document_rename_rejects_path_and_control_characters(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        from app.api.routes import documents
+
+        monkeypatch.setattr(
+            documents.upload_service,
+            "get_document",
+            lambda _document_id: {"document_id": "12345678-abc", "filename": "old.txt"},
+        )
+        save_document = MagicMock()
+        monkeypatch.setattr(documents.upload_service, "save_document", save_document)
+        for filename in (
+            "../outside.txt",
+            "folder\\outside.txt",
+            "bad\nname.txt",
+            " ",
+            "x" * 256,
+        ):
+            response = client.patch(
+                "/api/v1/documents/12345678-abc",
+                json={"filename": filename},
+            )
+            assert response.status_code == 422
+        save_document.assert_not_called()
+
+    def test_document_rename_trims_filename(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        from app.api.routes import documents
+
+        monkeypatch.setattr(
+            documents.upload_service,
+            "get_document",
+            lambda _document_id: {"document_id": "12345678-abc", "filename": "old.txt"},
+        )
+        saved_documents: list[dict] = []
+        monkeypatch.setattr(
+            documents.upload_service,
+            "save_document",
+            lambda _document_id, document: saved_documents.append(document.copy()),
+        )
+
+        response = client.patch(
+            "/api/v1/documents/12345678-abc",
+            json={"filename": "  normalized.txt  "},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["filename"] == "normalized.txt"
+        assert saved_documents[0]["filename"] == "normalized.txt"
 
     def test_document_delete_rejects_traversal_and_reserved_names(
         self, client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
