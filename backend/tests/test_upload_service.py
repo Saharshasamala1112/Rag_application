@@ -14,6 +14,7 @@ from app.rag.pipeline import DocumentPipeline
 from app.rag.vector_store import VectorStore
 from app.services import upload_service as upload_service_module
 from app.services.upload_service import (
+    UploadQuotaExceededError,
     UploadService,
     UploadTooLargeError,
     resolve_document_dir,
@@ -86,6 +87,63 @@ def test_document_processing_is_limited_to_configured_concurrency(
     assert maximum_active == concurrency_limit
     assert len(results) == 8
     assert all(result["status"] == "ready" for result in results)
+
+
+@pytest.mark.parametrize(
+    ("quota_setting", "quota_limit", "expected_status"),
+    [
+        ("max_document_count", 1, 429),
+        ("max_total_storage_mb", 1, 413),
+    ],
+)
+def test_upload_quotas_reject_without_processing_or_leaving_partial_data(
+    tmp_path: Path,
+    quota_setting: str,
+    quota_limit: int,
+    expected_status: int,
+):
+    existing = tmp_path / "12345678-ab1"
+    existing.mkdir()
+    (existing / "document_info.json").write_text(
+        json.dumps({"document_id": existing.name, "filename": "existing.bin"}),
+        encoding="utf-8",
+    )
+    (existing / "original.bin").write_bytes(
+        b"x" * (1024 * 1024) if quota_setting == "max_total_storage_mb" else b"x"
+    )
+    service = UploadService.__new__(UploadService)
+    service.pipeline = MagicMock()
+    patches = [
+        patch.object(settings, "upload_dir", tmp_path),
+        patch.object(settings, quota_setting, quota_limit),
+    ]
+
+    with patches[0], patches[1]:
+        with pytest.raises(UploadQuotaExceededError) as error:
+            service.process_upload_stream(BytesIO(b"new"), "new.txt")
+
+    assert error.value.status_code == expected_status
+    assert "quota" in error.value.detail.lower()
+    assert list(tmp_path.iterdir()) == [existing]
+    service.pipeline.process.assert_not_called()
+
+
+def test_document_list_cache_is_invalidated_by_metadata_updates(tmp_path: Path):
+    document_dir = tmp_path / "12345678-ab1"
+    document_dir.mkdir()
+    (document_dir / "document_info.json").write_text(
+        json.dumps({"document_id": document_dir.name, "filename": "old.txt"}),
+        encoding="utf-8",
+    )
+    service = UploadService.__new__(UploadService)
+
+    with patch.object(settings, "upload_dir", tmp_path):
+        assert service.list_documents()[0]["filename"] == "old.txt"
+        assert service.save_document(
+            document_dir.name,
+            {"document_id": document_dir.name, "filename": "new.txt"},
+        )
+        assert service.list_documents()[0]["filename"] == "new.txt"
 
 
 def test_document_path_helper_rejects_symlinks_escaping_upload_root(tmp_path: Path):

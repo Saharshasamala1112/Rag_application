@@ -297,6 +297,35 @@ class TestUploadEndpoint:
         assert "internal-parser-path" not in response.text
         assert "internal-parser-path" in caplog.text
 
+    @pytest.mark.parametrize(
+        ("status_code", "detail"),
+        [
+            (429, "Document-count quota reached."),
+            (413, "Total document storage quota exceeded."),
+        ],
+    )
+    def test_upload_quota_errors_have_explicit_status(
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+        status_code: int,
+        detail: str,
+    ):
+        from app.api.routes import upload
+        from app.services.upload_service import UploadQuotaExceededError
+
+        def reject_upload(**_kwargs):
+            raise UploadQuotaExceededError(detail, status_code)
+
+        monkeypatch.setattr(upload.upload_service, "process_upload_stream", reject_upload)
+        response = client.post(
+            "/api/v1/upload",
+            files={"file": ("document.txt", b"content", "text/plain")},
+        )
+
+        assert response.status_code == status_code
+        assert detail in response.json()["detail"]
+
 
 class TestUploadSupportedTypesEndpoint:
     def test_returns_supported_types(self, client: TestClient):

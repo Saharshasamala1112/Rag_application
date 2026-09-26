@@ -62,9 +62,12 @@ def test_interrupted_assistant_message_is_persisted(tmp_path: Path):
 
 
 def test_conversation_history_is_bounded(tmp_path: Path):
-    with patch.object(settings, "upload_dir", tmp_path):
+    with (
+        patch.object(settings, "upload_dir", tmp_path),
+        patch.object(settings, "max_conversation_messages", 2),
+    ):
         conversation = conversation_service.create_conversation()
-        for index in range(conversation_service.MAX_CONVERSATION_MESSAGES + 1):
+        for index in range(settings.max_conversation_messages + 1):
             conversation_service.add_message(
                 conversation["conversation_id"],
                 "user",
@@ -74,6 +77,23 @@ def test_conversation_history_is_bounded(tmp_path: Path):
 
     assert stored is not None
     messages = stored["messages"]
-    assert len(messages) == conversation_service.MAX_CONVERSATION_MESSAGES
+    assert len(messages) == 2
     assert messages[0]["content"] == "message-1"
-    assert messages[-1]["content"] == "message-200"
+    assert messages[-1]["content"] == "message-2"
+
+
+def test_conversation_list_cache_invalidates_after_changes(tmp_path: Path):
+    with patch.object(settings, "upload_dir", tmp_path):
+        first = conversation_service.create_conversation()
+        cached = conversation_service.list_conversations()
+        cached[0]["title"] = "mutated response"
+
+        second = conversation_service.create_conversation()
+        updated = conversation_service.list_conversations()
+
+    assert len(updated) == 2
+    assert {item["conversation_id"] for item in updated} == {
+        first["conversation_id"],
+        second["conversation_id"],
+    }
+    assert all(item["title"] != "mutated response" for item in updated)

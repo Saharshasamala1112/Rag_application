@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     max_tabular_file_mb: int = 10
     max_concurrent_document_processing: int = 4
     external_parser_timeout_seconds: int = 10
+    max_document_count: int = 1000
+    max_total_storage_mb: int = 10240
+    max_conversation_messages: int = 200
     _available_models: list[str] | None = PrivateAttr(default=None)
     _models_checked_at: float = PrivateAttr(default=0.0)
     _models_lock: threading.Lock = PrivateAttr(default_factory=threading.Lock)
@@ -80,9 +83,12 @@ class Settings(BaseSettings):
                 self.max_tabular_file_mb,
                 self.max_concurrent_document_processing,
                 self.external_parser_timeout_seconds,
+                self.max_document_count,
+                self.max_total_storage_mb,
+                self.max_conversation_messages,
             )
         ):
-            raise ValueError("Document parser limits must be at least 1.")
+            raise ValueError("Configured resource limits must be at least 1.")
         if self.max_context_tokens < 1:
             raise ValueError("MAX_CONTEXT_TOKENS must be at least 1.")
         if not 0.0 <= self.reranker_min_score <= 1.0:

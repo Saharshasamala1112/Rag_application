@@ -8,6 +8,7 @@ import shutil
 import tempfile
 import threading
 import time
+from copy import deepcopy
 from io import BytesIO
 from pathlib import Path
 from typing import BinaryIO
@@ -21,10 +22,61 @@ DOCUMENT_ID_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{3}$")
 _document_processing_slots = threading.BoundedSemaphore(
     settings.max_concurrent_document_processing
 )
+_upload_quota_lock = threading.Lock()
+_document_list_cache_lock = threading.RLock()
+_document_list_cache: list[dict] | None = None
+_document_list_cache_time = 0.0
+_document_list_cache_dir: Path | None = None
+_DOCUMENT_LIST_CACHE_TTL_SECONDS = 2.0
 
 
 class UploadTooLargeError(ValueError):
     pass
+
+
+class UploadQuotaExceededError(ValueError):
+    def __init__(self, detail: str, status_code: int) -> None:
+        super().__init__(detail)
+        self.detail = detail
+        self.status_code = status_code
+
+
+def _invalidate_document_list_cache() -> None:
+    global _document_list_cache
+    with _document_list_cache_lock:
+        _document_list_cache = None
+
+
+def _enforce_document_quotas() -> None:
+    upload_dir = settings.upload_dir
+    document_count = 0
+    total_storage_bytes = 0
+
+    if upload_dir.exists():
+        for child in upload_dir.iterdir():
+            if (
+                not child.is_dir()
+                or not DOCUMENT_ID_PATTERN.fullmatch(child.name)
+                or not (child / "document_info.json").is_file()
+            ):
+                continue
+            document_count += 1
+            for stored_file in child.rglob("*"):
+                if stored_file.is_file() and not stored_file.is_symlink():
+                    total_storage_bytes += stored_file.stat().st_size
+
+    if document_count > settings.max_document_count:
+        raise UploadQuotaExceededError(
+            "Document-count quota reached. Delete a document before uploading another.",
+            status_code=429,
+        )
+
+    storage_limit = settings.max_total_storage_mb * 1024 * 1024
+    if total_storage_bytes > storage_limit:
+        raise UploadQuotaExceededError(
+            "Total document storage quota exceeded.",
+            status_code=413,
+        )
 
 
 def resolve_document_dir(document_id: str) -> Path:
@@ -67,6 +119,7 @@ class UploadService:
                 temporary_file.flush()
                 os.fsync(temporary_file.fileno())
             os.replace(temporary_path, info_file)
+            _invalidate_document_list_cache()
         except Exception:
             if temporary_path is not None:
                 temporary_path.unlink(missing_ok=True)
@@ -126,8 +179,18 @@ class UploadService:
             document_info["file_size"] = file_size
             document_info["status"] = "processing"
             self._save_document_info(output_dir, document_info)
+            with _upload_quota_lock:
+                _enforce_document_quotas()
             with _document_processing_slots:
                 result = self.pipeline.process(file_path)
+            with _upload_quota_lock:
+                _enforce_document_quotas()
+        except UploadQuotaExceededError:
+            try:
+                shutil.rmtree(output_dir)
+            except OSError:
+                logger.exception("Failed to clean up quota-rejected upload %s.", document_id)
+            raise
         except UploadTooLargeError:
             try:
                 shutil.rmtree(output_dir)
@@ -242,27 +305,39 @@ class UploadService:
 
     def list_documents(self) -> list[dict]:
         """List all uploaded documents."""
-        documents = []
+        global _document_list_cache, _document_list_cache_dir
+        global _document_list_cache_time
 
-        if not settings.upload_dir.exists():
-            return documents
+        with _document_list_cache_lock:
+            if (
+                _document_list_cache is not None
+                and _document_list_cache_dir == settings.upload_dir
+                and time.monotonic() - _document_list_cache_time
+                < _DOCUMENT_LIST_CACHE_TTL_SECONDS
+            ):
+                return deepcopy(_document_list_cache)
 
-        for child in sorted(settings.upload_dir.iterdir(), reverse=True):
-            if not child.is_dir():
-                continue
+            documents = []
+            if settings.upload_dir.exists():
+                for child in sorted(settings.upload_dir.iterdir(), reverse=True):
+                    if not child.is_dir():
+                        continue
 
-            try:
-                info_file = resolve_document_dir(child.name) / "document_info.json"
-            except ValueError:
-                continue
-            if info_file.exists():
-                try:
-                    info = json.loads(info_file.read_text(encoding="utf-8"))
-                    documents.append(info)
-                except (json.JSONDecodeError, OSError):
-                    continue
+                    try:
+                        info_file = resolve_document_dir(child.name) / "document_info.json"
+                    except ValueError:
+                        continue
+                    if info_file.exists():
+                        try:
+                            info = json.loads(info_file.read_text(encoding="utf-8"))
+                            documents.append(info)
+                        except (json.JSONDecodeError, OSError):
+                            continue
 
-        return documents
+            _document_list_cache = documents
+            _document_list_cache_dir = settings.upload_dir
+            _document_list_cache_time = time.monotonic()
+            return deepcopy(documents)
 
     def get_document(self, document_id: str) -> dict | None:
         """Get document info by ID."""
@@ -308,6 +383,7 @@ class UploadService:
         except OSError as e:
             logger.error("Failed to delete document %s: %s", document_id, e)
             return False
+        _invalidate_document_list_cache()
 
         from app.rag.retriever import Retriever
 
