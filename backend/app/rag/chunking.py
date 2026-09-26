@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import bisect
 import hashlib
+import logging
 import re
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.config.settings import settings
 from app.models.document import DocumentChunk
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentChunker:
@@ -17,6 +21,7 @@ class DocumentChunker:
         chunk_size: int = settings.chunk_size,
         chunk_overlap: int = settings.chunk_overlap,
     ) -> None:
+        self.chunk_overlap = chunk_overlap
         self.splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
@@ -44,13 +49,23 @@ class DocumentChunker:
         match = re.search(r"^#{1,4}\s+(.+)$", text, re.MULTILINE)
         return match.group(1).strip() if match else None
 
-    def _estimate_page(self, text: str, markdown: str) -> int:
-        """Estimate page number from position in the original markdown."""
-        char_pos = markdown.find(text[:50]) if text else 0
-        if char_pos == -1:
-            char_pos = 0
-        page_breaks = markdown[:char_pos].count("\x0c")
-        return page_breaks + 1
+    @staticmethod
+    def _estimate_page(
+        text: str,
+        markdown: str,
+        page_break_positions: list[int] | None = None,
+        start_pos: int | None = None,
+    ) -> int:
+        """Estimate page number using precomputed form-feed positions."""
+        if start_pos is None:
+            start_pos = markdown.find(text) if text else 0
+        if start_pos < 0:
+            return 1
+        if page_break_positions is None:
+            page_break_positions = [
+                index for index, character in enumerate(markdown) if character == "\x0c"
+            ]
+        return bisect.bisect_right(page_break_positions, start_pos) + 1
 
     def split(
         self,
@@ -64,27 +79,34 @@ class DocumentChunker:
 
         chunks: list[DocumentChunk] = []
         seen_hashes: set[str] = set()
-        current_pos = 0
+        search_pos = 0
         chunk_index = 0
+        page_break_positions = [
+            index for index, character in enumerate(markdown) if character == "\x0c"
+        ]
 
         for text in texts:
+            start_pos = markdown.find(text, search_pos)
+            if start_pos == -1:
+                logger.warning("Skipping chunk that could not be aligned to source text.")
+                continue
+            search_pos = max(start_pos + 1, start_pos + len(text) - self.chunk_overlap)
+
             # Deduplication: skip near-identical chunks
             h = self._content_hash(text)
             if h in seen_hashes:
-                start_pos = markdown.find(text[:80], current_pos)
-                if start_pos == -1:
-                    start_pos = current_pos
-                current_pos = start_pos + len(text)
                 continue
             seen_hashes.add(h)
 
-            start_pos = markdown.find(text[:80], current_pos)
-            if start_pos == -1:
-                start_pos = current_pos
             end_pos = start_pos + len(text)
 
             header = self._extract_header(text)
-            page = self._estimate_page(text, markdown)
+            page = self._estimate_page(
+                text,
+                markdown,
+                page_break_positions=page_break_positions,
+                start_pos=start_pos,
+            )
 
             chunks.append(
                 DocumentChunk(
@@ -101,6 +123,5 @@ class DocumentChunker:
             )
 
             chunk_index += 1
-            current_pos = end_pos
 
         return chunks

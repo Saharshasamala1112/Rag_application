@@ -41,6 +41,29 @@ def test_bm25_empty_documents_and_invalid_indices_are_explicit():
         scorer.score("query", -1)
 
 
+def test_bm25_batch_tokenizes_query_once_and_handles_empty_corpus():
+    scorer = BM25Scorer()
+    scorer.fit(["alpha beta", "", "beta gamma"])
+    original_tokenize = scorer._tokenize
+    calls = 0
+
+    def count_tokenizations(text: str) -> list[str]:
+        nonlocal calls
+        calls += 1
+        return original_tokenize(text)
+
+    scorer._tokenize = count_tokenizations
+    scores = scorer.batch_score("alpha beta", [0, 1, 2])
+    assert len(scores) == 3
+    assert calls == 1
+
+    empty_scorer = BM25Scorer()
+    empty_scorer.fit(["", ""])
+    assert empty_scorer.batch_score("query", [0, 1]) == [0.0, 0.0]
+    with pytest.raises(IndexError):
+        scorer.batch_score("query", [-1])
+
+
 def test_hybrid_retrieval_fuses_semantic_and_bm25_ranks(tmp_path: Path):
     class QueryEmbedding:
         def encode(self, _texts: list[str]) -> np.ndarray:

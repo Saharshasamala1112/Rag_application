@@ -90,6 +90,24 @@ class TestDocumentChunker:
         chunks = chunker.split(md, document_id="doc1", source="large.txt")
         assert len(chunks) > 1
 
+    def test_chunk_offsets_align_with_source_and_progress_through_overlaps(self):
+        markdown = "First paragraph. " * 20
+        chunks = DocumentChunker(chunk_size=40, chunk_overlap=10).split(
+            markdown,
+            document_id="doc1",
+            source="repeat.txt",
+        )
+
+        assert len(chunks) > 1
+        assert all(
+            markdown[chunk.start_pos : chunk.end_pos] == chunk.content
+            for chunk in chunks
+        )
+        assert all(len(chunk.content) <= 40 for chunk in chunks)
+        assert [chunk.start_pos for chunk in chunks] == sorted(
+            chunk.start_pos for chunk in chunks
+        )
+
     def test_pagebreaks_estimated(self, doc_with_pagebreaks: Path):
         md = doc_with_pagebreaks.read_text()
         chunker = DocumentChunker(chunk_size=500, chunk_overlap=50)

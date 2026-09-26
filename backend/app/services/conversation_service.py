@@ -10,6 +10,7 @@ import tempfile
 import threading
 import time
 import uuid
+from copy import deepcopy
 from pathlib import Path
 
 from app.config.settings import settings
@@ -17,7 +18,10 @@ from app.config.settings import settings
 logger = logging.getLogger(__name__)
 _CONVERSATION_ID_PATTERN = re.compile(r"^conv-[0-9a-f]{12}$")
 _conversation_lock = threading.RLock()
-MAX_CONVERSATION_MESSAGES = 200
+_conversation_list_cache: list[dict] | None = None
+_conversation_list_cache_time = 0.0
+_conversation_list_cache_dir: Path | None = None
+_CONVERSATION_LIST_CACHE_TTL_SECONDS = 2.0
 
 
 def _conversations_dir() -> Path:
@@ -47,6 +51,8 @@ def _load(conversation_id: str) -> dict | None:
 
 
 def _save(conversation_id: str, data: dict) -> None:
+    global _conversation_list_cache
+
     path = _conversation_path(conversation_id)
     temporary_path: Path | None = None
     with _conversation_lock:
@@ -64,6 +70,7 @@ def _save(conversation_id: str, data: dict) -> None:
                 temporary_file.flush()
                 os.fsync(temporary_file.fileno())
             os.replace(temporary_path, path)
+            _conversation_list_cache = None
         except Exception:
             if temporary_path is not None:
                 temporary_path.unlink(missing_ok=True)
@@ -85,9 +92,20 @@ def create_conversation(title: str | None = None) -> dict:
 
 
 def list_conversations() -> list[dict]:
+    global _conversation_list_cache, _conversation_list_cache_time
+    global _conversation_list_cache_dir
+
     conv_dir = _conversations_dir()
-    conversations = []
     with _conversation_lock:
+        if (
+            _conversation_list_cache is not None
+            and _conversation_list_cache_dir == conv_dir
+            and time.monotonic() - _conversation_list_cache_time
+            < _CONVERSATION_LIST_CACHE_TTL_SECONDS
+        ):
+            return deepcopy(_conversation_list_cache)
+
+        conversations = []
         for path in sorted(conv_dir.glob("conv-*.json"), reverse=True):
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
@@ -100,7 +118,10 @@ def list_conversations() -> list[dict]:
                 })
             except (json.JSONDecodeError, OSError, KeyError):
                 continue
-    return conversations
+        _conversation_list_cache = conversations
+        _conversation_list_cache_time = time.monotonic()
+        _conversation_list_cache_dir = conv_dir
+        return deepcopy(conversations)
 
 
 def get_conversation(conversation_id: str) -> dict | None:
@@ -139,8 +160,8 @@ def add_message(
         if interrupted:
             msg["interrupted"] = True
         data["messages"].append(msg)
-        if len(data["messages"]) > MAX_CONVERSATION_MESSAGES:
-            del data["messages"][:-MAX_CONVERSATION_MESSAGES]
+        if len(data["messages"]) > settings.max_conversation_messages:
+            del data["messages"][:-settings.max_conversation_messages]
         data["updated_at"] = msg["created_at"]
 
         if role == "user" and len(data["messages"]) == 1:
@@ -151,6 +172,8 @@ def add_message(
 
 
 def delete_conversation(conversation_id: str) -> bool:
+    global _conversation_list_cache
+
     try:
         path = _conversation_path(conversation_id)
     except ValueError:
@@ -158,5 +181,6 @@ def delete_conversation(conversation_id: str) -> bool:
     with _conversation_lock:
         if path.exists():
             path.unlink()
+            _conversation_list_cache = None
             return True
         return False

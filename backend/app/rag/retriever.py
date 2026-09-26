@@ -59,10 +59,13 @@ class BM25Scorer:
         """Score a query against a specific document."""
         if not 0 <= doc_idx < len(self.doc_tfs):
             raise IndexError(f"BM25 document index out of range: {doc_idx}")
+        return self._score_tokens(self._tokenize(query), doc_idx)
+
+    def _score_tokens(self, query_tokens: list[str], doc_idx: int) -> float:
+        if not 0 <= doc_idx < len(self.doc_tfs):
+            raise IndexError(f"BM25 document index out of range: {doc_idx}")
         if self.avg_doc_len == 0:
             return 0.0
-
-        query_tokens = self._tokenize(query)
 
         tf = self.doc_tfs[doc_idx]
         doc_len = self.doc_lens[doc_idx]
@@ -86,7 +89,8 @@ class BM25Scorer:
 
     def batch_score(self, query: str, doc_indices: list[int]) -> list[float]:
         """Score query against multiple documents."""
-        return [self.score(query, idx) for idx in doc_indices]
+        query_tokens = self._tokenize(query)
+        return [self._score_tokens(query_tokens, idx) for idx in doc_indices]
 
 
 class Retriever:

@@ -6,7 +6,11 @@ from pydantic import BaseModel
 from app.config.settings import settings
 from app.models.response import SupportedFileType, SupportedTypesResponse
 from app.rag.document_loader import SUPPORTED_EXTENSIONS, DocumentLimitError
-from app.services.upload_service import UploadService, UploadTooLargeError
+from app.services.upload_service import (
+    UploadQuotaExceededError,
+    UploadService,
+    UploadTooLargeError,
+)
 
 router = APIRouter(tags=["Upload"])
 logger = logging.getLogger(__name__)
@@ -51,6 +55,8 @@ def upload_document(
             filename=file.filename,
             max_size=max_size,
         )
+    except UploadQuotaExceededError as error:
+        raise HTTPException(status_code=error.status_code, detail=error.detail) from error
     except UploadTooLargeError:
         raise HTTPException(
             status_code=413,
@@ -106,6 +112,8 @@ def upload_text(request: TextUploadRequest) -> dict:
             file_content=content,
             filename=filename,
         )
+    except UploadQuotaExceededError as error:
+        raise HTTPException(status_code=error.status_code, detail=error.detail) from error
     except ValueError as error:
         logger.exception("Text upload was rejected.")
         raise HTTPException(
