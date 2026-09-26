@@ -1,5 +1,24 @@
 import api from '../lib/axios'
-import type { QueryRequest, QueryResponse, RagTraceStep } from '../types/chat'
+import type { QueryRequest, QueryResponse, RagTraceStep, SSEEvent } from '../types/chat'
+
+function isSSEEvent(value: unknown): value is SSEEvent {
+  if (!value || typeof value !== 'object') return false
+  const event = value as Record<string, unknown>
+  switch (event.type) {
+    case 'token':
+    case 'status':
+    case 'error':
+      return typeof event.content === 'string'
+    case 'sources':
+      return Array.isArray(event.content)
+    case 'trace':
+      return Boolean(event.content && typeof event.content === 'object')
+    case 'done':
+      return typeof event.content === 'string'
+    default:
+      return false
+  }
+}
 
 export const queryDocuments = async (payload: QueryRequest): Promise<QueryResponse> => {
   const res = await api.post<QueryResponse>('/query', payload)
@@ -30,8 +49,15 @@ export const queryDocumentsStream = async (
     if (signal?.aborted) return
     let detail = `HTTP ${response.status}: ${response.statusText}`
     try {
-      const body = await response.json()
-      if (body.detail) detail = body.detail
+      const body: unknown = await response.json()
+      if (
+        body
+        && typeof body === 'object'
+        && 'detail' in body
+        && typeof body.detail === 'string'
+      ) {
+        detail = body.detail
+      }
     } catch {
       // keep default
     }
@@ -62,7 +88,8 @@ export const queryDocumentsStream = async (
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           try {
-            const event = JSON.parse(line.slice(6))
+            const event: unknown = JSON.parse(line.slice(6))
+            if (!isSSEEvent(event)) continue
             if (event.type === 'token') {
               if (!signal?.aborted) onToken(event.content)
             } else if (event.type === 'sources') {

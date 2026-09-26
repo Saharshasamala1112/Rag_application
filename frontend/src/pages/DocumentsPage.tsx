@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { FileText, Upload, Grid3X3, List, Trash2, Pencil, Check, X, Loader2 } from 'lucide-react'
 import { useDocumentStore } from '../store/document.store'
@@ -14,7 +14,7 @@ type ViewMode = 'grid' | 'list'
 export function DocumentsPage() {
   const documents = useDocumentStore((s) => s.documents)
   const removeDocument = useDocumentStore((s) => s.removeDocument)
-  const { uploadBatch, loading: uploading, uploadQueue } = useUpload()
+  const { uploadBatch, loading: uploading, uploadQueue, fetchDocuments } = useUpload()
   const [view, setView] = useState<ViewMode>('grid')
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -25,6 +25,10 @@ export function DocumentsPage() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    void fetchDocuments()
+  }, [fetchDocuments])
 
   const handleDelete = async () => {
     if (!deleteTarget) return
@@ -79,7 +83,7 @@ export function DocumentsPage() {
     e.preventDefault()
     setIsDragOver(false)
     const files = Array.from(e.dataTransfer.files)
-    if (files.length > 0) uploadBatch(files)
+    if (files.length > 0) void uploadBatch(files)
   }, [uploadBatch])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -94,7 +98,7 @@ export function DocumentsPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
-    if (files.length > 0) uploadBatch(files)
+    if (files.length > 0) void uploadBatch(files)
     e.target.value = ''
   }
 
@@ -259,56 +263,45 @@ export function DocumentsPage() {
               const isEditing = editingId === doc.document_id
 
               return (
-                <Link
+                <div
                   key={doc.document_id}
-                  to={`/documents/${doc.document_id}`}
                   className={cn(
-                    'group relative rounded-xl border bg-surface dark:bg-surface-dark p-4 transition-colors block',
+                    'group relative rounded-xl border bg-surface dark:bg-surface-dark p-4 transition-colors',
                     isSelected
                       ? 'border-accent/50 dark:border-accent-dark/50 ring-1 ring-accent/20 dark:ring-accent-dark/20'
                       : 'border-edge dark:border-edge-dark hover:border-edge-strong dark:hover:border-edge-dark-strong',
                   )}
-                  onClick={(e) => {
-                    if (isEditing || e.defaultPrevented) return
-                  }}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
+                        aria-label={`Select ${doc.filename}`}
                         checked={isSelected}
-                        onChange={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          toggleSelect(doc.document_id)
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="rounded border-edge dark:border-edge-dark text-accent focus:ring-accent/40 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onChange={() => toggleSelect(doc.document_id)}
+                        className="rounded border-edge dark:border-edge-dark text-accent focus:ring-accent/40"
                       />
                       <FileIconLarge extension={doc.filename.split('.').pop() || ''} />
                     </div>
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setDeleteTarget(doc.document_id)
-                      }}
-                      className="p-1 rounded text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark transition-colors opacity-0 group-hover:opacity-100"
+                      onClick={() => setDeleteTarget(doc.document_id)}
+                      className="p-1 rounded text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark transition-colors"
                       title="Delete"
+                      aria-label={`Delete ${doc.filename}`}
                     >
                       <Trash2 size={13} />
                     </button>
                   </div>
 
                   {isEditing ? (
-                    <div className="flex items-center gap-1" onClick={(e) => e.preventDefault()}>
+                    <div className="flex items-center gap-1">
                       <input
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleRename(doc.document_id)
+                          if (e.key === 'Enter') void handleRename(doc.document_id)
                           if (e.key === 'Escape') setEditingId(null)
                         }}
                         autoFocus
@@ -316,40 +309,39 @@ export function DocumentsPage() {
                       />
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          handleRename(doc.document_id)
-                        }}
+                        onClick={() => void handleRename(doc.document_id)}
                         className="p-0.5 text-success dark:text-success-dark"
+                        aria-label={`Save name for ${doc.filename}`}
                       >
                         <Check size={12} />
                       </button>
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          setEditingId(null)
-                        }}
+                        onClick={() => setEditingId(null)}
                         className="p-0.5 text-fg-tertiary dark:text-fg-dark-tertiary"
+                        aria-label="Cancel rename"
                       >
                         <X size={12} />
                       </button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-1">
-                      <p className="text-xs font-medium text-fg dark:text-fg-dark truncate flex-1" title={doc.filename}>
+                      <Link
+                        to={`/documents/${doc.document_id}`}
+                        className="text-xs font-medium text-fg dark:text-fg-dark truncate flex-1"
+                        title={doc.filename}
+                      >
                         {doc.filename}
-                      </p>
+                      </Link>
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
+                        onClick={() => {
                           setEditingId(doc.document_id)
                           setEditName(doc.filename)
                         }}
-                        className="p-0.5 rounded text-fg-muted hover:text-fg dark:text-fg-dark-tertiary dark:hover:text-fg-dark opacity-0 group-hover:opacity-100 transition-all"
+                        className="p-0.5 rounded text-fg-muted hover:text-fg dark:text-fg-dark-tertiary dark:hover:text-fg-dark"
                         title="Rename"
+                        aria-label={`Rename ${doc.filename}`}
                       >
                         <Pencil size={10} />
                       </button>
@@ -359,7 +351,7 @@ export function DocumentsPage() {
                   <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary mt-1">
                     {doc.chunk_count} chunks · {new Date(doc.uploaded_at).toLocaleDateString()}
                   </p>
-                </Link>
+                </div>
               )
             })}
           </div>
@@ -370,40 +362,32 @@ export function DocumentsPage() {
               const isEditing = editingId === doc.document_id
 
               return (
-                <Link
+                <div
                   key={doc.document_id}
-                  to={`/documents/${doc.document_id}`}
                   className={cn(
                     'group flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
                     isSelected
                       ? 'bg-accent-subtle dark:bg-accent-dark-subtle'
                       : 'hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated',
                   )}
-                  onClick={(e) => {
-                    if (isEditing || e.defaultPrevented) return
-                  }}
                 >
                   <input
                     type="checkbox"
+                    aria-label={`Select ${doc.filename}`}
                     checked={isSelected}
-                    onChange={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      toggleSelect(doc.document_id)
-                    }}
-                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => toggleSelect(doc.document_id)}
                     className="rounded border-edge dark:border-edge-dark text-accent focus:ring-accent/40"
                   />
                   <FileIconLarge extension={doc.filename.split('.').pop() || ''} />
                   <div className="flex-1 min-w-0">
                     {isEditing ? (
-                      <div className="flex items-center gap-1" onClick={(e) => e.preventDefault()}>
+                      <div className="flex items-center gap-1">
                         <input
                           type="text"
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleRename(doc.document_id)
+                            if (e.key === 'Enter') void handleRename(doc.document_id)
                             if (e.key === 'Escape') setEditingId(null)
                           }}
                           autoFocus
@@ -411,40 +395,38 @@ export function DocumentsPage() {
                         />
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            handleRename(doc.document_id)
-                          }}
+                          onClick={() => void handleRename(doc.document_id)}
                           className="p-0.5 text-success dark:text-success-dark"
+                          aria-label={`Save name for ${doc.filename}`}
                         >
                           <Check size={12} />
                         </button>
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            setEditingId(null)
-                          }}
+                          onClick={() => setEditingId(null)}
                           className="p-0.5 text-fg-tertiary dark:text-fg-dark-tertiary"
+                          aria-label="Cancel rename"
                         >
                           <X size={12} />
                         </button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5">
-                        <p className="text-xs font-medium text-fg dark:text-fg-dark truncate">
+                        <Link
+                          to={`/documents/${doc.document_id}`}
+                          className="text-xs font-medium text-fg dark:text-fg-dark truncate"
+                        >
                           {doc.filename}
-                        </p>
+                        </Link>
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
+                          onClick={() => {
                             setEditingId(doc.document_id)
                             setEditName(doc.filename)
                           }}
-                          className="p-0.5 rounded text-fg-muted hover:text-fg dark:text-fg-dark-tertiary dark:hover:text-fg-dark opacity-0 group-hover:opacity-100 transition-all"
+                          className="p-0.5 rounded text-fg-muted hover:text-fg dark:text-fg-dark-tertiary dark:hover:text-fg-dark"
                           title="Rename"
+                          aria-label={`Rename ${doc.filename}`}
                         >
                           <Pencil size={10} />
                         </button>
@@ -456,17 +438,14 @@ export function DocumentsPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      setDeleteTarget(doc.document_id)
-                    }}
-                    className="p-1.5 rounded text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark opacity-0 group-hover:opacity-100 transition-all"
+                    onClick={() => setDeleteTarget(doc.document_id)}
+                    className="p-1.5 rounded text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark"
                     title="Delete"
+                    aria-label={`Delete ${doc.filename}`}
                   >
                     <Trash2 size={14} />
                   </button>
-                </Link>
+                </div>
               )
             })}
           </div>
@@ -478,7 +457,7 @@ export function DocumentsPage() {
         title="Delete document"
         description="This will permanently remove the document and all its chunks. This cannot be undone."
         confirmLabel="Delete"
-        onConfirm={handleDelete}
+        onConfirm={() => void handleDelete()}
         onCancel={() => setDeleteTarget(null)}
         loading={deleting}
       />
@@ -488,7 +467,7 @@ export function DocumentsPage() {
         title={`Delete ${selectedIds.length} documents`}
         description={`This will permanently remove ${selectedIds.length} documents and all their chunks. This cannot be undone.`}
         confirmLabel={`Delete ${selectedIds.length} documents`}
-        onConfirm={handleBulkDelete}
+        onConfirm={() => void handleBulkDelete()}
         onCancel={() => setBulkDeleteOpen(false)}
         loading={bulkDeleting}
       />

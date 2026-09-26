@@ -14,6 +14,7 @@ const streamMock = vi.mocked(queryDocumentsStream)
 beforeEach(() => {
   streamMock.mockReset()
   useChatStore.setState({
+    activeStream: null,
     activeSessionId: 'session-1',
     sessions: [{
       id: 'session-1',
@@ -29,8 +30,9 @@ beforeEach(() => {
 
 describe('useChat', () => {
   it('uses the selected document for each submitted question', async () => {
-    streamMock.mockImplementation(async (...args) => {
+    streamMock.mockImplementation((...args) => {
       args[5]()
+      return Promise.resolve()
     })
     const { result } = renderHook(() => useChat())
 
@@ -73,6 +75,80 @@ describe('useChat', () => {
       role: 'assistant',
       content: '',
       isStreaming: false,
+      interrupted: true,
     })
+  })
+
+  it('keeps a cancellable stream in the store across hook unmounts', async () => {
+    let resolveStream: () => void = () => {}
+    let tokenCallback: ((token: string) => void) | undefined
+    streamMock.mockImplementation(async (...args) => {
+      tokenCallback = args[1]
+      await new Promise<void>((resolve) => {
+        resolveStream = resolve
+      })
+      tokenCallback?.('late token')
+    })
+
+    const firstMount = renderHook(() => useChat())
+    let request: Promise<void> = Promise.resolve()
+    await act(async () => {
+      request = firstMount.result.current.ask('keep streaming')
+      await Promise.resolve()
+    })
+    firstMount.unmount()
+
+    const secondMount = renderHook(() => useChat())
+    expect(secondMount.result.current.loading).toBe(true)
+    act(() => secondMount.result.current.cancel())
+    resolveStream()
+    await act(async () => request)
+
+    expect(secondMount.result.current.loading).toBe(false)
+    expect(useChatStore.getState().sessions[0].messages.at(-1)).toMatchObject({
+      content: '',
+      interrupted: true,
+      isStreaming: false,
+    })
+  })
+
+  it('updates the originating session after navigation', async () => {
+    useChatStore.setState((state) => ({
+      sessions: [
+        ...state.sessions,
+        {
+          id: 'session-2',
+          serverConversationId: null,
+          title: 'Other session',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          messages: [],
+        },
+      ],
+    }))
+    let resolveStream: () => void = () => {}
+    let tokenCallback: ((token: string) => void) | undefined
+    streamMock.mockImplementation(async (...args) => {
+      tokenCallback = args[1]
+      await new Promise<void>((resolve) => {
+        resolveStream = resolve
+      })
+      tokenCallback?.('answer')
+      args[5]()
+    })
+    const { result } = renderHook(() => useChat())
+    let request: Promise<void> = Promise.resolve()
+    await act(async () => {
+      request = result.current.ask('question')
+      await Promise.resolve()
+    })
+    act(() => useChatStore.getState().setActiveSession('session-2'))
+    resolveStream()
+    await act(async () => request)
+
+    const sessions = useChatStore.getState().sessions
+    expect(sessions.find((session) => session.id === 'session-1')?.messages.at(-1))
+      .toMatchObject({ content: 'answer', isStreaming: false })
+    expect(sessions.find((session) => session.id === 'session-2')?.messages).toEqual([])
   })
 })

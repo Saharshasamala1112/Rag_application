@@ -152,7 +152,7 @@ describe('ChatStore', () => {
     await new Promise((resolve) => setTimeout(resolve, 700))
     const stored = localStorageMock.getItem('rag-chat-sessions')
     expect(stored).toBeTruthy()
-    const parsed = JSON.parse(stored!)
+    const parsed = JSON.parse(stored!) as { messages: { content: string }[] }[]
     expect(parsed[0].messages[0].content).toBe('Persist me')
   })
 })

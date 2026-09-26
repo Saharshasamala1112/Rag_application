@@ -5,6 +5,7 @@ export type ConversationMessage = {
   content: string
   sources?: Record<string, unknown>[]
   created_at: string
+  interrupted?: boolean
 }
 
 export type ConversationSummary = {

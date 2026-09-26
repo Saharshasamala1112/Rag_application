@@ -34,6 +34,7 @@ export type ChatMessage = {
   trace?: RagTrace
   createdAt: string
   isStreaming?: boolean
+  interrupted?: boolean
 }
 
 export type QueryRequest = {
@@ -52,7 +53,8 @@ export type QueryResponse = {
   total_time_ms: number
 }
 
-export type SSEEvent = {
-  type: 'sources' | 'token' | 'done' | 'error' | 'trace'
-  content: string | ChatSource[] | RagTraceStep
-}
+export type SSEEvent =
+  | { type: 'sources'; content: ChatSource[] }
+  | { type: 'token' | 'status' | 'error'; content: string }
+  | { type: 'done'; content: string; total_time_ms?: number }
+  | { type: 'trace'; content: RagTraceStep }

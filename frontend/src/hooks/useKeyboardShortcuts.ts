@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useChatStore } from '../store/chat.store'
 
 let helpOpenSetter: ((v: boolean) => void) | null = null
@@ -13,10 +14,17 @@ export function useKeyboardShortcuts() {
     const handler = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey
 
+      if (e.key === 'Escape' && useChatStore.getState().activeStream) {
+        e.preventDefault()
+        useChatStore.getState().cancelActiveStream()
+        toast.info('Generation stopped')
+        return
+      }
+
       // Ctrl+K → Search
       if (mod && e.key === 'k') {
         e.preventDefault()
-        navigate('/search')
+        void navigate('/search')
       }
 
       // Ctrl+N → New chat
@@ -24,7 +32,7 @@ export function useKeyboardShortcuts() {
         e.preventDefault()
         const id = createSession()
         setActiveSession(id)
-        navigate('/')
+        void navigate('/')
       }
 
       // Ctrl+/ → Keyboard shortcuts help

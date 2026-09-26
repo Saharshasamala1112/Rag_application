@@ -10,7 +10,7 @@ import { MessageBubble } from '../components/chat/MessageBubble'
 import { EmptyState } from '../components/chat/EmptyState'
 import { ChatComposer } from '../components/chat/ChatComposer'
 import { RagLoadingIndicator } from '../components/chat/RagLoadingIndicator'
-import { Badge } from '../components/ui/Badge'
+import { DocumentScopeBadge } from '../components/chat/DocumentScopeBadge'
 import { Tooltip } from '../components/ui/Tooltip'
 
 interface LayoutContext {
@@ -45,7 +45,7 @@ export const Chat = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    fetchDocuments()
+    void fetchDocuments()
   }, [fetchDocuments])
 
   useEffect(() => {
@@ -83,7 +83,7 @@ export const Chat = () => {
         setActiveDocument(doc.document_id)
         toast.success(`Uploaded "${doc.filename}" — ask a question about it`)
       }
-      fetchDocuments()
+      void fetchDocuments()
     } catch {
       toast.error('Upload failed')
     }
@@ -133,10 +133,6 @@ export const Chat = () => {
       e.preventDefault()
       void handleSubmit()
     }
-    if (e.key === 'Escape' && loading) {
-      cancel()
-      toast.info('Generation cancelled')
-    }
   }
 
   const activeDoc = documents.find((d) => d.document_id === activeDocument)
@@ -169,17 +165,10 @@ export const Chat = () => {
       <div className="flex items-center justify-between px-4 h-12 border-b border-edge dark:border-edge-dark shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <Sparkles size={14} className="text-fg-tertiary dark:text-fg-dark-tertiary shrink-0" />
-          {activeDoc ? (
-            <>
-              <Badge variant="accent" className="max-w-[200px] truncate">
-                <span className="truncate">{activeDoc.filename}</span>
-              </Badge>
-            </>
-          ) : (
-            <span className="text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary">
-              New conversation
-            </span>
-          )}
+          <DocumentScopeBadge
+            documentName={activeDoc?.filename ?? null}
+            onClear={() => setActiveDocument(null)}
+          />
         </div>
 
         {/* Loading indicator in header */}
@@ -284,7 +273,7 @@ export const Chat = () => {
         selectedFile={selectedFile}
         onFileSelect={setSelectedFile}
         uploading={uploading}
-        onUpload={handleUpload}
+        onUpload={() => void handleUpload()}
         fileInputRef={fileInputRef}
       />
     </>

@@ -11,12 +11,21 @@ export default defineConfig([
     files: ['**/*.{ts,tsx}'],
     extends: [
       js.configs.recommended,
-      tseslint.configs.recommended,
+      tseslint.configs.recommendedTypeChecked,
       reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
     ],
     languageOptions: {
       globals: globals.browser,
+      parserOptions: {
+        projectService: {
+          allowDefaultProject: [
+            'eslint.config.ts',
+            'postcss.config.ts',
+            'tailwind.config.ts',
+          ],
+        },
+      },
     },
   },
 ])

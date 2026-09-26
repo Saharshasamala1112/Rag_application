@@ -32,11 +32,11 @@ export default {
         fg: {
           DEFAULT: '#1C1917',       // stone-900 light
           secondary: '#78716C',     // stone-500 light
-          tertiary: '#A8A29E',      // stone-400 light
-          muted: '#D6D3D1',         // stone-300 light
+          tertiary: '#6B6560',     // accessible warm gray on light surfaces
+          muted: '#6B6560',
           dark: '#F5F5F5',          // light text dark
           'dark-secondary': '#A1A1AA', // zinc-400 dark
-          'dark-tertiary': '#71717A', // zinc-500 dark
+          'dark-tertiary': '#8B8B95', // accessible zinc on dark surfaces
         },
         // Accent — restrained teal/slate
         accent: {

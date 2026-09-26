@@ -1,15 +1,23 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Clock, Trash2, MessageSquare, Search } from 'lucide-react'
 import { useChatStore } from '../store/chat.store'
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog'
 
 export function HistoryPage() {
+  const navigate = useNavigate()
   const sessions = useChatStore((s) => s.sessions)
   const activeSessionId = useChatStore((s) => s.activeSessionId)
   const setActiveSession = useChatStore((s) => s.setActiveSession)
   const deleteSession = useChatStore((s) => s.deleteSession)
+  const loadServerConversations = useChatStore((s) => s.loadServerConversations)
+  const syncSessionFromServer = useChatStore((s) => s.syncSessionFromServer)
   const [search, setSearch] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+
+  useEffect(() => {
+    void loadServerConversations()
+  }, [loadServerConversations])
 
   const sorted = useMemo(() => {
     const filtered = sessions.filter((s) =>
@@ -37,6 +45,7 @@ export function HistoryPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search conversations"
               placeholder="Search conversations..."
               className="w-full pl-8 pr-3 py-1.5 text-[11px] bg-surface-secondary dark:bg-surface-dark-elevated border border-edge dark:border-edge-dark rounded-md text-fg dark:text-fg-dark placeholder-fg-tertiary focus:outline-none focus:ring-1 focus:ring-accent/40"
             />
@@ -64,38 +73,46 @@ export function HistoryPage() {
               return (
                 <div
                   key={session.id}
-                  className={`group flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors cursor-pointer ${
+                  className={`group flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
                     activeSessionId === session.id
                       ? 'border-accent/30 dark:border-accent-dark/30 bg-accent-subtle dark:bg-accent-dark-subtle'
                       : 'border-edge dark:border-edge-dark hover:border-edge-strong dark:hover:border-edge-dark-strong bg-surface dark:bg-surface-dark'
                   }`}
-                  onClick={() => {
-                    setActiveSession(session.id)
-                    window.location.href = '/'
-                  }}
                 >
-                  <MessageSquare size={14} className="text-fg-tertiary dark:text-fg-dark-tertiary shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-fg dark:text-fg-dark truncate">
-                      {session.title || 'Untitled conversation'}
-                    </p>
-                    {preview && (
-                      <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary truncate mt-0.5">
-                        {preview}
+                  <button
+                    type="button"
+                    aria-pressed={activeSessionId === session.id}
+                    onClick={() => {
+                      setActiveSession(session.id)
+                      void syncSessionFromServer(session.id)
+                      void navigate('/')
+                    }}
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                  >
+                    <MessageSquare size={14} className="text-fg-tertiary dark:text-fg-dark-tertiary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-fg dark:text-fg-dark truncate">
+                        {session.title || 'Untitled conversation'}
                       </p>
-                    )}
-                    <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary mt-0.5">
-                      {session.messages.length} message{session.messages.length !== 1 ? 's' : ''} · {new Date(session.updatedAt).toLocaleDateString()}
-                    </p>
-                  </div>
+                      {preview && (
+                        <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary truncate mt-0.5">
+                          {preview}
+                        </p>
+                      )}
+                      <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary mt-0.5">
+                        {session.messages.length} message{session.messages.length !== 1 ? 's' : ''} · {new Date(session.updatedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </button>
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation()
                       setDeleteTarget(session.id)
                     }}
-                    className="p-1.5 rounded text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark opacity-0 group-hover:opacity-100 transition-all"
+                    className="p-1.5 rounded text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark"
                     title="Delete conversation"
+                    aria-label={`Delete ${session.title || 'conversation'}`}
                   >
                     <Trash2 size={13} />
                   </button>
@@ -111,7 +128,7 @@ export function HistoryPage() {
         title="Delete conversation"
         description="This will permanently remove this conversation and all its messages."
         confirmLabel="Delete"
-        onConfirm={handleDelete}
+        onConfirm={() => void handleDelete()}
         onCancel={() => setDeleteTarget(null)}
       />
     </div>

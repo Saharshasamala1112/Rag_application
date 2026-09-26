@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useId, useRef } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { useDialogFocus } from '../../hooks/useDialogFocus'
 
 interface ConfirmationDialogProps {
   open: boolean
@@ -25,22 +26,10 @@ export function ConfirmationDialog({
   onCancel,
   loading = false,
 }: ConfirmationDialogProps) {
-  const cancelRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    if (open) {
-      cancelRef.current?.focus()
-    }
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel()
-    }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [open, onCancel])
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const titleId = useId()
+  const descriptionId = useId()
+  useDialogFocus(open, onCancel, dialogRef)
 
   if (!open) return null
 
@@ -52,10 +41,12 @@ export function ConfirmationDialog({
         aria-hidden="true"
       />
       <div
+        ref={dialogRef}
         role="alertdialog"
         aria-modal="true"
-        aria-labelledby="dialog-title"
-        aria-describedby="dialog-desc"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        tabIndex={-1}
         className={cn(
           'relative z-10 w-full max-w-sm mx-4 rounded-xl shadow-lg animate-scale-in',
           'bg-surface border border-edge',
@@ -64,10 +55,10 @@ export function ConfirmationDialog({
       >
         <div className="flex items-start justify-between p-5 pb-0">
           <div className="flex-1">
-            <h3 id="dialog-title" className="text-sm font-semibold text-fg dark:text-fg-dark">
+            <h3 id={titleId} className="text-sm font-semibold text-fg dark:text-fg-dark">
               {title}
             </h3>
-            <p id="dialog-desc" className="mt-1.5 text-xs text-fg-secondary dark:text-fg-dark-secondary leading-relaxed">
+            <p id={descriptionId} className="mt-1.5 text-xs text-fg-secondary dark:text-fg-dark-secondary leading-relaxed">
               {description}
             </p>
           </div>
@@ -82,7 +73,6 @@ export function ConfirmationDialog({
         </div>
         <div className="flex justify-end gap-2 p-5 pt-4">
           <button
-            ref={cancelRef}
             type="button"
             onClick={onCancel}
             className="px-3 py-1.5 text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary rounded-md hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated transition-colors"

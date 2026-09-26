@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react'
+import { useState, useRef, useEffect, useCallback, useId, type ReactNode } from 'react'
 import { cn } from '../../lib/utils'
 
 interface DropdownItem {
@@ -17,9 +17,12 @@ interface DropdownProps {
   className?: string
 }
 
-export function Dropdown({ trigger, items, align = 'left' }: DropdownProps) {
+export function Dropdown({ trigger, items, align = 'left', className }: DropdownProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const menuId = useId()
 
   const close = useCallback(() => setOpen(false), [])
 
@@ -34,26 +37,84 @@ export function Dropdown({ trigger, items, align = 'left' }: DropdownProps) {
 
   useEffect(() => {
     if (!open) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close()
+    const items = menuRef.current?.querySelectorAll<HTMLButtonElement>(
+      '[role="menuitem"]:not(:disabled)',
+    )
+    items?.[0]?.focus()
+  }, [open])
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!open && event.key === 'ArrowDown') {
+      event.preventDefault()
+      setOpen(true)
+      return
     }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [open, close])
+    if (!open) return
+
+    const menuItems = Array.from(
+      menuRef.current?.querySelectorAll<HTMLButtonElement>(
+        '[role="menuitem"]:not(:disabled)',
+      ) ?? [],
+    )
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      close()
+      triggerRef.current?.focus()
+      return
+    }
+    if (!menuItems.length) return
+    const currentIndex = menuItems.indexOf(document.activeElement as HTMLButtonElement)
+    let nextIndex: number | null = null
+    if (event.key === 'ArrowDown') {
+      nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % menuItems.length
+    }
+    if (event.key === 'ArrowUp') {
+      nextIndex = currentIndex < 0
+        ? menuItems.length - 1
+        : (currentIndex - 1 + menuItems.length) % menuItems.length
+    }
+    if (event.key === 'Home') nextIndex = 0
+    if (event.key === 'End') nextIndex = menuItems.length - 1
+    if (nextIndex !== null) {
+      event.preventDefault()
+      menuItems[nextIndex]?.focus()
+    }
+  }
 
   return (
-    <div ref={ref} className="relative inline-flex">
-      <div onClick={() => setOpen((o) => !o)} className="cursor-pointer">
+    <div
+      ref={ref}
+      className={cn('relative inline-flex', className)}
+      onKeyDown={handleKeyDown}
+      onBlur={(event) => {
+        if (
+          !(event.relatedTarget instanceof Node)
+          || !event.currentTarget.contains(event.relatedTarget)
+        ) close()
+      }}
+    >
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={menuId}
+        onClick={() => setOpen((value) => !value)}
+        className="inline-flex items-center"
+      >
         {trigger}
-      </div>
+      </button>
       {open && (
         <div
+          ref={menuRef}
+          id={menuId}
           className={cn(
             'absolute z-50 mt-1 min-w-[160px] py-1 rounded-lg border shadow-panel animate-scale-in',
             'bg-surface border-edge dark:bg-surface-dark dark:border-edge-dark',
             align === 'right' ? 'right-0' : 'left-0',
           )}
           role="menu"
+          aria-orientation="vertical"
         >
           {items.map((item, i) => {
             if (item.divider) {
@@ -68,6 +129,7 @@ export function Dropdown({ trigger, items, align = 'left' }: DropdownProps) {
                 onClick={() => {
                   item.onClick?.()
                   close()
+                  triggerRef.current?.focus()
                 }}
                 className={cn(
                   'flex items-center gap-2 w-full px-3 py-1.5 text-xs text-left transition-colors',
