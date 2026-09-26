@@ -1,5 +1,25 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useChatStore } from '../store/chat.store'
+import * as conversationService from '../services/conversation.service'
+import { ApiError } from '../lib/axios'
+
+vi.mock('../services/conversation.service', () => ({
+  getConversation: vi.fn(),
+  createConversation: vi.fn(),
+  listConversations: vi.fn(),
+  deleteConversation: vi.fn(),
+}))
+
+const getConversationMock = vi.mocked(conversationService.getConversation)
+const createConversationMock = vi.mocked(conversationService.createConversation)
+
+const conversationDetail = (id: string) => ({
+  conversation_id: id,
+  title: 'New conversation',
+  messages: [],
+  created_at: '2026-09-27T00:00:00Z',
+  updated_at: '2026-09-27T00:00:00Z',
+})
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -23,6 +43,9 @@ Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock })
 describe('ChatStore', () => {
   beforeEach(() => {
     localStorageMock.clear()
+    getConversationMock.mockReset()
+    createConversationMock.mockReset()
+    createConversationMock.mockResolvedValue(conversationDetail('conv-created12345'))
     // Reset store to initial state
     useChatStore.setState({
       sessions: [
@@ -164,5 +187,69 @@ describe('ChatStore', () => {
     expect(stored).toBeTruthy()
     const parsed = JSON.parse(stored!) as { messages: { content: string }[] }[]
     expect(parsed[0].messages[0].content).toBe('Persist me')
+  })
+
+  it('ensureServerConversation creates a conversation when the session has none', async () => {
+    const id = await useChatStore.getState().ensureServerConversation()
+    expect(id).toBe('conv-created12345')
+    expect(useChatStore.getState().sessions[0].serverConversationId).toBe('conv-created12345')
+    expect(getConversationMock).not.toHaveBeenCalled()
+  })
+
+  it('ensureServerConversation reuses a conversation the server still knows', async () => {
+    useChatStore.setState((state) => ({
+      sessions: state.sessions.map((session) => ({
+        ...session,
+        serverConversationId: 'conv-valid12345',
+      })),
+    }))
+    getConversationMock.mockResolvedValue(conversationDetail('conv-valid12345'))
+
+    const id = await useChatStore.getState().ensureServerConversation()
+
+    expect(id).toBe('conv-valid12345')
+    expect(createConversationMock).not.toHaveBeenCalled()
+    expect(useChatStore.getState().sessions[0].serverConversationId).toBe('conv-valid12345')
+  })
+
+  it('ensureServerConversation replaces an id the server reports as 404', async () => {
+    useChatStore.setState((state) => ({
+      sessions: state.sessions.map((session) => ({
+        ...session,
+        serverConversationId: 'conv-stale1234',
+      })),
+    }))
+    getConversationMock.mockRejectedValue(new ApiError('Conversation not found.', 404, null))
+
+    const id = await useChatStore.getState().ensureServerConversation()
+
+    expect(getConversationMock).toHaveBeenCalledWith('conv-stale1234')
+    expect(id).toBe('conv-created12345')
+    expect(useChatStore.getState().sessions[0].serverConversationId).toBe('conv-created12345')
+  })
+
+  it('ensureServerConversation keeps the current id when validation fails transiently', async () => {
+    useChatStore.setState((state) => ({
+      sessions: state.sessions.map((session) => ({
+        ...session,
+        serverConversationId: 'conv-keepme1234',
+      })),
+    }))
+    getConversationMock.mockRejectedValue(new ApiError('Request failed', undefined, undefined))
+
+    const id = await useChatStore.getState().ensureServerConversation()
+
+    expect(id).toBe('conv-keepme1234')
+    expect(createConversationMock).not.toHaveBeenCalled()
+    expect(useChatStore.getState().sessions[0].serverConversationId).toBe('conv-keepme1234')
+  })
+
+  it('ensureServerConversation returns null when no conversation can be created', async () => {
+    createConversationMock.mockRejectedValue(new ApiError('Network Error', undefined, undefined))
+
+    const id = await useChatStore.getState().ensureServerConversation()
+
+    expect(id).toBeNull()
+    expect(useChatStore.getState().sessions[0].serverConversationId).toBeNull()
   })
 })

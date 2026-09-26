@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { ChatMessage, ChatSource, RagTrace } from '../types/chat'
 import * as conversationService from '../services/conversation.service'
+import { ApiError } from '../lib/axios'
 
 const STORAGE_KEY = 'rag-chat-sessions'
 
@@ -42,7 +43,7 @@ type ChatState = {
   setActiveSession: (sessionId: string) => void
   deleteSession: (sessionId: string) => void
   getMessages: (sessionId?: string) => ChatMessage[]
-  getServerConversationId: () => string | null
+  ensureServerConversation: (sessionId?: string) => Promise<string | null>
   loadServerConversations: () => Promise<void>
   syncSessionFromServer: (sessionId: string) => Promise<void>
 }
@@ -68,6 +69,7 @@ const loadSessions = (): ChatSession[] => {
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null
 let serverConversationLoad: Promise<void> | null = null
+const pendingEnsures = new Map<string, Promise<string | null>>()
 
 const saveSessionsDebounced = (sessions: ChatSession[]) => {
   if (typeof window === 'undefined') return
@@ -112,9 +114,48 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return active?.messages ?? []
   },
 
-  getServerConversationId: () => {
-    const active = get().sessions.find((session) => session.id === get().activeSessionId)
-    return active?.serverConversationId ?? null
+  ensureServerConversation: (sessionId) => {
+    const targetId = sessionId ?? get().activeSessionId
+    const pending = pendingEnsures.get(targetId)
+    if (pending) return pending
+
+    const task = (async () => {
+      const session = get().sessions.find((item) => item.id === targetId)
+      const existing = session?.serverConversationId ?? null
+
+      if (existing) {
+        try {
+          await conversationService.getConversation(existing)
+          return existing
+        } catch (error) {
+          // Only replace a conversation the server no longer knows about;
+          // transient failures keep the current id.
+          if (!(error instanceof ApiError) || error.status !== 404) {
+            return existing
+          }
+        }
+      }
+
+      try {
+        const conversation = await conversationService.createConversation()
+        set((state) => ({
+          sessions: state.sessions.map((item) =>
+            item.id === targetId
+              ? { ...item, serverConversationId: conversation.conversation_id }
+              : item,
+          ),
+        }))
+        return conversation.conversation_id
+      } catch {
+        // Server unavailable — callers fall back to local-only mode.
+        return null
+      }
+    })().finally(() => {
+      pendingEnsures.delete(targetId)
+    })
+
+    pendingEnsures.set(targetId, task)
+    return task
   },
 
   addUserMessage: (message, sessionId) => {
