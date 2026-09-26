@@ -9,15 +9,18 @@ interface NavItemProps {
   label: string
   collapsed?: boolean
   exact?: boolean
+  /** Fired on activation, e.g. to dismiss the mobile navigation drawer. */
+  onClick?: () => void
 }
 
-export function NavItem({ to, icon: Icon, label, collapsed, exact }: NavItemProps) {
+export function NavItem({ to, icon: Icon, label, collapsed, exact, onClick }: NavItemProps) {
   const location = useLocation()
   const isActive = exact ? location.pathname === to : location.pathname.startsWith(to) && (to !== '/' || location.pathname === '/')
 
   const content = (
     <NavLink
       to={to}
+      onClick={onClick}
       className={cn(
         'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-all duration-150',
         collapsed && 'justify-center px-0',

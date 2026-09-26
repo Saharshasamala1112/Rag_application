@@ -7,62 +7,81 @@ interface ContextPanelProps {
   open: boolean
   onClose: () => void
   selectedSource?: ChatSource | null
+  /** Desktop layout: the panel sits in the flow. Below `lg` it is a right-hand sheet. */
+  isDesktop: boolean
 }
 
-export function ContextPanel({ open, onClose, selectedSource }: ContextPanelProps) {
+export function ContextPanel({ open, onClose, selectedSource, isDesktop }: ContextPanelProps) {
+  const isSheet = !isDesktop
+
+  // The sheet only exists while open, so a closed panel stays out of the
+  // accessibility tree on small screens.
+  if (isSheet && !open) return null
+
   return (
-    <aside
-      className={cn(
-        'flex flex-col h-full border-l border-edge dark:border-edge-dark',
-        'bg-surface dark:bg-surface-dark',
-        'transition-all duration-200 ease-in-out',
-        open ? 'w-96' : 'w-0',
-        'overflow-hidden',
+    <>
+      {isSheet && open && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40"
+          onClick={onClose}
+          aria-hidden="true"
+          data-testid="context-panel-backdrop"
+        />
       )}
-    >
-      {open && (
-        <>
-          <div className="flex h-12 items-center justify-between px-4 border-b border-edge dark:border-edge-dark shrink-0">
-            <span className="text-2xs font-semibold text-fg-secondary dark:text-fg-dark-secondary uppercase tracking-wider">
-              RAG Trace
-            </span>
-            <button
-              type="button"
-              onClick={onClose}
-              className={cn(
-                'flex items-center justify-center w-7 h-7 rounded-md transition-colors',
-                'text-fg-tertiary hover:text-fg hover:bg-surface-secondary',
-                'dark:text-fg-dark-tertiary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated',
-              )}
-              aria-label="Close panel"
-            >
-              <X size={14} />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {selectedSource && (
-              <section
-                className="border-b border-edge px-4 py-3 dark:border-edge-dark"
-                aria-label="Selected source"
+      <aside
+        className={cn(
+          'flex flex-col h-full border-l border-edge dark:border-edge-dark',
+          'bg-surface dark:bg-surface-dark',
+          isDesktop
+            ? 'transition-all duration-200 ease-in-out overflow-hidden'
+            : 'fixed inset-y-0 right-0 z-40 w-80 max-w-[85vw] shadow-xl',
+          isDesktop && (open ? 'w-96' : 'w-0'),
+        )}
+      >
+        {open && (
+          <>
+            <div className="flex h-12 items-center justify-between px-4 border-b border-edge dark:border-edge-dark shrink-0">
+              <span className="text-2xs font-semibold text-fg-secondary dark:text-fg-dark-secondary uppercase tracking-wider">
+                RAG Trace
+              </span>
+              <button
+                type="button"
+                onClick={onClose}
+                className={cn(
+                  'flex items-center justify-center w-7 h-7 rounded-md transition-colors',
+                  'text-fg-tertiary hover:text-fg hover:bg-surface-secondary',
+                  'dark:text-fg-dark-tertiary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated',
+                )}
+                aria-label="Close panel"
               >
-                <p className="text-2xs font-semibold uppercase tracking-wider text-fg-tertiary dark:text-fg-dark-tertiary">
-                  Selected source
-                </p>
-                <p className="mt-1 text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary">
-                  {selectedSource.source}
-                  {selectedSource.page_number != null
-                    ? ` · p.${selectedSource.page_number}`
-                    : ''}
-                </p>
-                <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-fg-secondary dark:text-fg-dark-secondary">
-                  {selectedSource.content}
-                </p>
-              </section>
-            )}
-            <RagTracePanel />
-          </div>
-        </>
-      )}
-    </aside>
+                <X size={14} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {selectedSource && (
+                <section
+                  className="border-b border-edge px-4 py-3 dark:border-edge-dark"
+                  aria-label="Selected source"
+                >
+                  <p className="text-2xs font-semibold uppercase tracking-wider text-fg-tertiary dark:text-fg-dark-tertiary">
+                    Selected source
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary">
+                    {selectedSource.source}
+                    {selectedSource.page_number != null
+                      ? ` · p.${selectedSource.page_number}`
+                      : ''}
+                  </p>
+                  <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-fg-secondary dark:text-fg-dark-secondary">
+                    {selectedSource.content}
+                  </p>
+                </section>
+              )}
+              <RagTracePanel />
+            </div>
+          </>
+        )}
+      </aside>
+    </>
   )
 }
