@@ -16,6 +16,7 @@ dependencies = [
     "faiss-cpu==1.15.0",
     "numpy==2.5.1",
     "ollama==0.6.2",
+    "tiktoken==0.14.0",
 ]
 
 [project.optional-dependencies]

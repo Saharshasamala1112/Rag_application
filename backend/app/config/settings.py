@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     # Reranker
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     reranker_top_k: int = 8
+    reranker_min_score: float = 0.15
 
     # Chunking
     chunk_size: int = 800
@@ -47,6 +48,7 @@ class Settings(BaseSettings):
     # Retrieval
     retrieval_top_k: int = 12
     final_top_k: int = 5
+    max_context_tokens: int = 1500
 
     # Upload
     upload_dir: Path = Path("data/uploads")
@@ -63,6 +65,10 @@ class Settings(BaseSettings):
             )
         if self.max_file_size_mb < 1:
             raise ValueError("MAX_FILE_SIZE_MB must be at least 1.")
+        if self.max_context_tokens < 1:
+            raise ValueError("MAX_CONTEXT_TOKENS must be at least 1.")
+        if not 0.0 <= self.reranker_min_score <= 1.0:
+            raise ValueError("RERANKER_MIN_SCORE must be between 0 and 1.")
         if self.log_level.upper() not in {
             "CRITICAL",
             "ERROR",

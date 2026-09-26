@@ -20,6 +20,12 @@ def test_wildcard_cors_is_allowed_without_credentials():
     assert settings.cors_origins == ["*"]
 
 
+def test_reranker_threshold_must_be_a_probability():
+    assert Settings(reranker_min_score=0.15).reranker_min_score == 0.15
+    with pytest.raises(ValidationError, match="between 0 and 1"):
+        Settings(reranker_min_score=1.1)
+
+
 def test_ollama_model_list_uses_the_configured_ttl_cache():
     settings = Settings()
     settings._available_models = None
