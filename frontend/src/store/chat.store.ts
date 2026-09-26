@@ -23,7 +23,7 @@ type ChatState = {
   setTrace: (messageId: string, trace: RagTrace) => void
   finishStreaming: (messageId: string) => void
   clearMessages: () => void
-  createSession: () => void
+  createSession: () => string
   setActiveSession: (sessionId: string) => void
   deleteSession: (sessionId: string) => void
   getMessages: () => ChatMessage[]
@@ -217,6 +217,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }).catch(() => {
       // Server unavailable — local-only mode still works
     })
+    return nextSession.id
   },
 
   setActiveSession: (sessionId) => {

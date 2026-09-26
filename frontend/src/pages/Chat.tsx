@@ -30,8 +30,8 @@ export const Chat = () => {
     cancel,
   } = useChat()
 
-  const { upload, uploadTextContent, loading: uploading, fetchDocuments } = useUpload()
-  const activeDocument = useDocumentStore((s) => s.activeDocument)
+  const { upload, loading: uploading, fetchDocuments } = useUpload()
+  const activeDocument = useDocumentStore((s) => s.activeDocumentId)
   const documents = useDocumentStore((s) => s.documents)
   const setActiveDocument = useDocumentStore((s) => s.setActiveDocument)
 
@@ -112,18 +112,11 @@ export const Chat = () => {
     setIsDragOver(false)
   }, [])
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     const q = inputValue.trim()
     if (!q || loading) return
     setInputValue('')
-
-    const doc = await uploadTextContent(q, `query-${Date.now()}`)
-    if (doc) {
-      setActiveDocument(doc.document_id)
-      fetchDocuments()
-    }
-
-    await ask(q)
+    void ask(q)
   }
 
   const handleStopOrSubmit = () => {

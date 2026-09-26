@@ -206,11 +206,11 @@ export function SearchPage() {
                             <div className="w-12 h-1 rounded-full bg-surface-secondary dark:bg-surface-dark-elevated overflow-hidden">
                               <div
                                 className="h-full rounded-full bg-accent dark:bg-accent-dark"
-                                style={{ width: `${Math.min(src.score, 100)}%` }}
+                                style={{ width: `${Math.min(src.score * 100, 100)}%` }}
                               />
                             </div>
                             <span className="text-2xs text-accent dark:text-accent-dark font-medium">
-                              {src.score.toFixed(0)}%
+                              {Math.round(src.score * 100)}%
                             </span>
                           </div>
                         )}

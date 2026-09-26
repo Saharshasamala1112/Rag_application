@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 from app.config.settings import settings
 from app.rag.document_loader import SUPPORTED_EXTENSIONS
-from app.services.upload_service import UploadService
+from app.services.upload_service import UploadService, UploadTooLargeError
 
 router = APIRouter(tags=["Upload"])
 
@@ -18,7 +18,7 @@ class TextUploadRequest(BaseModel):
 
 
 @router.post("/upload")
-async def upload_document(
+def upload_document(
     file: UploadFile = File(...),
 ) -> dict:
     """Upload and process a document (PDF, TXT, MD, CSV, JSON, HTML, code files)."""
@@ -34,25 +34,26 @@ async def upload_document(
             detail=f"Unsupported file type '{ext}'. Supported: {supported}",
         )
 
-    content = await file.read()
-
-    if not content:
-        raise HTTPException(status_code=400, detail="File is empty.")
-
     max_size = settings.max_file_size_mb * 1024 * 1024
-    if len(content) > max_size:
+    if file.size is not None and file.size > max_size:
         raise HTTPException(
             status_code=413,
             detail=f"File too large. Maximum size is {settings.max_file_size_mb}MB.",
         )
 
     try:
-        doc_info = upload_service.process_upload(
-            file_content=content,
+        doc_info = upload_service.process_upload_stream(
+            file_stream=file.file,
             filename=file.filename,
+            max_size=max_size,
+        )
+    except UploadTooLargeError:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size is {settings.max_file_size_mb}MB.",
         )
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -68,11 +69,22 @@ async def upload_document(
 
 
 @router.post("/upload/text")
-async def upload_text(request: TextUploadRequest) -> dict:
+def upload_text(request: TextUploadRequest) -> dict:
     """Create a document from typed text content."""
 
     if not request.content.strip():
         raise HTTPException(status_code=400, detail="Content is empty.")
+
+    content = request.content.encode("utf-8")
+    max_size = settings.max_file_size_mb * 1024 * 1024
+    if len(content) > max_size:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Text content too large. Maximum size is "
+                f"{settings.max_file_size_mb}MB."
+            ),
+        )
 
     filename = request.filename or "typed-note.txt"
     if not filename.endswith(".txt"):
@@ -80,9 +92,11 @@ async def upload_text(request: TextUploadRequest) -> dict:
 
     try:
         doc_info = upload_service.process_upload(
-            file_content=request.content.encode("utf-8"),
+            file_content=content,
             filename=filename,
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(
             status_code=500,

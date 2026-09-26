@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import tempfile
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from app.config.settings import settings
+from app.middleware import RequestBodyLimitMiddleware
 
 
 @pytest.fixture()
@@ -19,8 +24,13 @@ def client():
     with tempfile.TemporaryDirectory() as td:
         with patch("app.config.settings.settings.upload_dir", Path(td)):
             with patch("app.main.settings.upload_dir", Path(td)):
-                with TestClient(app, raise_server_exceptions=False) as c:
-                    yield c
+                with patch.object(settings, "api_key", SecretStr("test-api-key")):
+                    with TestClient(
+                        app,
+                        headers={"X-API-Key": "test-api-key"},
+                        raise_server_exceptions=False,
+                    ) as c:
+                        yield c
 
 
 class TestRootEndpoint:
@@ -54,6 +64,24 @@ class TestHealthEndpoint:
         assert "model" in data
         assert "embedding_model" in data
 
+    def test_health_does_not_require_api_key(self, client: TestClient):
+        resp = client.get("/api/v1/health", headers={"X-API-Key": "invalid"})
+        assert resp.status_code == 200
+
+
+class TestAPIKeyMiddleware:
+    def test_protected_routes_require_a_valid_api_key(self, client: TestClient):
+        resp = client.get("/api/v1/documents", headers={"X-API-Key": "invalid"})
+        assert resp.status_code == 401
+        assert "X-API-Key" in resp.json()["detail"]
+
+    def test_missing_server_api_key_fails_closed(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(settings, "api_key", None)
+        resp = client.get("/api/v1/documents")
+        assert resp.status_code == 503
+
 
 class TestDocumentsEndpoint:
     def test_list_documents_empty(self, client: TestClient):
@@ -73,7 +101,9 @@ class TestUploadEndpoint:
     def test_upload_text_file(self, client: TestClient):
         resp = client.post(
             "/api/v1/upload",
-            files={"file": ("test.txt", b"Hello world content for testing.", "text/plain")},
+            files={
+                "file": ("test.txt", b"Hello world content for testing.", "text/plain")
+            },
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -122,10 +152,36 @@ class TestUploadEndpoint:
     def test_upload_malicious_filename(self, client: TestClient):
         resp = client.post(
             "/api/v1/upload",
-            files={"file": ("../../../etc/passwd.txt", b"not real passwd", "text/plain")},
+            files={
+                "file": (
+                    "../../../etc/passwd.txt",
+                    b"not real passwd",
+                    "text/plain",
+                )
+            },
         )
         # Should sanitize or reject
         assert resp.status_code in (200, 400, 422)
+
+    def test_upload_rejects_file_over_configured_limit(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(settings, "max_file_size_mb", 1)
+        resp = client.post(
+            "/api/v1/upload",
+            files={"file": ("large.txt", b"x" * (1024 * 1024 + 1), "text/plain")},
+        )
+        assert resp.status_code == 413
+
+    def test_text_upload_rejects_content_over_configured_limit(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(settings, "max_file_size_mb", 1)
+        resp = client.post(
+            "/api/v1/upload/text",
+            json={"content": "x" * (1024 * 1024 + 1), "filename": "large.txt"},
+        )
+        assert resp.status_code == 413
 
 
 class TestUploadSupportedTypesEndpoint:
@@ -147,7 +203,9 @@ class TestQueryEndpoint:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert "No documents" in data["answer"] or "no documents" in data["answer"].lower()
+        assert "No documents" in data["answer"] or (
+            "no documents" in data["answer"].lower()
+        )
 
     def test_query_empty_question(self, client: TestClient):
         resp = client.post(
@@ -199,6 +257,146 @@ class TestEndToEnd:
         # Verify gone
         list_resp = client.get("/api/v1/documents")
         assert list_resp.json()["total"] == 0
+
+    def test_document_delete_rejects_traversal_and_reserved_names(
+        self, client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        upload_dir = tmp_path / "uploads"
+        upload_dir.mkdir()
+        sentinel = tmp_path / "sentinel.txt"
+        sentinel.write_text("keep")
+        monkeypatch.setattr(settings, "upload_dir", upload_dir)
+
+        for document_id in ("..", "%2e%2e", "conversations", "collections"):
+            response = client.delete(f"/api/v1/documents/{document_id}")
+            assert response.status_code in (404, 405, 422)
+            assert sentinel.read_text() == "keep"
+            assert list(upload_dir.iterdir()) == []
+
+
+def test_synchronous_upload_runs_off_the_event_loop(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    from app.api.routes import health, upload
+
+    def slow_upload(**_kwargs):
+        time.sleep(0.3)
+        return {
+            "document_id": "12345678-abc",
+            "filename": "slow.txt",
+            "chunk_count": 1,
+        }
+
+    monkeypatch.setattr(upload.upload_service, "process_upload_stream", slow_upload)
+    monkeypatch.setattr(
+        type(health.settings),
+        "get_available_ollama_models",
+        lambda _self: [],
+    )
+    monkeypatch.setattr(
+        type(health.settings),
+        "resolve_model",
+        lambda _self: "test-model",
+    )
+    monkeypatch.setattr(health.upload_service, "list_documents", lambda: [])
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        upload_request = executor.submit(
+            client.post,
+            "/api/v1/upload",
+            files={"file": ("slow.txt", b"content", "text/plain")},
+        )
+        time.sleep(0.05)
+        started = time.perf_counter()
+        health_response = client.get("/api/v1/health")
+        elapsed = time.perf_counter() - started
+
+    assert health_response.status_code == 200
+    assert elapsed < 0.2
+    assert upload_request.result().status_code == 200
+
+
+def test_query_stream_does_not_block_health(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    from app.api.routes import health, query
+
+    def slow_events(_request):
+        time.sleep(0.3)
+        yield {"type": "done", "content": ""}
+
+    monkeypatch.setattr(query.query_service, "query_stream", slow_events)
+    monkeypatch.setattr(
+        type(health.settings),
+        "get_available_ollama_models",
+        lambda _self: [],
+    )
+    monkeypatch.setattr(
+        type(health.settings),
+        "resolve_model",
+        lambda _self: "test-model",
+    )
+    monkeypatch.setattr(health.upload_service, "list_documents", lambda: [])
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        query_request = executor.submit(
+            client.post,
+            "/api/v1/query/stream",
+            json={"question": "What is this?"},
+        )
+        time.sleep(0.05)
+        started = time.perf_counter()
+        health_response = client.get("/api/v1/health")
+        elapsed = time.perf_counter() - started
+
+    assert health_response.status_code == 200
+    assert elapsed < 0.2
+    assert query_request.result().status_code == 200
+
+
+def test_request_body_limit_rejects_chunked_overflow():
+    messages = [
+        {"type": "http.request", "body": b"1234", "more_body": True},
+        {"type": "http.request", "body": b"5678", "more_body": False},
+    ]
+    sent = []
+
+    async def receive():
+        return messages.pop(0)
+
+    async def send(message):
+        sent.append(message)
+
+    async def consume_request(_scope, limited_receive, _send):
+        while True:
+            message = await limited_receive()
+            if not message.get("more_body"):
+                return
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": "/api/v1/upload",
+        "raw_path": b"/api/v1/upload",
+        "query_string": b"",
+        "headers": [],
+        "server": ("testserver", 80),
+        "client": ("testclient", 1234),
+    }
+
+    asyncio.run(
+        RequestBodyLimitMiddleware(consume_request, max_body_size=6)(
+            scope, receive, send
+        )
+    )
+
+    response_start = next(
+        message for message in sent if message["type"] == "http.response.start"
+    )
+    assert response_start["status"] == 413
 
 
 class TestConversationsEndpoint:

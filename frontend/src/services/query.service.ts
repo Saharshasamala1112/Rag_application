@@ -14,17 +14,20 @@ export const queryDocumentsStream = async (
   onTrace: (step: RagTraceStep) => void,
   onDone: (totalTimeMs?: number) => void,
   onError: (error: string) => void,
+  signal?: AbortSignal,
 ): Promise<void> => {
-  const controller = new AbortController()
-
   const response = await fetch(`${api.defaults.baseURL}/query/stream`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(import.meta.env.VITE_API_KEY ? { 'X-API-Key': import.meta.env.VITE_API_KEY } : {}),
+    },
     body: JSON.stringify(payload),
-    signal: controller.signal,
+    signal,
   })
 
   if (!response.ok) {
+    if (signal?.aborted) return
     let detail = `HTTP ${response.status}: ${response.statusText}`
     try {
       const body = await response.json()
@@ -38,7 +41,7 @@ export const queryDocumentsStream = async (
 
   const reader = response.body?.getReader()
   if (!reader) {
-    onError('No response stream')
+    if (!signal?.aborted) onError('No response stream')
     return
   }
 
@@ -61,18 +64,19 @@ export const queryDocumentsStream = async (
           try {
             const event = JSON.parse(line.slice(6))
             if (event.type === 'token') {
-              onToken(event.content)
+              if (!signal?.aborted) onToken(event.content)
             } else if (event.type === 'sources') {
-              onSources(event.content)
+              if (!signal?.aborted) onSources(event.content)
             } else if (event.type === 'status') {
-              onStatus(event.content)
+              if (!signal?.aborted) onStatus(event.content)
             } else if (event.type === 'trace') {
-              onTrace(event.content)
+              if (!signal?.aborted) onTrace(event.content)
             } else if (event.type === 'done') {
+              if (signal?.aborted) return
               onDone(event.total_time_ms)
               return
             } else if (event.type === 'error') {
-              onError(event.content)
+              if (!signal?.aborted) onError(event.content)
               return
             }
           } catch {
@@ -85,5 +89,5 @@ export const queryDocumentsStream = async (
     reader.releaseLock()
   }
 
-  onDone()
+  if (!signal?.aborted) onDone()
 }

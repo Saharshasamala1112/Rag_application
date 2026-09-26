@@ -33,10 +33,11 @@ describe('ChatStore', () => {
 
   it('creates a session with default title', () => {
     const { createSession } = useChatStore.getState()
-    createSession()
+    const newId = createSession()
     const newSessions = useChatStore.getState().sessions
     expect(newSessions.length).toBe(2)
     expect(newSessions[0].title).toMatch(/Session/)
+    expect(newId).toBe(newSessions[0].id)
   })
 
   it('adds a user message to active session', () => {

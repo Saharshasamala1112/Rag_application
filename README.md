@@ -165,7 +165,12 @@ Copy environment variables:
 cp .env.example .env
 ```
 
-Edit the `.env` file according to your local configuration.
+Set `API_KEY` to a high-entropy local secret in `backend/.env`, then set the same value
+as `VITE_API_KEY` in `frontend/.env` (copy `frontend/.env.example`). Protected API
+routes require this key; `/api/v1/health` remains available for health checks. The
+backend defaults to `127.0.0.1`. For production, set `ENV=production` to disable the
+interactive API documentation and deploy behind TLS and an authenticated reverse proxy.
+Do not commit either `.env` file.
 
 ---
 

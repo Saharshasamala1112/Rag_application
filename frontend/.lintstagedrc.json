@@ -4,6 +4,6 @@
     "eslint --fix"
   ],
   "*.ts": [
-    "tsc -p tsconfig.json --noEmit"
+    "tsc -p tsconfig.app.json --noEmit"
   ]
 }

@@ -13,26 +13,27 @@ class TestResolveDocumentDirs:
     def test_specific_existing_document(self):
         with tempfile.TemporaryDirectory() as td:
             svc = QueryService.__new__(QueryService)
-            doc_dir = Path(td) / "doc1"
+            document_id = "12345678-abc"
+            doc_dir = Path(td) / document_id
             doc_dir.mkdir()
             (doc_dir / "chunks.json").write_text("[]")
 
             with patch.object(settings, "upload_dir", Path(td)):
-                result = svc.resolve_document_dirs("doc1")
+                result = svc.resolve_document_dirs(document_id)
                 assert len(result) == 1
-                assert result[0].name == "doc1"
+                assert result[0].name == document_id
 
     def test_specific_nonexistent_document(self):
         with tempfile.TemporaryDirectory() as td:
             svc = QueryService.__new__(QueryService)
             with patch.object(settings, "upload_dir", Path(td)):
-                result = svc.resolve_document_dirs("nonexistent")
+                result = svc.resolve_document_dirs("12345678-abc")
                 assert result == []
 
     def test_all_documents(self):
         with tempfile.TemporaryDirectory() as td:
             svc = QueryService.__new__(QueryService)
-            for name in ["a", "b", "c"]:
+            for name in ["00000000-001", "00000000-002", "00000000-003"]:
                 d = Path(td) / name
                 d.mkdir()
                 (d / "chunks.json").write_text("[]")
@@ -43,9 +44,9 @@ class TestResolveDocumentDirs:
                 result = svc.resolve_document_dirs(None)
                 assert len(result) == 3
                 names = [d.name for d in result]
-                assert "a" in names
-                assert "b" in names
-                assert "c" in names
+                assert "00000000-001" in names
+                assert "00000000-002" in names
+                assert "00000000-003" in names
                 assert "no_chunks" not in names
 
 
@@ -116,9 +117,9 @@ class TestBuildSources:
         ]
         sources = svc._build_sources(chunks)
         assert len(sources) == 2
-        # Scores normalized: 0.9 is max, so should be 100%
-        assert sources[0].score == 100
-        assert sources[1].score == round((0.6 / 0.9) * 100)
+        assert sources[0].score == 1.0
+        assert sources[1].score == round(0.6 / 0.9, 4)
+        assert all(0 <= source.score <= 1 for source in sources)
         assert sources[0].source == "a.txt"
         assert sources[1].page_number == 2
 
