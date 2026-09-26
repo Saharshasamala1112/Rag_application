@@ -329,13 +329,20 @@ class QueryService:
     def query(
         self,
         request: QueryRequest,
+        document_dirs: list[Path] | None = None,
     ) -> QueryResponse:
-        """Retrieve relevant chunks and generate an answer."""
+        """Retrieve relevant chunks and generate an answer.
+
+        ``document_dirs`` may be passed in by the route so a request resolves
+        its document directories exactly once (issue #48). When omitted the
+        directories are resolved here.
+        """
 
         total_start = time.perf_counter()
         request_id = uuid.uuid4().hex[:8]
 
-        document_dirs = self.resolve_document_dirs(request.document_id)
+        if document_dirs is None:
+            document_dirs = self.resolve_document_dirs(request.document_id)
         if not document_dirs:
             if request.use_reranking:
                 logger.warning("Reranking requested but no documents were found.")
@@ -347,7 +354,7 @@ class QueryService:
 
         # Retrieval
         retrieval_start = time.perf_counter()
-        top_k = request.top_k or settings.final_top_k
+        top_k = request.top_k
 
         results = self.retriever.retrieve(
             question=request.question,
@@ -434,11 +441,18 @@ class QueryService:
     def query_stream(
         self,
         request: QueryRequest,
+        document_dirs: list[Path] | None = None,
     ):
-        """Stream response chunks for SSE with progress events."""
+        """Stream response chunks for SSE with progress events.
+
+        ``document_dirs`` may be passed in by the route so a request resolves
+        its document directories exactly once (issue #48). When omitted the
+        directories are resolved here.
+        """
 
         request_id = uuid.uuid4().hex[:8]
-        document_dirs = self.resolve_document_dirs(request.document_id)
+        if document_dirs is None:
+            document_dirs = self.resolve_document_dirs(request.document_id)
 
         if not document_dirs:
             yield {
@@ -453,7 +467,7 @@ class QueryService:
             "content": QUERY_STREAM_STATUSES["retrieving"]["text"],
         }
 
-        top_k = request.top_k or settings.final_top_k
+        top_k = request.top_k
 
         retrieval_start = time.perf_counter()
 

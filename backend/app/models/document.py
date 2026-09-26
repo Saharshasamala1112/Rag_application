@@ -1,3 +1,5 @@
+"""Chunk model produced by the document chunker."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel
@@ -15,14 +17,3 @@ class DocumentChunk(BaseModel):
     header: str | None = None
     start_pos: int = 0
     end_pos: int = 0
-
-
-class DocumentInfo(BaseModel):
-    """Stored document metadata."""
-
-    document_id: str
-    filename: str
-    chunk_count: int
-    total_chars: int
-    file_size: int
-    uploaded_at: str

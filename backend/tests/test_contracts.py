@@ -57,3 +57,37 @@ def test_health_query_and_supported_type_schemas_are_explicit():
     score_schema = schemas["SourceChunk"]["properties"]["score"]
     assert score_schema["minimum"] == 0.0
     assert score_schema["maximum"] == 1.0
+
+
+def test_successful_json_responses_are_pydantic_models():
+    """Every 200 JSON response must come from a named Pydantic model (issue #48)."""
+    schema = app.openapi()
+    untyped: list[str] = []
+    for path, operations in schema["paths"].items():
+        for method, operation in operations.items():
+            content = operation.get("responses", {}).get("200", {}).get("content", {})
+            if "application/json" not in content:
+                continue
+            response_schema = content["application/json"]["schema"]
+            if "$ref" not in response_schema and "properties" not in response_schema:
+                untyped.append(f"{method.upper()} {path}")
+    assert untyped == []
+
+
+def test_document_and_collection_response_schemas_are_named():
+    schemas = app.openapi()["components"]["schemas"]
+    for name in (
+        "UploadResponse",
+        "DocumentInfo",
+        "DocumentStatusResponse",
+        "DocumentPreviewResponse",
+        "DocumentChunksResponse",
+        "DocumentDeleteResponse",
+        "ConversationDetail",
+        "ConversationListResponse",
+        "ConversationDeleteResponse",
+        "CollectionResponse",
+        "CollectionListResponse",
+        "CollectionDeleteResponse",
+    ):
+        assert name in schemas

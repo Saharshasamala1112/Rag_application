@@ -11,8 +11,8 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.api.router import api_router
 from app.config.settings import settings
-from app.exceptions import LLMError
 from app.middleware import APIKeyMiddleware, RequestBodyLimitMiddleware
+from app.models.response import RootResponse
 from app.observability import JSONLogFormatter, RequestIDFilter, request_id_context
 from app.services.upload_service import UploadService
 
@@ -135,14 +135,8 @@ def metrics() -> PlainTextResponse:
 app.include_router(api_router, prefix="/api/v1")
 
 
-@app.exception_handler(LLMError)
-async def llm_error_handler(_request: Request, exc: LLMError) -> JSONResponse:
-    return JSONResponse(
-        status_code=503,
-        content={"detail": str(exc), "type": "llm_error"},
-    )
-
-
+# LLMError is handled where it is raised (query route -> 503, stream -> SSE
+# error event), so no app-level handler is registered for it. See issue #48.
 @app.exception_handler(Exception)
 async def global_error_handler(_request: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unhandled exception: %s", exc)
@@ -158,10 +152,10 @@ def on_startup() -> None:
     logger.info("Reconciled document processing state at startup.")
 
 
-@app.get("/")
-def root() -> dict[str, str | None]:
-    return {
-        "name": "DocuChat RAG API",
-        "version": "3.1.0",
-        "docs": None if is_production else "/docs",
-    }
+@app.get("/", response_model=RootResponse)
+def root() -> RootResponse:
+    return RootResponse(
+        name="DocuChat RAG API",
+        version="3.1.0",
+        docs=None if is_production else "/docs",
+    )

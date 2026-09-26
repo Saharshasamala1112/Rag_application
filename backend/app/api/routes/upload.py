@@ -4,7 +4,11 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.config.settings import settings
-from app.models.response import SupportedFileType, SupportedTypesResponse
+from app.models.response import (
+    SupportedFileType,
+    SupportedTypesResponse,
+    UploadResponse,
+)
 from app.rag.document_loader import SUPPORTED_EXTENSIONS, DocumentLimitError
 from app.services.upload_service import (
     UploadQuotaExceededError,
@@ -25,10 +29,10 @@ class TextUploadRequest(BaseModel):
     filename: str
 
 
-@router.post("/upload")
+@router.post("/upload", response_model=UploadResponse)
 def upload_document(
     file: UploadFile = File(...),
-) -> dict:
+) -> UploadResponse:
     """Upload and process a document (PDF, TXT, MD, CSV, JSON, HTML, code files)."""
 
     if not file.filename:
@@ -77,16 +81,16 @@ def upload_document(
             detail="Failed to process document. Check the server logs and retry.",
         ) from error
 
-    return {
-        "message": "Document uploaded and processed successfully.",
-        "document_id": doc_info["document_id"],
-        "filename": doc_info["filename"],
-        "chunk_count": doc_info["chunk_count"],
-    }
+    return UploadResponse(
+        message="Document uploaded and processed successfully.",
+        document_id=doc_info["document_id"],
+        filename=doc_info["filename"],
+        chunk_count=doc_info["chunk_count"],
+    )
 
 
-@router.post("/upload/text")
-def upload_text(request: TextUploadRequest) -> dict:
+@router.post("/upload/text", response_model=UploadResponse)
+def upload_text(request: TextUploadRequest) -> UploadResponse:
     """Create a document from typed text content."""
 
     if not request.content.strip():
@@ -127,12 +131,12 @@ def upload_text(request: TextUploadRequest) -> dict:
             detail="Failed to process text. Check the server logs and retry.",
         ) from error
 
-    return {
-        "message": "Document created from text.",
-        "document_id": doc_info["document_id"],
-        "filename": doc_info["filename"],
-        "chunk_count": doc_info["chunk_count"],
-    }
+    return UploadResponse(
+        message="Document created from text.",
+        document_id=doc_info["document_id"],
+        filename=doc_info["filename"],
+        chunk_count=doc_info["chunk_count"],
+    )
 
 
 @router.get("/upload/supported-types", response_model=SupportedTypesResponse)

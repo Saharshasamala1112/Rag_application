@@ -10,6 +10,7 @@ class ConversationMessage(BaseModel):
     content: str
     sources: list[dict] | None = None
     created_at: str
+    interrupted: bool = False
 
 
 class Conversation(BaseModel):
@@ -34,3 +35,17 @@ class ConversationCreate(BaseModel):
 
 class ConversationUpdate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
+
+
+class ConversationListResponse(BaseModel):
+    """Response for listing conversations."""
+
+    conversations: list[Conversation]
+    total: int
+
+
+class ConversationDeleteResponse(BaseModel):
+    """Response returned when a conversation is deleted."""
+
+    message: str
+    conversation_id: str

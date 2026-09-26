@@ -214,16 +214,3 @@ class Retriever:
                 results.append(chunk)
 
         return results
-
-    def retrieve_from_document(
-        self,
-        question: str,
-        document_dir: Path,
-        top_k: int = settings.retrieval_top_k,
-    ) -> list[dict]:
-        """Retrieve from a single document directory."""
-        return self.retrieve(
-            question=question,
-            document_dirs=[document_dir],
-            top_k=top_k,
-        )

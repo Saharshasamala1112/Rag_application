@@ -22,6 +22,8 @@ query_service = QueryService()
 @router.post("/query", response_model=QueryResponse)
 def query(request: QueryRequest) -> QueryResponse:
     """Query documents with RAG."""
+    # Resolved once here and handed to the service so a single request never
+    # resolves document directories twice (issue #48).
     document_dirs = query_service.resolve_document_dirs(request.document_id)
 
     if not document_dirs and request.document_id:
@@ -39,7 +41,7 @@ def query(request: QueryRequest) -> QueryResponse:
             raise HTTPException(status_code=404, detail="Conversation not found.")
 
     try:
-        result = query_service.query(request)
+        result = query_service.query(request, document_dirs=document_dirs)
     except LLMError as error:
         logger.exception("Query generation failed.")
         raise HTTPException(
@@ -74,6 +76,8 @@ def query(request: QueryRequest) -> QueryResponse:
 async def query_stream(request: QueryRequest):
     """Stream RAG response via Server-Sent Events."""
 
+    # Resolved once here so the 404 status can be decided before the stream
+    # starts; the service reuses the same resolution (issue #48).
     document_dirs = query_service.resolve_document_dirs(request.document_id)
     if not document_dirs and request.document_id:
         raise HTTPException(
@@ -99,7 +103,7 @@ async def query_stream(request: QueryRequest):
 
         try:
             async for event in iterate_in_threadpool(
-                query_service.query_stream(request)
+                query_service.query_stream(request, document_dirs=document_dirs)
             ):
                 if event["type"] == QUERY_STREAM_EVENTS["error"]:
                     stream_failed = True

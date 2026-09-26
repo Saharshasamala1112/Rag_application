@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException
 
 from app.config.settings import settings
-from app.models.response import HealthResponse
+from app.models.response import HealthLiveResponse, HealthResponse
 from app.services.upload_service import UploadService
 
 router = APIRouter(tags=["Health"])
@@ -36,9 +36,9 @@ def readiness() -> HealthResponse:
     return response
 
 
-@router.get("/health/live")
-def health_live() -> dict[str, str]:
-    return {"status": "alive"}
+@router.get("/health/live", response_model=HealthLiveResponse)
+def health_live() -> HealthLiveResponse:
+    return HealthLiveResponse()
 
 
 @router.get("/health/ready")

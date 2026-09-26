@@ -363,6 +363,13 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** CollectionDeleteResponse */
+        CollectionDeleteResponse: {
+            /** Collection Id */
+            collection_id: string;
+            /** Message */
+            message: string;
+        };
         /** CollectionListResponse */
         CollectionListResponse: {
             /** Collections */
@@ -394,15 +401,134 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /** Conversation */
+        Conversation: {
+            /** Conversation Id */
+            conversation_id: string;
+            /** Created At */
+            created_at: string;
+            /**
+             * Message Count
+             * @default 0
+             */
+            message_count: number;
+            /** Title */
+            title: string;
+            /** Updated At */
+            updated_at: string;
+        };
         /** ConversationCreate */
         ConversationCreate: {
             /** Title */
             title?: string | null;
         };
+        /**
+         * ConversationDeleteResponse
+         * @description Response returned when a conversation is deleted.
+         */
+        ConversationDeleteResponse: {
+            /** Conversation Id */
+            conversation_id: string;
+            /** Message */
+            message: string;
+        };
+        /** ConversationDetail */
+        ConversationDetail: {
+            /** Conversation Id */
+            conversation_id: string;
+            /** Created At */
+            created_at: string;
+            /** Messages */
+            messages: components["schemas"]["ConversationMessage"][];
+            /** Title */
+            title: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /**
+         * ConversationListResponse
+         * @description Response for listing conversations.
+         */
+        ConversationListResponse: {
+            /** Conversations */
+            conversations: components["schemas"]["Conversation"][];
+            /** Total */
+            total: number;
+        };
+        /** ConversationMessage */
+        ConversationMessage: {
+            /** Content */
+            content: string;
+            /** Created At */
+            created_at: string;
+            /**
+             * Interrupted
+             * @default false
+             */
+            interrupted: boolean;
+            /** Role */
+            role: string;
+            /** Sources */
+            sources?: {
+                [key: string]: unknown;
+            }[] | null;
+        };
         /** ConversationUpdate */
         ConversationUpdate: {
             /** Title */
             title: string;
+        };
+        /**
+         * DocumentChunk
+         * @description One chunk of a document with metadata.
+         */
+        DocumentChunk: {
+            /** Chunk Id */
+            chunk_id: number;
+            /** Chunk Length */
+            chunk_length: number;
+            /** Content */
+            content: string;
+            /** Document Id */
+            document_id: string;
+            /**
+             * End Pos
+             * @default 0
+             */
+            end_pos: number;
+            /** Header */
+            header?: string | null;
+            /** Page Number */
+            page_number?: number | null;
+            /** Source */
+            source: string;
+            /**
+             * Start Pos
+             * @default 0
+             */
+            start_pos: number;
+        };
+        /**
+         * DocumentChunksResponse
+         * @description All chunks stored for a document.
+         */
+        DocumentChunksResponse: {
+            /** Chunks */
+            chunks: components["schemas"]["DocumentChunk"][];
+            /** Document Id */
+            document_id: string;
+            /** Total */
+            total: number;
+        };
+        /**
+         * DocumentDeleteResponse
+         * @description Response returned when a document is deleted.
+         */
+        DocumentDeleteResponse: {
+            /** Document Id */
+            document_id: string;
+            /** Message */
+            message: string;
         };
         /**
          * DocumentInfo
@@ -457,6 +583,41 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * DocumentPreviewResponse
+         * @description Text preview of a document.
+         */
+        DocumentPreviewResponse: {
+            /** Document Id */
+            document_id: string;
+            /** Preview */
+            preview: string;
+        };
+        /**
+         * DocumentStatusResponse
+         * @description Processing status of a single document.
+         */
+        DocumentStatusResponse: {
+            /**
+             * Chunk Count
+             * @default 0
+             */
+            chunk_count: number;
+            /** Document Id */
+            document_id: string;
+            /** Error */
+            error?: string | null;
+            /**
+             * Filename
+             * @default unknown
+             */
+            filename: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "uploading" | "processing" | "ready" | "failed";
+        };
         /** DocumentUpdate */
         DocumentUpdate: {
             /** Filename */
@@ -466,6 +627,17 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HealthLiveResponse
+         * @description Liveness probe response.
+         */
+        HealthLiveResponse: {
+            /**
+             * Status
+             * @default alive
+             */
+            status: string;
         };
         /**
          * HealthResponse
@@ -546,6 +718,18 @@ export interface components {
             total_time_ms: number;
         };
         /**
+         * RootResponse
+         * @description Service identity returned by the API root.
+         */
+        RootResponse: {
+            /** Docs */
+            docs?: string | null;
+            /** Name */
+            name: string;
+            /** Version */
+            version: string;
+        };
+        /**
          * SourceChunk
          * @description A retrieved source chunk.
          */
@@ -584,6 +768,20 @@ export interface components {
             /** Filename */
             filename: string;
         };
+        /**
+         * UploadResponse
+         * @description Response returned by the document upload endpoints.
+         */
+        UploadResponse: {
+            /** Chunk Count */
+            chunk_count: number;
+            /** Document Id */
+            document_id: string;
+            /** Filename */
+            filename: string;
+            /** Message */
+            message: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -621,9 +819,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string | null;
-                    };
+                    "application/json": components["schemas"]["RootResponse"];
                 };
             };
         };
@@ -729,9 +925,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["CollectionDeleteResponse"];
                 };
             };
             /** @description Validation Error */
@@ -795,9 +989,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ConversationListResponse"];
                 };
             };
         };
@@ -821,9 +1013,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ConversationDetail"];
                 };
             };
             /** @description Validation Error */
@@ -854,9 +1044,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ConversationDetail"];
                 };
             };
             /** @description Validation Error */
@@ -887,9 +1075,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ConversationDeleteResponse"];
                 };
             };
             /** @description Validation Error */
@@ -924,9 +1110,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ConversationDetail"];
                 };
             };
             /** @description Validation Error */
@@ -977,9 +1161,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DocumentInfo"];
                 };
             };
             /** @description Validation Error */
@@ -1010,9 +1192,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DocumentDeleteResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1047,9 +1227,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DocumentInfo"];
                 };
             };
             /** @description Validation Error */
@@ -1080,9 +1258,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DocumentChunksResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1113,9 +1289,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DocumentPreviewResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1146,9 +1320,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DocumentStatusResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1197,9 +1369,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
+                    "application/json": components["schemas"]["HealthLiveResponse"];
                 };
             };
         };
@@ -1309,9 +1479,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["UploadResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1364,9 +1532,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["UploadResponse"];
                 };
             };
             /** @description Validation Error */

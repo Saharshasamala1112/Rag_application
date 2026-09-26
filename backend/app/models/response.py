@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.models.document import DocumentChunk
+
 
 class SourceChunk(BaseModel):
     """A retrieved source chunk."""
@@ -37,6 +39,20 @@ class HealthResponse(BaseModel):
     document_count: int = 0
 
 
+class HealthLiveResponse(BaseModel):
+    """Liveness probe response."""
+
+    status: str = "alive"
+
+
+class RootResponse(BaseModel):
+    """Service identity returned by the API root."""
+
+    name: str
+    version: str
+    docs: str | None = None
+
+
 class SupportedFileType(BaseModel):
     extension: str
     description: str
@@ -65,4 +81,45 @@ class DocumentListResponse(BaseModel):
     """Response for listing documents."""
 
     documents: list[DocumentInfo]
+    total: int
+
+
+class UploadResponse(BaseModel):
+    """Response returned by the document upload endpoints."""
+
+    message: str
+    document_id: str
+    filename: str
+    chunk_count: int
+
+
+class DocumentStatusResponse(BaseModel):
+    """Processing status of a single document."""
+
+    document_id: str
+    status: Literal["uploading", "processing", "ready", "failed"]
+    chunk_count: int = 0
+    filename: str = "unknown"
+    error: str | None = None
+
+
+class DocumentDeleteResponse(BaseModel):
+    """Response returned when a document is deleted."""
+
+    message: str
+    document_id: str
+
+
+class DocumentPreviewResponse(BaseModel):
+    """Text preview of a document."""
+
+    document_id: str
+    preview: str
+
+
+class DocumentChunksResponse(BaseModel):
+    """All chunks stored for a document."""
+
+    document_id: str
+    chunks: list[DocumentChunk]
     total: int

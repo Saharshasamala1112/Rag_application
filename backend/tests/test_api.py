@@ -400,7 +400,7 @@ def test_query_stream_emits_events_and_persists_completed_conversation(
     monkeypatch.setattr(
         query_route.query_service,
         "query_stream",
-        lambda _request: iter(stream_events),
+        lambda _request, **_kwargs: iter(stream_events),
     )
 
     response = client.post(
@@ -442,34 +442,34 @@ def test_query_stream_emits_events_and_persists_completed_conversation(
 def test_collections_crud_uses_a_redirected_temporary_directory(
     client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    from app.api.routes import collections as collections_route
-
     collection_dir = tmp_path / "collections"
-    monkeypatch.setattr(collections_route, "COLLECTIONS_DIR", collection_dir)
 
-    created = client.post(
-        "/api/v1/collections",
-        json={"name": "Research", "description": "Test collection"},
-    )
-    assert created.status_code == 200
-    collection = created.json()
-    collection_id = collection["collection_id"]
-    assert list(collection_dir.iterdir()) == [collection_dir / f"{collection_id}.json"]
+    with patch.object(settings, "upload_dir", tmp_path):
+        created = client.post(
+            "/api/v1/collections",
+            json={"name": "Research", "description": "Test collection"},
+        )
+        assert created.status_code == 200
+        collection = created.json()
+        collection_id = collection["collection_id"]
+        assert list(collection_dir.iterdir()) == [
+            collection_dir / f"{collection_id}.json"
+        ]
 
-    listing = client.get("/api/v1/collections")
-    assert listing.status_code == 200
-    assert listing.json()["collections"][0]["name"] == "Research"
+        listing = client.get("/api/v1/collections")
+        assert listing.status_code == 200
+        assert listing.json()["collections"][0]["name"] == "Research"
 
-    updated = client.patch(
-        f"/api/v1/collections/{collection_id}",
-        json={"document_ids": ["document-1"]},
-    )
-    assert updated.status_code == 200
-    assert updated.json()["document_ids"] == ["document-1"]
+        updated = client.patch(
+            f"/api/v1/collections/{collection_id}",
+            json={"document_ids": ["document-1"]},
+        )
+        assert updated.status_code == 200
+        assert updated.json()["document_ids"] == ["document-1"]
 
-    deleted = client.delete(f"/api/v1/collections/{collection_id}")
-    assert deleted.status_code == 200
-    assert list(collection_dir.iterdir()) == []
+        deleted = client.delete(f"/api/v1/collections/{collection_id}")
+        assert deleted.status_code == 200
+        assert list(collection_dir.iterdir()) == []
 
 
 class TestEndToEnd:
@@ -623,7 +623,7 @@ def test_query_stream_does_not_block_health(
 ):
     from app.api.routes import health, query
 
-    def slow_events(_request):
+    def slow_events(_request, **_kwargs):
         time.sleep(0.3)
         yield {"type": "done", "content": ""}
 
@@ -726,7 +726,7 @@ def test_llm_failure_returns_503_without_persisting_an_answer(
         lambda _document_id: [Path("document")],
     )
 
-    def fail_query(_request):
+    def fail_query(_request, **_kwargs):
         raise LLMError("model unavailable")
 
     monkeypatch.setattr(query_route.query_service, "query", fail_query)
@@ -758,7 +758,7 @@ def test_stream_error_is_terminal_and_not_saved_as_an_answer(
         lambda _document_id: [],
     )
 
-    def failed_events(_request):
+    def failed_events(_request, **_kwargs):
         yield {"type": "error", "content": "model unavailable"}
 
     monkeypatch.setattr(query_route.query_service, "query_stream", failed_events)
@@ -803,7 +803,7 @@ def test_stream_disconnect_persists_interrupted_answer(
         lambda _document_id: [],
     )
 
-    def partial_events(_request):
+    def partial_events(_request, **_kwargs):
         yield {"type": "token", "content": "partial "}
         yield {"type": "token", "content": "answer"}
 
