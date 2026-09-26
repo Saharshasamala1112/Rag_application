@@ -19,15 +19,14 @@ const variantStyles: Record<BadgeVariant, string> = {
     'bg-success-subtle text-success border border-success/20 dark:bg-success-dark-subtle dark:text-success-dark dark:border-success-dark/20',
   warning:
     'bg-warning-subtle text-warning border border-warning/20 dark:bg-warning-dark-subtle dark:text-warning-dark dark:border-warning-dark/20',
-  muted:
-    'bg-transparent text-fg-tertiary border border-transparent dark:text-fg-dark-tertiary',
+  muted: 'bg-transparent text-fg-tertiary border border-transparent dark:text-fg-dark-tertiary',
 }
 
 export function Badge({ variant = 'default', dot, className, children, ...props }: BadgeProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-medium',
+        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-medium',
         variantStyles[variant],
         className,
       )}
@@ -36,7 +35,7 @@ export function Badge({ variant = 'default', dot, className, children, ...props 
       {dot && (
         <span
           className={cn(
-            'w-1.5 h-1.5 rounded-full',
+            'h-1.5 w-1.5 rounded-full',
             variant === 'accent' && 'bg-accent dark:bg-accent-dark',
             variant === 'danger' && 'bg-danger dark:bg-danger-dark',
             variant === 'success' && 'bg-success dark:bg-success-dark',

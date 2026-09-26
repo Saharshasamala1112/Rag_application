@@ -102,10 +102,13 @@ export function SearchPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="px-6 h-12 border-b border-edge dark:border-edge-dark shrink-0 flex items-center gap-3">
-        <div className="relative flex-1 max-w-xl">
-          <SearchIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-tertiary dark:text-fg-dark-tertiary" />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-12 shrink-0 items-center gap-3 border-b border-edge px-6 dark:border-edge-dark">
+        <div className="relative max-w-xl flex-1">
+          <SearchIcon
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-tertiary dark:text-fg-dark-tertiary"
+          />
           <input
             ref={inputRef}
             type="text"
@@ -113,13 +116,13 @@ export function SearchPage() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Semantic search across all documents..."
-            className="w-full pl-9 pr-10 py-2 text-xs bg-surface-secondary dark:bg-surface-dark-elevated border border-edge dark:border-edge-dark rounded-lg text-fg dark:text-fg-dark placeholder-fg-tertiary dark:placeholder-fg-dark-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-colors"
+            className="w-full rounded-lg border border-edge bg-surface-secondary py-2 pl-9 pr-10 text-xs text-fg placeholder-fg-tertiary transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/40 dark:border-edge-dark dark:bg-surface-dark-elevated dark:text-fg-dark dark:placeholder-fg-dark-tertiary"
           />
           {query && (
             <button
               type="button"
               onClick={() => void handleSearch()}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-fg-tertiary hover:text-accent dark:hover:text-accent-dark transition-colors disabled:opacity-50"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-fg-tertiary transition-colors hover:text-accent disabled:opacity-50 dark:hover:text-accent-dark"
             >
               <Send size={13} />
             </button>
@@ -129,10 +132,12 @@ export function SearchPage() {
 
       <div className="flex-1 overflow-y-auto">
         {!searched ? (
-          <div className="max-w-2xl mx-auto px-6 py-8">
+          <div className="mx-auto max-w-2xl px-6 py-8">
             <EmptyState
               icon={<SearchIcon size={24} />}
-              title={documents.length === 0 ? 'No documents to search' : 'Search across all documents'}
+              title={
+                documents.length === 0 ? 'No documents to search' : 'Search across all documents'
+              }
               description={
                 documents.length === 0
                   ? 'Upload documents first to enable search'
@@ -142,14 +147,14 @@ export function SearchPage() {
 
             {history.length > 0 && (
               <div className="mt-8">
-                <div className="flex items-center justify-between mb-3">
+                <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-2xs font-semibold uppercase tracking-wider text-fg-tertiary dark:text-fg-dark-tertiary">
                     Recent searches
                   </h3>
                   <button
                     type="button"
                     onClick={handleClearHistory}
-                    className="text-2xs text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark transition-colors"
+                    className="text-2xs text-fg-muted transition-colors hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark"
                   >
                     Clear
                   </button>
@@ -163,11 +168,14 @@ export function SearchPage() {
                         setQuery(h)
                         void handleSearch(h)
                       }}
-                      className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-left text-xs text-fg-secondary dark:text-fg-dark-secondary hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated transition-colors group"
+                      className="group flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-fg-secondary transition-colors hover:bg-surface-secondary dark:text-fg-dark-secondary dark:hover:bg-surface-dark-elevated"
                     >
-                      <Clock size={12} className="text-fg-muted dark:text-fg-dark-tertiary shrink-0" />
-                      <span className="truncate flex-1">{h}</span>
-                      <span className="text-2xs text-accent dark:text-accent-dark opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Clock
+                        size={12}
+                        className="shrink-0 text-fg-muted dark:text-fg-dark-tertiary"
+                      />
+                      <span className="flex-1 truncate">{h}</span>
+                      <span className="text-2xs text-accent opacity-0 transition-opacity group-hover:opacity-100 dark:text-accent-dark">
                         Search →
                       </span>
                     </button>
@@ -177,22 +185,25 @@ export function SearchPage() {
             )}
           </div>
         ) : loading ? (
-          <div className="max-w-2xl mx-auto px-6 py-8 space-y-4">
-            <div className="h-20 rounded-xl bg-surface-secondary dark:bg-surface-dark-elevated animate-pulse" />
+          <div className="mx-auto max-w-2xl space-y-4 px-6 py-8">
+            <div className="h-20 animate-pulse rounded-xl bg-surface-secondary dark:bg-surface-dark-elevated" />
             <div className="space-y-2">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-16 rounded-lg bg-surface-secondary dark:bg-surface-dark-elevated animate-pulse" />
+                <div
+                  key={i}
+                  className="h-16 animate-pulse rounded-lg bg-surface-secondary dark:bg-surface-dark-elevated"
+                />
               ))}
             </div>
           </div>
         ) : (
-          <div className="max-w-2xl mx-auto px-6 py-6 space-y-6">
+          <div className="mx-auto max-w-2xl space-y-6 px-6 py-6">
             {answer && (
-              <div className="rounded-xl border border-accent/20 dark:border-accent-dark/20 bg-accent-subtle dark:bg-accent-dark-subtle p-4">
-                <p className="text-2xs font-semibold text-accent dark:text-accent-dark uppercase tracking-wider mb-2">
+              <div className="rounded-xl border border-accent/20 bg-accent-subtle p-4 dark:border-accent-dark/20 dark:bg-accent-dark-subtle">
+                <p className="mb-2 text-2xs font-semibold uppercase tracking-wider text-accent dark:text-accent-dark">
                   Answer
                 </p>
-                <p className="text-xs text-fg-secondary dark:text-fg-dark-secondary leading-relaxed whitespace-pre-wrap">
+                <p className="whitespace-pre-wrap text-xs leading-relaxed text-fg-secondary dark:text-fg-dark-secondary">
                   {answer}
                 </p>
               </div>
@@ -200,7 +211,7 @@ export function SearchPage() {
 
             {results.length > 0 && (
               <div>
-                <p className="text-2xs font-semibold text-fg-tertiary dark:text-fg-dark-tertiary uppercase tracking-wider mb-3">
+                <p className="mb-3 text-2xs font-semibold uppercase tracking-wider text-fg-tertiary dark:text-fg-dark-tertiary">
                   Sources ({results.length})
                 </p>
                 <div className="space-y-2">
@@ -208,15 +219,18 @@ export function SearchPage() {
                     <div
                       key={`${src.chunk_id}-${i}`}
                       className={cn(
-                        'rounded-lg border bg-surface dark:bg-surface-dark p-4 transition-colors hover:border-edge-strong dark:hover:border-edge-dark-strong',
+                        'rounded-lg border bg-surface p-4 transition-colors hover:border-edge-strong dark:bg-surface-dark dark:hover:border-edge-dark-strong',
                         i === 0
                           ? 'border-accent/30 dark:border-accent-dark/30'
                           : 'border-edge dark:border-edge-dark',
                       )}
                     >
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="mb-2 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <FileText size={12} className="text-fg-tertiary dark:text-fg-dark-tertiary" />
+                          <FileText
+                            size={12}
+                            className="text-fg-tertiary dark:text-fg-dark-tertiary"
+                          />
                           <span className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
                             {src.source}
                             {src.page_number != null ? ` · p.${src.page_number}` : ''}
@@ -224,19 +238,19 @@ export function SearchPage() {
                         </div>
                         {src.score != null && (
                           <div className="flex items-center gap-1.5">
-                            <div className="w-12 h-1 rounded-full bg-surface-secondary dark:bg-surface-dark-elevated overflow-hidden">
+                            <div className="h-1 w-12 overflow-hidden rounded-full bg-surface-secondary dark:bg-surface-dark-elevated">
                               <div
                                 className="h-full rounded-full bg-accent dark:bg-accent-dark"
                                 style={{ width: `${Math.min(src.score * 100, 100)}%` }}
                               />
                             </div>
-                            <span className="text-2xs text-accent dark:text-accent-dark font-medium">
+                            <span className="text-2xs font-medium text-accent dark:text-accent-dark">
                               {Math.round(src.score * 100)}%
                             </span>
                           </div>
                         )}
                       </div>
-                      <p className="text-xs text-fg-secondary dark:text-fg-dark-secondary leading-relaxed">
+                      <p className="text-xs leading-relaxed text-fg-secondary dark:text-fg-dark-secondary">
                         {src.content}
                       </p>
                     </div>
@@ -246,13 +260,13 @@ export function SearchPage() {
             )}
 
             {results.length === 0 && answer && (
-              <p className="text-xs text-fg-tertiary dark:text-fg-dark-tertiary text-center">
+              <p className="text-center text-xs text-fg-tertiary dark:text-fg-dark-tertiary">
                 No source chunks found for this query.
               </p>
             )}
 
             {results.length === 0 && !answer && (
-              <p className="text-xs text-fg-tertiary dark:text-fg-dark-tertiary text-center">
+              <p className="text-center text-xs text-fg-tertiary dark:text-fg-dark-tertiary">
                 No results found for this query.
               </p>
             )}

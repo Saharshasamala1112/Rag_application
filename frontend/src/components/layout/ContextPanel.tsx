@@ -30,27 +30,27 @@ export function ContextPanel({ open, onClose, selectedSource, isDesktop }: Conte
       )}
       <aside
         className={cn(
-          'flex flex-col h-full border-l border-edge dark:border-edge-dark',
+          'flex h-full flex-col border-l border-edge dark:border-edge-dark',
           'bg-surface dark:bg-surface-dark',
           isDesktop
-            ? 'transition-all duration-200 ease-in-out overflow-hidden'
+            ? 'overflow-hidden transition-all duration-200 ease-in-out'
             : 'fixed inset-y-0 right-0 z-40 w-80 max-w-[85vw] shadow-xl',
           isDesktop && (open ? 'w-96' : 'w-0'),
         )}
       >
         {open && (
           <>
-            <div className="flex h-12 items-center justify-between px-4 border-b border-edge dark:border-edge-dark shrink-0">
-              <span className="text-2xs font-semibold text-fg-secondary dark:text-fg-dark-secondary uppercase tracking-wider">
+            <div className="flex h-12 shrink-0 items-center justify-between border-b border-edge px-4 dark:border-edge-dark">
+              <span className="text-2xs font-semibold uppercase tracking-wider text-fg-secondary dark:text-fg-dark-secondary">
                 RAG Trace
               </span>
               <button
                 type="button"
                 onClick={onClose}
                 className={cn(
-                  'flex items-center justify-center w-7 h-7 rounded-md transition-colors',
-                  'text-fg-tertiary hover:text-fg hover:bg-surface-secondary',
-                  'dark:text-fg-dark-tertiary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated',
+                  'flex h-7 w-7 items-center justify-center rounded-md transition-colors',
+                  'text-fg-tertiary hover:bg-surface-secondary hover:text-fg',
+                  'dark:text-fg-dark-tertiary dark:hover:bg-surface-dark-elevated dark:hover:text-fg-dark',
                 )}
                 aria-label="Close panel"
               >
@@ -68,9 +68,7 @@ export function ContextPanel({ open, onClose, selectedSource, isDesktop }: Conte
                   </p>
                   <p className="mt-1 text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary">
                     {selectedSource.source}
-                    {selectedSource.page_number != null
-                      ? ` · p.${selectedSource.page_number}`
-                      : ''}
+                    {selectedSource.page_number != null ? ` · p.${selectedSource.page_number}` : ''}
                   </p>
                   <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-fg-secondary dark:text-fg-dark-secondary">
                     {selectedSource.content}

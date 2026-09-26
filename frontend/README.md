@@ -16,11 +16,11 @@ The shell switches layout at the `lg` breakpoint. The widths live in one place,
 `src/lib/breakpoints.ts`, and `src/lib/useMediaQuery.ts` subscribes to them so
 the markup and the Tailwind classes always agree.
 
-| Width | Sidebar | Context panel (RAG trace) |
-| --- | --- | --- |
-| < 768px (phone) | Drawer with backdrop, opened from the header menu button | Right-hand sheet with backdrop |
-| 768px – 1023px (tablet, below `lg`) | Same as phone | Same as phone |
-| ≥ 1024px (desktop, `lg`) | Persistent, collapsible to a 56px icon rail | Inline panel that pushes the chat area |
+| Width                               | Sidebar                                                  | Context panel (RAG trace)              |
+| ----------------------------------- | -------------------------------------------------------- | -------------------------------------- |
+| < 768px (phone)                     | Drawer with backdrop, opened from the header menu button | Right-hand sheet with backdrop         |
+| 768px – 1023px (tablet, below `lg`) | Same as phone                                            | Same as phone                          |
+| ≥ 1024px (desktop, `lg`)            | Persistent, collapsible to a 56px icon rail              | Inline panel that pushes the chat area |
 
 Verified at 360px, 768px and 1280px; the layout rules are covered by
 `src/__tests__/responsive.shell.test.tsx`.

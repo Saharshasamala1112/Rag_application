@@ -54,14 +54,14 @@ export function ChatComposer({
   const canSend = inputValue.trim().length > 0 && !loading
 
   return (
-    <div className="px-4 pb-4 pt-2 shrink-0">
-      <div className="max-w-[800px] mx-auto">
+    <div className="shrink-0 px-4 pb-4 pt-2">
+      <div className="mx-auto max-w-[800px]">
         {/* Attachment preview */}
         {selectedFile && (
-          <div className="mb-2.5 flex items-center gap-2.5 rounded-xl border border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark px-3.5 py-2.5 animate-scale-in">
+          <div className="mb-2.5 flex animate-scale-in items-center gap-2.5 rounded-xl border border-edge bg-surface px-3.5 py-2.5 dark:border-edge-dark dark:bg-surface-dark">
             <FileIcon type={selectedFile.name.split('.').pop() || ''} />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary truncate">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary">
                 {selectedFile.name}
               </p>
               <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
@@ -75,7 +75,7 @@ export function ChatComposer({
                 onFileSelect(null)
                 if (fileInputRef.current) fileInputRef.current.value = ''
               }}
-              className="p-1 rounded-lg text-fg-tertiary hover:text-fg hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated transition-colors"
+              className="rounded-lg p-1 text-fg-tertiary transition-colors hover:bg-surface-secondary hover:text-fg dark:hover:bg-surface-dark-elevated"
             >
               <X size={14} />
             </button>
@@ -84,7 +84,7 @@ export function ChatComposer({
               aria-label="Upload document"
               onClick={onUpload}
               disabled={uploading}
-              className="rounded-lg bg-fg dark:bg-fg-dark px-3 py-1.5 text-[11px] font-medium text-app dark:text-app-dark hover:opacity-90 disabled:opacity-40 transition-opacity"
+              className="rounded-lg bg-fg px-3 py-1.5 text-[11px] font-medium text-app transition-opacity hover:opacity-90 disabled:opacity-40 dark:bg-fg-dark dark:text-app-dark"
             >
               {uploading ? <Loader2 size={11} className="animate-spin" /> : 'Upload'}
             </button>
@@ -92,7 +92,7 @@ export function ChatComposer({
         )}
 
         {/* Composer container */}
-        <div className="relative rounded-2xl border border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark shadow-xs focus-within:border-fg-muted dark:focus-within:border-fg-dark-tertiary focus-within:shadow-sm transition-all duration-150">
+        <div className="relative rounded-2xl border border-edge bg-surface shadow-xs transition-all duration-150 focus-within:border-fg-muted focus-within:shadow-sm dark:border-edge-dark dark:bg-surface-dark dark:focus-within:border-fg-dark-tertiary">
           <textarea
             ref={textareaRef}
             value={inputValue}
@@ -105,7 +105,7 @@ export function ChatComposer({
             }
             rows={1}
             readOnly={loading}
-            className="w-full resize-none border-0 bg-transparent pl-4 pr-4 pt-3.5 pb-2 text-sm text-fg dark:text-fg-dark outline-none placeholder:text-fg-tertiary dark:placeholder:text-fg-dark-tertiary min-h-[44px] max-h-[200px] rounded-t-2xl"
+            className="max-h-[200px] min-h-[44px] w-full resize-none rounded-t-2xl border-0 bg-transparent pb-2 pl-4 pr-4 pt-3.5 text-sm text-fg outline-none placeholder:text-fg-tertiary dark:text-fg-dark dark:placeholder:text-fg-dark-tertiary"
             aria-label="Message input"
           />
 
@@ -119,17 +119,16 @@ export function ChatComposer({
                   aria-label="Attach file"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  className="p-2 rounded-xl text-fg-tertiary hover:text-fg hover:bg-surface-secondary dark:text-fg-dark-tertiary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated disabled:opacity-40 transition-colors"
+                  className="rounded-xl p-2 text-fg-tertiary transition-colors hover:bg-surface-secondary hover:text-fg disabled:opacity-40 dark:text-fg-dark-tertiary dark:hover:bg-surface-dark-elevated dark:hover:text-fg-dark"
                 >
                   <Paperclip size={16} />
                 </button>
               </Tooltip>
-
             </div>
 
             <div className="flex items-center gap-1.5">
               {/* Keyboard hint */}
-              <span className="text-2xs text-fg-muted dark:text-fg-dark-tertiary mr-1 hidden sm:inline">
+              <span className="mr-1 hidden text-2xs text-fg-muted dark:text-fg-dark-tertiary sm:inline">
                 ↵ send
               </span>
 
@@ -140,7 +139,7 @@ export function ChatComposer({
                     type="button"
                     aria-label="Stop generating"
                     onClick={onSubmit}
-                    className="flex items-center justify-center w-8 h-8 rounded-xl bg-danger dark:bg-danger-dark text-white transition-colors hover:opacity-90 active:scale-95"
+                    className="flex h-8 w-8 items-center justify-center rounded-xl bg-danger text-white transition-colors hover:opacity-90 active:scale-95 dark:bg-danger-dark"
                   >
                     <X size={15} />
                   </button>
@@ -151,10 +150,10 @@ export function ChatComposer({
                   aria-label="Send message"
                   onClick={onSubmit}
                   disabled={!canSend}
-                  className={`flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-150 ${
+                  className={`flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-150 ${
                     canSend
-                      ? 'bg-fg dark:bg-fg-dark text-app dark:text-app-dark hover:opacity-90 active:scale-95 shadow-xs'
-                      : 'bg-surface-secondary dark:bg-surface-dark-elevated text-fg-muted dark:text-fg-dark-tertiary cursor-not-allowed'
+                      ? 'bg-fg text-app shadow-xs hover:opacity-90 active:scale-95 dark:bg-fg-dark dark:text-app-dark'
+                      : 'cursor-not-allowed bg-surface-secondary text-fg-muted dark:bg-surface-dark-elevated dark:text-fg-dark-tertiary'
                   }`}
                 >
                   <ArrowUp size={16} strokeWidth={2.5} />

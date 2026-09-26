@@ -18,14 +18,16 @@ describe('CollectionsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     listMock.mockResolvedValue({
-      collections: [{
-        collection_id: 'collection-1',
-        name: 'Research',
-        description: '',
-        document_ids: [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }],
+      collections: [
+        {
+          collection_id: 'collection-1',
+          name: 'Research',
+          description: '',
+          document_ids: [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ],
       total: 1,
     })
     updateMock.mockImplementation(async (_id, update) => {
@@ -40,15 +42,17 @@ describe('CollectionsPage', () => {
       }
     })
     useDocumentStore.setState({
-      documents: [{
-        document_id: 'document-1',
-        filename: 'Research.pdf',
-        file_type: '.pdf',
-        chunk_count: 1,
-        total_chars: 10,
-        file_size: 10,
-        uploaded_at: new Date().toISOString(),
-      }],
+      documents: [
+        {
+          document_id: 'document-1',
+          filename: 'Research.pdf',
+          file_type: '.pdf',
+          chunk_count: 1,
+          total_chars: 10,
+          file_size: 10,
+          uploaded_at: new Date().toISOString(),
+        },
+      ],
     })
   })
 

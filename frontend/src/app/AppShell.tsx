@@ -56,9 +56,9 @@ export function AppShell() {
         isDesktop={isDesktop}
       />
 
-      <main className="flex flex-1 flex-col min-w-0 relative">
+      <main className="relative flex min-w-0 flex-1 flex-col">
         {!isDesktop && (
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark px-3">
+          <header className="flex h-12 shrink-0 items-center gap-2 border-b border-edge bg-surface px-3 dark:border-edge-dark dark:bg-surface-dark">
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
@@ -66,29 +66,31 @@ export function AppShell() {
               aria-expanded={sidebarOpen}
               aria-controls="app-sidebar"
               className={cn(
-                'flex items-center justify-center w-8 h-8 rounded-md transition-colors',
-                'text-fg-secondary hover:text-fg hover:bg-surface-secondary',
-                'dark:text-fg-dark-secondary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated',
+                'flex h-8 w-8 items-center justify-center rounded-md transition-colors',
+                'text-fg-secondary hover:bg-surface-secondary hover:text-fg',
+                'dark:text-fg-dark-secondary dark:hover:bg-surface-dark-elevated dark:hover:text-fg-dark',
               )}
             >
               <Menu size={16} />
             </button>
-            <span className="flex items-center gap-2 min-w-0">
-              <span className="flex items-center justify-center w-6 h-6 rounded-md bg-accent/10 dark:bg-accent-dark/10 shrink-0">
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent/10 dark:bg-accent-dark/10">
                 <Layers size={13} className="text-accent dark:text-accent-dark" />
               </span>
-              <span className="text-sm font-semibold text-fg dark:text-fg-dark tracking-tight truncate">
+              <span className="truncate text-sm font-semibold tracking-tight text-fg dark:text-fg-dark">
                 RAG Workspace
               </span>
             </span>
           </header>
         )}
 
-        <Outlet context={{
-          contextPanelOpen,
-          toggleContextPanel,
-          selectSource,
-        }} />
+        <Outlet
+          context={{
+            contextPanelOpen,
+            toggleContextPanel,
+            selectSource,
+          }}
+        />
       </main>
 
       <ContextPanel

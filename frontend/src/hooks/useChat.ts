@@ -37,136 +37,133 @@ export const useChat = () => {
     cancelActiveStream(activeSessionId)
   }, [activeSessionId, cancelActiveStream])
 
-  const ask = useCallback(async (question: string) => {
-    const previousRequest = useChatStore.getState().activeStream
-    if (previousRequest) {
-      previousRequest.controller.abort()
-      useChatStore.getState().interruptStreaming(
-        previousRequest.assistantId,
-        previousRequest.sessionId,
-      )
-    }
+  const ask = useCallback(
+    async (question: string) => {
+      const previousRequest = useChatStore.getState().activeStream
+      if (previousRequest) {
+        previousRequest.controller.abort()
+        useChatStore
+          .getState()
+          .interruptStreaming(previousRequest.assistantId, previousRequest.sessionId)
+      }
 
-    const sessionId = useChatStore.getState().activeSessionId
-    const serverConversationId = getServerConversationId()
-    const documentId = useDocumentStore.getState().activeDocumentId
-    const now = new Date().toISOString()
-    const userMessage: ChatMessage = {
-      id: `user-${crypto.randomUUID()}`,
-      role: 'user',
-      content: question,
-      createdAt: now,
-    }
-    addUserMessage(userMessage, sessionId)
+      const sessionId = useChatStore.getState().activeSessionId
+      const serverConversationId = getServerConversationId()
+      const documentId = useDocumentStore.getState().activeDocumentId
+      const now = new Date().toISOString()
+      const userMessage: ChatMessage = {
+        id: `user-${crypto.randomUUID()}`,
+        role: 'user',
+        content: question,
+        createdAt: now,
+      }
+      addUserMessage(userMessage, sessionId)
 
-    const assistantId = `assistant-${crypto.randomUUID()}`
-    const assistantMessage: ChatMessage = {
-      id: assistantId,
-      role: 'assistant',
-      content: '',
-      sources: [],
-      createdAt: new Date().toISOString(),
-      isStreaming: true,
-    }
-    addAssistantMessage(assistantMessage, sessionId)
+      const assistantId = `assistant-${crypto.randomUUID()}`
+      const assistantMessage: ChatMessage = {
+        id: assistantId,
+        role: 'assistant',
+        content: '',
+        sources: [],
+        createdAt: new Date().toISOString(),
+        isStreaming: true,
+      }
+      addAssistantMessage(assistantMessage, sessionId)
 
-    const traceSteps: RagTraceStep[] = []
-    const controller = new AbortController()
-    setActiveStream({
-      sessionId,
-      assistantId,
-      controller,
-      status: 'Preparing...',
-      traceSteps: [],
-    })
+      const traceSteps: RagTraceStep[] = []
+      const controller = new AbortController()
+      setActiveStream({
+        sessionId,
+        assistantId,
+        controller,
+        status: 'Preparing...',
+        traceSteps: [],
+      })
 
-    const isActiveRequest = () => {
-      const active = useChatStore.getState().activeStream
-      return !controller.signal.aborted && active?.controller === controller
-    }
+      const isActiveRequest = () => {
+        const active = useChatStore.getState().activeStream
+        return !controller.signal.aborted && active?.controller === controller
+      }
 
-    try {
-      await queryDocumentsStream(
-        {
-          question,
-          document_id: documentId,
-          conversation_id: serverConversationId,
-          use_reranking: true,
-        },
-        (token: string) => {
-          if (!isActiveRequest()) return
-          setActiveStreamStatus(controller, null)
-          const current = useChatStore.getState().getMessages(sessionId)
-          const message = current.find((item) => item.id === assistantId)
-          updateAssistantMessage(
-            assistantId,
-            (message?.content || '') + token,
-            sessionId,
-          )
-        },
-        (sources: ChatSource[]) => {
-          if (isActiveRequest()) setStreamingSources(assistantId, sources, sessionId)
-        },
-        (statusMessage: string) => {
-          if (isActiveRequest()) setActiveStreamStatus(controller, statusMessage)
-        },
-        (step: RagTraceStep) => {
-          if (!isActiveRequest()) return
-          traceSteps.push(step)
-          setActiveStreamTraceSteps(
-            controller,
-            traceSteps.map((traceStep) => traceStep.step),
-          )
-          setTrace(assistantId, { steps: [...traceSteps] }, sessionId)
-        },
-        (totalTimeMs?: number) => {
-          if (!isActiveRequest()) return
-          if (traceSteps.length > 0) {
-            setTrace(
-              assistantId,
-              { steps: [...traceSteps], total_time_ms: totalTimeMs },
-              sessionId,
+      try {
+        await queryDocumentsStream(
+          {
+            question,
+            document_id: documentId,
+            conversation_id: serverConversationId,
+            use_reranking: true,
+          },
+          (token: string) => {
+            if (!isActiveRequest()) return
+            setActiveStreamStatus(controller, null)
+            const current = useChatStore.getState().getMessages(sessionId)
+            const message = current.find((item) => item.id === assistantId)
+            updateAssistantMessage(assistantId, (message?.content || '') + token, sessionId)
+          },
+          (sources: ChatSource[]) => {
+            if (isActiveRequest()) setStreamingSources(assistantId, sources, sessionId)
+          },
+          (statusMessage: string) => {
+            if (isActiveRequest()) setActiveStreamStatus(controller, statusMessage)
+          },
+          (step: RagTraceStep) => {
+            if (!isActiveRequest()) return
+            traceSteps.push(step)
+            setActiveStreamTraceSteps(
+              controller,
+              traceSteps.map((traceStep) => traceStep.step),
             )
-          }
-          finishStreaming(assistantId, sessionId)
-        },
-        (errorMessage: string) => {
-          if (!isActiveRequest()) return
-          toast.error(errorMessage)
-          updateAssistantMessage(assistantId, errorMessage, sessionId)
-          setMessageError(assistantId, true, sessionId)
-          finishStreaming(assistantId, sessionId)
-        },
-        controller.signal,
-      )
-    } catch (error) {
-      if (!isActiveRequest()) return
-      const message =
-        error instanceof Error ? error.message : 'Unable to answer right now'
-      toast.error(message)
-      updateAssistantMessage(assistantId, message, sessionId)
-      setMessageError(assistantId, true, sessionId)
-      finishStreaming(assistantId, sessionId)
-    }
-  }, [
-    addUserMessage,
-    addAssistantMessage,
-    updateAssistantMessage,
-    setMessageError,
-    setStreamingSources,
-    setTrace,
-    finishStreaming,
-    setActiveStream,
-    setActiveStreamStatus,
-    setActiveStreamTraceSteps,
-    getServerConversationId,
-  ])
+            setTrace(assistantId, { steps: [...traceSteps] }, sessionId)
+          },
+          (totalTimeMs?: number) => {
+            if (!isActiveRequest()) return
+            if (traceSteps.length > 0) {
+              setTrace(
+                assistantId,
+                { steps: [...traceSteps], total_time_ms: totalTimeMs },
+                sessionId,
+              )
+            }
+            finishStreaming(assistantId, sessionId)
+          },
+          (errorMessage: string) => {
+            if (!isActiveRequest()) return
+            toast.error(errorMessage)
+            updateAssistantMessage(assistantId, errorMessage, sessionId)
+            setMessageError(assistantId, true, sessionId)
+            finishStreaming(assistantId, sessionId)
+          },
+          controller.signal,
+        )
+      } catch (error) {
+        if (!isActiveRequest()) return
+        const message = error instanceof Error ? error.message : 'Unable to answer right now'
+        toast.error(message)
+        updateAssistantMessage(assistantId, message, sessionId)
+        setMessageError(assistantId, true, sessionId)
+        finishStreaming(assistantId, sessionId)
+      }
+    },
+    [
+      addUserMessage,
+      addAssistantMessage,
+      updateAssistantMessage,
+      setMessageError,
+      setStreamingSources,
+      setTrace,
+      finishStreaming,
+      setActiveStream,
+      setActiveStreamStatus,
+      setActiveStreamTraceSteps,
+      getServerConversationId,
+    ],
+  )
 
   return {
     messages,
     loading: isCurrentSessionStreaming,
-    status: isCurrentSessionStreaming ? activeStream?.status ?? null : null,
-    traceSteps: isCurrentSessionStreaming ? activeStream?.traceSteps ?? [] : [],
+    status: isCurrentSessionStreaming ? (activeStream?.status ?? null) : null,
+    traceSteps: isCurrentSessionStreaming ? (activeStream?.traceSteps ?? []) : [],
     ask,
     cancel,
     clearMessages,

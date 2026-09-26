@@ -16,21 +16,17 @@ describe('RagLoadingIndicator backend status contract', () => {
   it.each(Object.values(QUERY_STREAM_STATUSES))(
     'activates the $stage stage for "$text"',
     ({ stage, text }) => {
-      const { container } = render(
-        <RagLoadingIndicator status={text} traceSteps={[]} />,
-      )
+      const { container } = render(<RagLoadingIndicator status={text} traceSteps={[]} />)
 
-      expect(
-        container.querySelector('[aria-current="step"]')?.textContent,
-      ).toBe(STAGE_LABELS[stage])
+      expect(container.querySelector('[aria-current="step"]')?.textContent).toBe(
+        STAGE_LABELS[stage],
+      )
     },
   )
 
   it('warns rather than silently mapping unknown statuses', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const { container } = render(
-      <RagLoadingIndicator status="Unexpected stage" traceSteps={[]} />,
-    )
+    const { container } = render(<RagLoadingIndicator status="Unexpected stage" traceSteps={[]} />)
 
     expect(warn).toHaveBeenCalledWith('Unknown RAG status: Unexpected stage')
     expect(container.querySelector('[aria-current="step"]')).toBeNull()

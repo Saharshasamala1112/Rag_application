@@ -19,7 +19,11 @@ export const listCollections = async (): Promise<CollectionListResponse> => {
   return res.data
 }
 
-export const createCollection = async (name: string, description?: string, documentIds?: string[]): Promise<Collection> => {
+export const createCollection = async (
+  name: string,
+  description?: string,
+  documentIds?: string[],
+): Promise<Collection> => {
   const res = await api.post<Collection>('/collections', {
     name,
     description: description || '',
@@ -28,7 +32,10 @@ export const createCollection = async (name: string, description?: string, docum
   return res.data
 }
 
-export const updateCollection = async (id: string, data: { name?: string; description?: string; document_ids?: string[] }): Promise<Collection> => {
+export const updateCollection = async (
+  id: string,
+  data: { name?: string; description?: string; document_ids?: string[] },
+): Promise<Collection> => {
   const res = await api.patch<Collection>(`/collections/${id}`, data)
   return res.data
 }

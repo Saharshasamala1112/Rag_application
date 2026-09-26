@@ -9,17 +9,19 @@ const { markdownRender } = vi.hoisted(() => ({
 }))
 
 vi.mock('react-markdown', () => ({
-  default: memo(({
-    children,
-    components,
-  }: {
-    children: string
-    components?: { p?: (props: { children: string }) => ReactNode }
-  }) => {
-    markdownRender()
-    const Paragraph = components?.p
-    return Paragraph ? <Paragraph>{children}</Paragraph> : <div>{children}</div>
-  }),
+  default: memo(
+    ({
+      children,
+      components,
+    }: {
+      children: string
+      components?: { p?: (props: { children: string }) => ReactNode }
+    }) => {
+      markdownRender()
+      const Paragraph = components?.p
+      return Paragraph ? <Paragraph>{children}</Paragraph> : <div>{children}</div>
+    },
+  ),
 }))
 
 import { MessageBubble } from '../components/chat/MessageBubble'
@@ -48,9 +50,7 @@ describe('MessageBubble render performance', () => {
     expect(markdownRender).toHaveBeenCalledTimes(30)
 
     const updatedMessages = messages.map((message, index) =>
-      index === messages.length - 1
-        ? { ...message, content: `${message.content} token` }
-        : message,
+      index === messages.length - 1 ? { ...message, content: `${message.content} token` } : message,
     )
     rerender(
       <>
@@ -76,20 +76,12 @@ describe('MessageBubble render performance', () => {
     }
     const onSelectSource = vi.fn()
 
-    render(
-      <MessageBubble
-        message={message}
-        onSelectSource={onSelectSource}
-      />,
-    )
+    render(<MessageBubble message={message} onSelectSource={onSelectSource} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open source 1: manual.pdf' }))
 
     expect(onSelectSource).toHaveBeenCalledWith(source, 'answer-1')
-    expect(document.getElementById('source-answer-1-0')).toHaveAttribute(
-      'aria-current',
-      'location',
-    )
+    expect(document.getElementById('source-answer-1-0')).toHaveAttribute('aria-current', 'location')
   })
 
   it('uses structured error state rather than sniffing answer text', () => {

@@ -1,8 +1,6 @@
 import { lazy } from 'react'
 
-export const Chat = lazy(() =>
-  import('../pages/Chat').then((module) => ({ default: module.Chat })),
-)
+export const Chat = lazy(() => import('../pages/Chat').then((module) => ({ default: module.Chat })))
 export const DocumentsPage = lazy(() =>
   import('../pages/DocumentsPage').then((module) => ({ default: module.DocumentsPage })),
 )

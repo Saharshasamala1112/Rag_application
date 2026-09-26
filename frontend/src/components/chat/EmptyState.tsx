@@ -14,7 +14,8 @@ const SUGGESTIONS = [
   {
     icon: GitCompare,
     label: 'Compare documents',
-    prompt: 'Compare the findings and conclusions across these documents. What are the key differences and similarities?',
+    prompt:
+      'Compare the findings and conclusions across these documents. What are the key differences and similarities?',
   },
   {
     icon: FileSearch,
@@ -24,7 +25,8 @@ const SUGGESTIONS = [
   {
     icon: Lightbulb,
     label: 'Explain a topic',
-    prompt: 'Explain the main concepts and methodologies described in these documents in simple terms.',
+    prompt:
+      'Explain the main concepts and methodologies described in these documents in simple terms.',
   },
 ]
 
@@ -34,9 +36,7 @@ export function EmptyState({ onSelectPrompt }: EmptyStateProps) {
   const hasDocs = documents.length > 0
   const activeDoc = documents.find((d) => d.document_id === activeDocumentId)
 
-  const heading = activeDoc
-    ? `Ask about "${activeDoc.filename}"`
-    : 'Ask your knowledge base'
+  const heading = activeDoc ? `Ask about "${activeDoc.filename}"` : 'Ask your knowledge base'
   const subtext = activeDoc
     ? 'This document is selected — ask anything about it.'
     : hasDocs
@@ -44,17 +44,17 @@ export function EmptyState({ onSelectPrompt }: EmptyStateProps) {
       : 'Upload documents to start asking questions.'
 
   return (
-    <div className="flex h-full flex-col items-center justify-center text-center px-6 max-w-xl mx-auto select-none">
+    <div className="mx-auto flex h-full max-w-xl select-none flex-col items-center justify-center px-6 text-center">
       {/* Hero icon */}
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark">
+      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-edge bg-surface dark:border-edge-dark dark:bg-surface-dark">
         <Search size={26} className="text-fg-tertiary dark:text-fg-dark-tertiary" />
       </div>
 
       {/* Heading */}
-      <h2 className="text-xl font-semibold text-fg dark:text-fg-dark mb-2 tracking-tight">
+      <h2 className="mb-2 text-xl font-semibold tracking-tight text-fg dark:text-fg-dark">
         {heading}
       </h2>
-      <p className="text-sm text-fg-secondary dark:text-fg-dark-secondary leading-relaxed mb-8 max-w-md">
+      <p className="mb-8 max-w-md text-sm leading-relaxed text-fg-secondary dark:text-fg-dark-secondary">
         {subtext}
       </p>
 
@@ -68,12 +68,15 @@ export function EmptyState({ onSelectPrompt }: EmptyStateProps) {
                 key={s.label}
                 type="button"
                 onClick={() => onSelectPrompt(s.prompt)}
-                className="group w-full flex items-center gap-3 rounded-xl border border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark px-4 py-3.5 text-left hover:border-edge-strong dark:hover:border-edge-dark-strong hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated active:scale-[0.985] transition-all duration-150"
+                className="group flex w-full items-center gap-3 rounded-xl border border-edge bg-surface px-4 py-3.5 text-left transition-all duration-150 hover:border-edge-strong hover:bg-surface-secondary active:scale-[0.985] dark:border-edge-dark dark:bg-surface-dark dark:hover:border-edge-dark-strong dark:hover:bg-surface-dark-elevated"
               >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-secondary dark:bg-surface-dark-elevated group-hover:bg-accent/10 dark:group-hover:bg-accent-dark/10 transition-colors">
-                  <Icon size={15} className="text-fg-tertiary dark:text-fg-dark-tertiary group-hover:text-accent dark:group-hover:text-accent-dark transition-colors" />
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-secondary transition-colors group-hover:bg-accent/10 dark:bg-surface-dark-elevated dark:group-hover:bg-accent-dark/10">
+                  <Icon
+                    size={15}
+                    className="text-fg-tertiary transition-colors group-hover:text-accent dark:text-fg-dark-tertiary dark:group-hover:text-accent-dark"
+                  />
                 </div>
-                <span className="text-sm text-fg-secondary dark:text-fg-dark-secondary group-hover:text-fg dark:group-hover:text-fg-dark transition-colors">
+                <span className="text-sm text-fg-secondary transition-colors group-hover:text-fg dark:text-fg-dark-secondary dark:group-hover:text-fg-dark">
                   {s.label}
                 </span>
               </button>
@@ -81,8 +84,8 @@ export function EmptyState({ onSelectPrompt }: EmptyStateProps) {
           })}
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-3 mt-2">
-          <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-edge-strong dark:border-edge-dark-strong flex items-center justify-center">
+        <div className="mt-2 flex flex-col items-center gap-3">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-edge-strong dark:border-edge-dark-strong">
             <FileText size={28} className="text-fg-muted dark:text-fg-dark-tertiary" />
           </div>
           <p className="text-xs text-fg-tertiary dark:text-fg-dark-tertiary">

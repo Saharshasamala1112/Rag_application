@@ -19,11 +19,7 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: {
         projectService: {
-          allowDefaultProject: [
-            'eslint.config.ts',
-            'postcss.config.ts',
-            'tailwind.config.ts',
-          ],
+          allowDefaultProject: ['eslint.config.ts', 'postcss.config.ts', 'tailwind.config.ts'],
         },
       },
     },

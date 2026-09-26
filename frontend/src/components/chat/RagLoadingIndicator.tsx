@@ -1,8 +1,5 @@
 import { Search, ArrowUpDown, LayoutGrid, MessageSquare, Check } from 'lucide-react'
-import {
-  QUERY_STREAM_STATUS_TO_STAGE,
-  QUERY_STREAM_TRACE_STEPS,
-} from '../../contracts/queryStream'
+import { QUERY_STREAM_STATUS_TO_STAGE, QUERY_STREAM_TRACE_STEPS } from '../../contracts/queryStream'
 
 interface RagLoadingIndicatorProps {
   status: string | null
@@ -10,16 +7,14 @@ interface RagLoadingIndicatorProps {
 }
 
 const STAGE_MAP: Record<string, { icon: typeof Search; label: string }> = {
-  'retrieval': { icon: Search, label: 'Searching knowledge base' },
-  'reranking': { icon: ArrowUpDown, label: 'Ranking relevant sources' },
-  'context': { icon: LayoutGrid, label: 'Assembling context' },
-  'generation': { icon: MessageSquare, label: 'Generating answer' },
+  retrieval: { icon: Search, label: 'Searching knowledge base' },
+  reranking: { icon: ArrowUpDown, label: 'Ranking relevant sources' },
+  context: { icon: LayoutGrid, label: 'Assembling context' },
+  generation: { icon: MessageSquare, label: 'Generating answer' },
 }
 
 export function RagLoadingIndicator({ status, traceSteps }: RagLoadingIndicatorProps) {
-  const currentStage = status
-    ? QUERY_STREAM_STATUS_TO_STAGE[status]
-    : QUERY_STREAM_TRACE_STEPS[0]
+  const currentStage = status ? QUERY_STREAM_STATUS_TO_STAGE[status] : QUERY_STREAM_TRACE_STEPS[0]
   if (status && !currentStage) {
     console.warn(`Unknown RAG status: ${status}`)
   }
@@ -54,7 +49,7 @@ export function RagLoadingIndicator({ status, traceSteps }: RagLoadingIndicatorP
                       size={10}
                       className={
                         isActive
-                          ? 'text-accent dark:text-accent-dark animate-pulse'
+                          ? 'animate-pulse text-accent dark:text-accent-dark'
                           : 'text-fg-muted dark:text-fg-dark-tertiary'
                       }
                     />
@@ -64,7 +59,7 @@ export function RagLoadingIndicator({ status, traceSteps }: RagLoadingIndicatorP
                   aria-current={stageKey === currentStage ? 'step' : undefined}
                   className={`text-2xs transition-colors duration-200 ${
                     isActive
-                      ? 'text-fg-secondary dark:text-fg-dark-secondary font-medium'
+                      ? 'font-medium text-fg-secondary dark:text-fg-dark-secondary'
                       : isCompleted
                         ? 'text-fg-tertiary dark:text-fg-dark-tertiary'
                         : 'text-fg-muted dark:text-fg-dark-tertiary'
@@ -75,8 +70,10 @@ export function RagLoadingIndicator({ status, traceSteps }: RagLoadingIndicatorP
               </div>
               {idx < stages.length - 1 && (
                 <div
-                  className={`w-6 h-px transition-colors duration-200 ${
-                    isCompleted ? 'bg-success/30 dark:bg-success-dark/30' : 'bg-edge dark:bg-edge-dark'
+                  className={`h-px w-6 transition-colors duration-200 ${
+                    isCompleted
+                      ? 'bg-success/30 dark:bg-success-dark/30'
+                      : 'bg-edge dark:bg-edge-dark'
                   }`}
                 />
               )}

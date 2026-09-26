@@ -1,17 +1,44 @@
 import { FileText } from 'lucide-react'
 
 const TYPE_COLORS: Record<string, { bg: string; text: string }> = {
-  pdf:  { bg: 'bg-danger-subtle dark:bg-danger-dark-subtle', text: 'text-danger dark:text-danger-dark' },
-  doc:  { bg: 'bg-accent-subtle dark:bg-accent-dark-subtle', text: 'text-accent dark:text-accent-dark' },
-  docx: { bg: 'bg-accent-subtle dark:bg-accent-dark-subtle', text: 'text-accent dark:text-accent-dark' },
-  txt:  { bg: 'bg-surface-secondary dark:bg-surface-dark-elevated', text: 'text-fg-secondary dark:text-fg-dark-secondary' },
-  md:   { bg: 'bg-surface-secondary dark:bg-surface-dark-elevated', text: 'text-accent dark:text-accent-dark' },
-  csv:  { bg: 'bg-success-subtle dark:bg-success-dark-subtle', text: 'text-success dark:text-success-dark' },
-  json: { bg: 'bg-warning-subtle dark:bg-warning-dark-subtle', text: 'text-warning dark:text-warning-dark' },
-  html: { bg: 'bg-surface-secondary dark:bg-surface-dark-elevated', text: 'text-fg-secondary dark:text-fg-dark-secondary' },
+  pdf: {
+    bg: 'bg-danger-subtle dark:bg-danger-dark-subtle',
+    text: 'text-danger dark:text-danger-dark',
+  },
+  doc: {
+    bg: 'bg-accent-subtle dark:bg-accent-dark-subtle',
+    text: 'text-accent dark:text-accent-dark',
+  },
+  docx: {
+    bg: 'bg-accent-subtle dark:bg-accent-dark-subtle',
+    text: 'text-accent dark:text-accent-dark',
+  },
+  txt: {
+    bg: 'bg-surface-secondary dark:bg-surface-dark-elevated',
+    text: 'text-fg-secondary dark:text-fg-dark-secondary',
+  },
+  md: {
+    bg: 'bg-surface-secondary dark:bg-surface-dark-elevated',
+    text: 'text-accent dark:text-accent-dark',
+  },
+  csv: {
+    bg: 'bg-success-subtle dark:bg-success-dark-subtle',
+    text: 'text-success dark:text-success-dark',
+  },
+  json: {
+    bg: 'bg-warning-subtle dark:bg-warning-dark-subtle',
+    text: 'text-warning dark:text-warning-dark',
+  },
+  html: {
+    bg: 'bg-surface-secondary dark:bg-surface-dark-elevated',
+    text: 'text-fg-secondary dark:text-fg-dark-secondary',
+  },
 }
 
-const DEFAULT_COLOR = { bg: 'bg-surface-secondary dark:bg-surface-dark-elevated', text: 'text-fg-tertiary dark:text-fg-dark-tertiary' }
+const DEFAULT_COLOR = {
+  bg: 'bg-surface-secondary dark:bg-surface-dark-elevated',
+  text: 'text-fg-tertiary dark:text-fg-dark-tertiary',
+}
 
 function getColor(type: string) {
   const ext = type.replace('.', '').toLowerCase()
@@ -50,7 +77,7 @@ export function FileIconLarge({ type, extension }: FileIconLargeProps) {
   const color = getColor(ext)
 
   return (
-    <div className={`inline-flex items-center justify-center w-10 h-10 rounded-lg ${color.bg}`}>
+    <div className={`inline-flex h-10 w-10 items-center justify-center rounded-lg ${color.bg}`}>
       <FileText size={18} className={color.text} />
     </div>
   )

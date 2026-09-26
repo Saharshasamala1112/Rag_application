@@ -36,7 +36,7 @@ export function ConfirmationDialog({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
+        className="fixed inset-0 animate-fade-in bg-black/40 backdrop-blur-sm"
         onClick={onCancel}
         aria-hidden="true"
       />
@@ -48,9 +48,9 @@ export function ConfirmationDialog({
         aria-describedby={descriptionId}
         tabIndex={-1}
         className={cn(
-          'relative z-10 w-full max-w-sm mx-4 rounded-xl shadow-lg animate-scale-in',
-          'bg-surface border border-edge',
-          'dark:bg-surface-dark dark:border-edge-dark',
+          'relative z-10 mx-4 w-full max-w-sm animate-scale-in rounded-xl shadow-lg',
+          'border border-edge bg-surface',
+          'dark:border-edge-dark dark:bg-surface-dark',
         )}
       >
         <div className="flex items-start justify-between p-5 pb-0">
@@ -58,14 +58,17 @@ export function ConfirmationDialog({
             <h3 id={titleId} className="text-sm font-semibold text-fg dark:text-fg-dark">
               {title}
             </h3>
-            <p id={descriptionId} className="mt-1.5 text-xs text-fg-secondary dark:text-fg-dark-secondary leading-relaxed">
+            <p
+              id={descriptionId}
+              className="mt-1.5 text-xs leading-relaxed text-fg-secondary dark:text-fg-dark-secondary"
+            >
               {description}
             </p>
           </div>
           <button
             type="button"
             onClick={onCancel}
-            className="p-1 -mt-0.5 -mr-1 rounded-md text-fg-tertiary hover:text-fg hover:bg-surface-secondary dark:text-fg-dark-tertiary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated transition-colors"
+            className="-mr-1 -mt-0.5 rounded-md p-1 text-fg-tertiary transition-colors hover:bg-surface-secondary hover:text-fg dark:text-fg-dark-tertiary dark:hover:bg-surface-dark-elevated dark:hover:text-fg-dark"
             aria-label="Close dialog"
           >
             <X size={14} />
@@ -75,7 +78,7 @@ export function ConfirmationDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="px-3 py-1.5 text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary rounded-md hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated transition-colors"
+            className="rounded-md px-3 py-1.5 text-xs font-medium text-fg-secondary transition-colors hover:bg-surface-secondary dark:text-fg-dark-secondary dark:hover:bg-surface-dark-elevated"
           >
             {cancelLabel}
           </button>
@@ -84,7 +87,7 @@ export function ConfirmationDialog({
             onClick={onConfirm}
             disabled={loading}
             className={cn(
-              'px-3 py-1.5 text-xs font-medium text-white rounded-md transition-colors disabled:opacity-50',
+              'rounded-md px-3 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50',
               variant === 'danger'
                 ? 'bg-danger hover:bg-danger-hover dark:bg-danger dark:hover:bg-danger-hover'
                 : 'bg-fg hover:opacity-90 dark:bg-fg-dark dark:text-app-dark',

@@ -6,10 +6,7 @@ import { QUERY_STREAM_EVENTS } from '../contracts/queryStream'
 function isSSEEvent(value: unknown): value is SSEEvent {
   if (!value || typeof value !== 'object') return false
   const event = value as Record<string, unknown>
-  if (
-    typeof event.type !== 'string'
-    || !Object.values(QUERY_STREAM_EVENTS).includes(event.type)
-  ) {
+  if (typeof event.type !== 'string' || !Object.values(QUERY_STREAM_EVENTS).includes(event.type)) {
     return false
   }
   switch (event.type) {
@@ -51,9 +48,7 @@ export const queryDocumentsStream = async (
   timeoutMs = 300000,
 ): Promise<void> => {
   const timeoutSignal = AbortSignal.timeout(timeoutMs)
-  const requestSignal = signal
-    ? AbortSignal.any([signal, timeoutSignal])
-    : timeoutSignal
+  const requestSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal
   const response = await fetch(`${api.defaults.baseURL}/query/stream`, {
     method: 'POST',
     headers: {
@@ -69,12 +64,7 @@ export const queryDocumentsStream = async (
     let detail = `HTTP ${response.status}: ${response.statusText}`
     try {
       const body: unknown = await response.json()
-      if (
-        body
-        && typeof body === 'object'
-        && 'detail' in body
-        && typeof body.detail === 'string'
-      ) {
+      if (body && typeof body === 'object' && 'detail' in body && typeof body.detail === 'string') {
         detail = body.detail
       }
     } catch {

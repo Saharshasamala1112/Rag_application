@@ -1,12 +1,4 @@
-import {
-  Children,
-  cloneElement,
-  Fragment,
-  isValidElement,
-  memo,
-  useEffect,
-  useState,
-} from 'react'
+import { Children, cloneElement, Fragment, isValidElement, memo, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -38,7 +30,7 @@ function CopyButton({ text }: { text: string }) {
     <button
       type="button"
       onClick={handleCopy}
-      className="p-1 rounded text-fg-tertiary dark:text-fg-dark-tertiary hover:text-fg-secondary dark:hover:text-fg-dark-secondary hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated transition-colors"
+      className="rounded p-1 text-fg-tertiary transition-colors hover:bg-surface-secondary hover:text-fg-secondary dark:text-fg-dark-tertiary dark:hover:bg-surface-dark-elevated dark:hover:text-fg-dark-secondary"
       aria-label="Copy message"
       title="Copy to clipboard"
     >
@@ -102,8 +94,8 @@ function renderCitationNodes(
   }
 
   if (
-    isValidElement<{ children?: ReactNode }>(nodes)
-    && (nodes.type === 'code' || nodes.type === 'pre')
+    isValidElement<{ children?: ReactNode }>(nodes) &&
+    (nodes.type === 'code' || nodes.type === 'pre')
   ) {
     return nodes
   }
@@ -151,14 +143,12 @@ export const MessageBubble = memo(function MessageBubble({
 
   if (isUser) {
     return (
-      <div className="flex justify-end animate-slide-up">
-        <div className="max-w-[75%] min-w-0">
-          <div className="rounded-2xl rounded-br-md bg-fg dark:bg-fg-dark text-app dark:text-app-dark px-4 py-2.5 shadow-xs">
-            <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed">
-              {message.content}
-            </p>
+      <div className="flex animate-slide-up justify-end">
+        <div className="min-w-0 max-w-[75%]">
+          <div className="rounded-2xl rounded-br-md bg-fg px-4 py-2.5 text-app shadow-xs dark:bg-fg-dark dark:text-app-dark">
+            <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed">{message.content}</p>
           </div>
-          <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary mt-1 text-right">
+          <p className="mt-1 text-right text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
             {formatTime(message.createdAt)}
           </p>
         </div>
@@ -167,10 +157,10 @@ export const MessageBubble = memo(function MessageBubble({
   }
 
   return (
-    <div className="flex justify-start animate-slide-up">
-      <div className="w-full max-w-[85%] min-w-0">
+    <div className="flex animate-slide-up justify-start">
+      <div className="w-full min-w-0 max-w-[85%]">
         {/* Assistant label */}
-        <div className="flex items-center gap-2 mb-2">
+        <div className="mb-2 flex items-center gap-2">
           <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 dark:bg-accent-dark/10">
             <svg
               width="12"
@@ -198,9 +188,9 @@ export const MessageBubble = memo(function MessageBubble({
               <span className="text-2xs text-fg-muted dark:text-fg-dark-tertiary">·</span>
               <span className="inline-flex items-center gap-1 text-2xs text-accent dark:text-accent-dark">
                 <span className="flex gap-[3px]">
-                  <span className="w-[3px] h-[3px] rounded-full bg-current animate-bounce [animation-delay:-0.3s]" />
-                  <span className="w-[3px] h-[3px] rounded-full bg-current animate-bounce [animation-delay:-0.15s]" />
-                  <span className="w-[3px] h-[3px] rounded-full bg-current animate-bounce" />
+                  <span className="h-[3px] w-[3px] animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
+                  <span className="h-[3px] w-[3px] animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
+                  <span className="h-[3px] w-[3px] animate-bounce rounded-full bg-current" />
                 </span>
                 <span className="ml-0.5">thinking</span>
               </span>
@@ -215,15 +205,23 @@ export const MessageBubble = memo(function MessageBubble({
 
         {/* Error state */}
         {isError && !message.isStreaming && (
-          <div role="alert" className="rounded-xl border border-danger/30 dark:border-danger-dark/30 bg-danger-subtle dark:bg-danger-dark-subtle px-4 py-3 mb-2">
+          <div
+            role="alert"
+            className="mb-2 rounded-xl border border-danger/30 bg-danger-subtle px-4 py-3 dark:border-danger-dark/30 dark:bg-danger-dark-subtle"
+          >
             <div className="flex items-start gap-2">
-              <AlertCircle size={14} className="text-danger dark:text-danger-dark mt-0.5 shrink-0" />
+              <AlertCircle
+                size={14}
+                className="mt-0.5 shrink-0 text-danger dark:text-danger-dark"
+              />
               <div>
-                <p className="text-sm font-medium text-danger dark:text-danger-dark">Something went wrong</p>
-                <p className="text-xs text-danger/80 dark:text-danger-dark/80 mt-1">
+                <p className="text-sm font-medium text-danger dark:text-danger-dark">
+                  Something went wrong
+                </p>
+                <p className="mt-1 text-xs text-danger/80 dark:text-danger-dark/80">
                   {message.content}
                 </p>
-                <p className="text-2xs text-danger/60 dark:text-danger-dark/60 mt-2">
+                <p className="mt-2 text-2xs text-danger/60 dark:text-danger-dark/60">
                   Try rephrasing your question or uploading different documents.
                 </p>
                 {onRetry && (
@@ -281,18 +279,17 @@ export const MessageBubble = memo(function MessageBubble({
                 ),
               }}
             >
-              {message.content ||
-                (message.isStreaming ? '' : 'No response generated.')}
+              {message.content || (message.isStreaming ? '' : 'No response generated.')}
             </ReactMarkdown>
             {message.isStreaming && message.content && (
-              <span className="inline-block h-[14px] w-[2px] bg-accent dark:bg-accent-dark animate-pulse ml-0.5 align-middle rounded-full" />
+              <span className="ml-0.5 inline-block h-[14px] w-[2px] animate-pulse rounded-full bg-accent align-middle dark:bg-accent-dark" />
             )}
             {message.isStreaming && !message.content && (
               <div className="flex items-center gap-2 py-2">
                 <div className="flex gap-1">
-                  <span className="w-2 h-2 rounded-full bg-fg-muted dark:bg-fg-dark-tertiary animate-bounce [animation-delay:-0.3s]" />
-                  <span className="w-2 h-2 rounded-full bg-fg-muted dark:bg-fg-dark-tertiary animate-bounce [animation-delay:-0.15s]" />
-                  <span className="w-2 h-2 rounded-full bg-fg-muted dark:bg-fg-dark-tertiary animate-bounce" />
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-fg-muted [animation-delay:-0.3s] dark:bg-fg-dark-tertiary" />
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-fg-muted [animation-delay:-0.15s] dark:bg-fg-dark-tertiary" />
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-fg-muted dark:bg-fg-dark-tertiary" />
                 </div>
               </div>
             )}
@@ -301,45 +298,48 @@ export const MessageBubble = memo(function MessageBubble({
 
         {/* Sources — only when not streaming and sources exist */}
         {hasSources && !message.isStreaming && (
-          <div className="mt-4 border border-edge dark:border-edge-dark rounded-xl overflow-hidden bg-surface dark:bg-surface-dark">
+          <div className="mt-4 overflow-hidden rounded-xl border border-edge bg-surface dark:border-edge-dark dark:bg-surface-dark">
             <button
               type="button"
               onClick={() => setSourcesExpanded((prev) => !prev)}
-              className="flex items-center gap-2 w-full px-4 py-2.5 text-left hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated transition-colors"
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated"
             >
               <ChevronDown
                 size={13}
-                className={`text-fg-tertiary dark:text-fg-dark-tertiary transition-transform duration-200 shrink-0 ${
+                className={`shrink-0 text-fg-tertiary transition-transform duration-200 dark:text-fg-dark-tertiary ${
                   sourcesExpanded ? 'rotate-180' : ''
                 }`}
               />
-              <FileText size={12} className="text-fg-tertiary dark:text-fg-dark-tertiary shrink-0" />
+              <FileText
+                size={12}
+                className="shrink-0 text-fg-tertiary dark:text-fg-dark-tertiary"
+              />
               <span className="text-2xs font-semibold uppercase tracking-wider text-fg-tertiary dark:text-fg-dark-tertiary">
                 Sources · {message.sources!.length}
               </span>
             </button>
 
             {sourcesExpanded && (
-              <div className="px-4 pb-3 space-y-2 border-t border-edge/50 dark:border-edge-dark/50">
+              <div className="space-y-2 border-t border-edge/50 px-4 pb-3 dark:border-edge-dark/50">
                 {message.sources!.map((source, idx) => (
                   <div
                     key={`${source.source}-${source.chunk_id}-${idx}`}
                     id={`source-${message.id}-${idx}`}
                     aria-current={selectedSourceIndex === idx ? 'location' : undefined}
-                    className={`rounded-lg p-3 mt-2 transition-colors ${
+                    className={`mt-2 rounded-lg p-3 transition-colors ${
                       selectedSourceIndex === idx
                         ? 'bg-accent/15 ring-2 ring-accent dark:bg-accent-dark/15 dark:ring-accent-dark'
                         : 'bg-surface-secondary dark:bg-surface-dark-elevated'
                     }`}
                   >
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-accent/10 dark:bg-accent-dark/10 text-2xs font-semibold text-accent dark:text-accent-dark">
+                    <div className="mb-1.5 flex items-center gap-2">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-accent/10 text-2xs font-semibold text-accent dark:bg-accent-dark/10 dark:text-accent-dark">
                         {idx + 1}
                       </span>
-                      <span className="text-[11px] font-medium text-fg-secondary dark:text-fg-dark-secondary truncate">
+                      <span className="truncate text-[11px] font-medium text-fg-secondary dark:text-fg-dark-secondary">
                         {source.source}
                       </span>
-                      <div className="flex items-center gap-1.5 ml-auto shrink-0">
+                      <div className="ml-auto flex shrink-0 items-center gap-1.5">
                         {source.page_number != null && (
                           <span className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
                             p.{source.page_number}
@@ -353,11 +353,11 @@ export const MessageBubble = memo(function MessageBubble({
                       </div>
                     </div>
                     {source.header && (
-                      <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary mb-1 italic">
+                      <p className="mb-1 text-2xs italic text-fg-tertiary dark:text-fg-dark-tertiary">
                         {source.header}
                       </p>
                     )}
-                    <p className="text-[11px] text-fg-secondary dark:text-fg-dark-secondary line-clamp-2 leading-relaxed">
+                    <p className="line-clamp-2 text-[11px] leading-relaxed text-fg-secondary dark:text-fg-dark-secondary">
                       {source.content}
                     </p>
                   </div>
@@ -369,7 +369,7 @@ export const MessageBubble = memo(function MessageBubble({
 
         {/* Copy button for completed messages */}
         {!message.isStreaming && message.content && !isError && (
-          <div className="flex items-center gap-1 mt-2">
+          <div className="mt-2 flex items-center gap-1">
             <CopyButton text={message.content} />
             {onRegenerate && (
               <button

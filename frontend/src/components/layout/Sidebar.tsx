@@ -74,8 +74,8 @@ export function Sidebar({ collapsed, onToggle, open, onClose, isDesktop }: Sideb
       <aside
         id="app-sidebar"
         className={cn(
-          'flex flex-col h-full bg-surface border-r border-edge',
-          'dark:bg-surface-dark dark:border-edge-dark',
+          'flex h-full flex-col border-r border-edge bg-surface',
+          'dark:border-edge-dark dark:bg-surface-dark',
           'transition-all duration-200 ease-in-out',
           isDesktop
             ? collapsed
@@ -85,25 +85,34 @@ export function Sidebar({ collapsed, onToggle, open, onClose, isDesktop }: Sideb
         )}
       >
         {/* Logo + Collapse / Close */}
-        <div className="flex h-12 items-center justify-between px-3 border-b border-edge dark:border-edge-dark shrink-0">
+        <div className="flex h-12 shrink-0 items-center justify-between border-b border-edge px-3 dark:border-edge-dark">
           {!iconOnly && (
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="flex items-center justify-center w-6 h-6 rounded-md bg-accent/10 dark:bg-accent-dark/10">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/10 dark:bg-accent-dark/10">
                 <Layers size={13} className="text-accent dark:text-accent-dark" />
               </div>
-              <span className="text-sm font-semibold text-fg dark:text-fg-dark tracking-tight truncate">
+              <span className="truncate text-sm font-semibold tracking-tight text-fg dark:text-fg-dark">
                 RAG Workspace
               </span>
             </div>
           )}
-          <Tooltip content={isDesktop ? (collapsed ? 'Expand sidebar' : 'Collapse sidebar') : 'Close navigation menu'} side="right">
+          <Tooltip
+            content={
+              isDesktop
+                ? collapsed
+                  ? 'Expand sidebar'
+                  : 'Collapse sidebar'
+                : 'Close navigation menu'
+            }
+            side="right"
+          >
             <button
               type="button"
               onClick={isDesktop ? onToggle : onClose}
               className={cn(
-                'flex items-center justify-center w-7 h-7 rounded-md transition-colors',
-                'text-fg-tertiary hover:text-fg hover:bg-surface-secondary',
-                'dark:text-fg-dark-tertiary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated',
+                'flex h-7 w-7 items-center justify-center rounded-md transition-colors',
+                'text-fg-tertiary hover:bg-surface-secondary hover:text-fg',
+                'dark:text-fg-dark-tertiary dark:hover:bg-surface-dark-elevated dark:hover:text-fg-dark',
               )}
               aria-label={
                 isDesktop
@@ -114,7 +123,11 @@ export function Sidebar({ collapsed, onToggle, open, onClose, isDesktop }: Sideb
               }
             >
               {isDesktop ? (
-                collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />
+                collapsed ? (
+                  <PanelLeftOpen size={15} />
+                ) : (
+                  <PanelLeftClose size={15} />
+                )
               ) : (
                 <PanelLeftClose size={15} />
               )}
@@ -123,14 +136,14 @@ export function Sidebar({ collapsed, onToggle, open, onClose, isDesktop }: Sideb
         </div>
 
         {/* New Chat */}
-        <div className="px-2 pt-3 pb-1 shrink-0">
+        <div className="shrink-0 px-2 pb-1 pt-3">
           {iconOnly ? (
             <Tooltip content="New Chat" side="right">
               <button
                 type="button"
                 onClick={handleNewChat}
                 className={cn(
-                  'flex items-center justify-center w-full h-8 rounded-lg transition-colors',
+                  'flex h-8 w-full items-center justify-center rounded-lg transition-colors',
                   'bg-accent text-white hover:bg-accent-hover',
                   'dark:bg-accent-dark dark:text-app-dark dark:hover:bg-accent-dark-hover',
                 )}
@@ -140,12 +153,7 @@ export function Sidebar({ collapsed, onToggle, open, onClose, isDesktop }: Sideb
               </button>
             </Tooltip>
           ) : (
-            <Button
-              variant="primary"
-              size="md"
-              onClick={handleNewChat}
-              className="w-full"
-            >
+            <Button variant="primary" size="md" onClick={handleNewChat} className="w-full">
               <Plus size={14} />
               New Chat
             </Button>
@@ -153,7 +161,11 @@ export function Sidebar({ collapsed, onToggle, open, onClose, isDesktop }: Sideb
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5" role="navigation" aria-label="Main navigation">
+        <nav
+          className="flex-1 space-y-0.5 overflow-y-auto px-2 py-1"
+          role="navigation"
+          aria-label="Main navigation"
+        >
           {NAV_ITEMS.map((item) => (
             <NavItem
               key={item.to}
@@ -168,7 +180,7 @@ export function Sidebar({ collapsed, onToggle, open, onClose, isDesktop }: Sideb
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-edge dark:border-edge-dark px-2 py-2 space-y-1 shrink-0">
+        <div className="shrink-0 space-y-1 border-t border-edge px-2 py-2 dark:border-edge-dark">
           {!iconOnly && (
             <div className="flex items-center justify-between px-2.5 py-1 text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
               <span>{documents.length} docs</span>

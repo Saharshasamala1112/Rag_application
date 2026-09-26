@@ -52,15 +52,17 @@ describe('SettingsPage API contract', () => {
   it('renders health details returned with a degraded 503 response', async () => {
     getMock.mockImplementation((url: string) => {
       if (url === '/health') {
-        return Promise.reject(new ApiError('Service unavailable', 503, {
-          detail: {
-            status: 'degraded',
-            model: 'llama3.2',
-            embedding_model: 'bge-small',
-            ollama_available: false,
-            document_count: 2,
-          },
-        }))
+        return Promise.reject(
+          new ApiError('Service unavailable', 503, {
+            detail: {
+              status: 'degraded',
+              model: 'llama3.2',
+              embedding_model: 'bge-small',
+              ollama_available: false,
+              document_count: 2,
+            },
+          }),
+        )
       }
       return Promise.resolve({ data: { types: [], total: 0 } })
     })

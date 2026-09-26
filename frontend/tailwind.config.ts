@@ -9,42 +9,42 @@ export default {
       colors: {
         // Application background
         app: {
-          DEFAULT: '#F8F7F4',       // warm off-white light
-          dark: '#0A0A0A',          // near-black dark
+          DEFAULT: '#F8F7F4', // warm off-white light
+          dark: '#0A0A0A', // near-black dark
         },
         // Surface (cards, panels)
         surface: {
-          DEFAULT: '#FFFFFF',       // white light
-          secondary: '#F5F5F4',     // stone-100 light
-          elevated: '#FAFAF9',      // stone-50 light
-          dark: '#111111',          // dark surface
+          DEFAULT: '#FFFFFF', // white light
+          secondary: '#F5F5F4', // stone-100 light
+          elevated: '#FAFAF9', // stone-50 light
+          dark: '#111111', // dark surface
           'dark-elevated': '#181818', // dark elevated
-          'dark-hover': '#1F1F1F',  // dark hover
+          'dark-hover': '#1F1F1F', // dark hover
         },
         // Borders
         edge: {
-          DEFAULT: '#E7E5E4',       // stone-200 light
-          strong: '#D6D3D1',        // stone-300 light
-          dark: '#262626',          // dark border
+          DEFAULT: '#E7E5E4', // stone-200 light
+          strong: '#D6D3D1', // stone-300 light
+          dark: '#262626', // dark border
           'dark-strong': '#333333', // dark strong border
         },
         // Text
         fg: {
-          DEFAULT: '#1C1917',       // stone-900 light
-          secondary: '#78716C',     // stone-500 light
-          tertiary: '#6B6560',     // accessible warm gray on light surfaces
+          DEFAULT: '#1C1917', // stone-900 light
+          secondary: '#78716C', // stone-500 light
+          tertiary: '#6B6560', // accessible warm gray on light surfaces
           muted: '#6B6560',
-          dark: '#F5F5F5',          // light text dark
+          dark: '#F5F5F5', // light text dark
           'dark-secondary': '#A1A1AA', // zinc-400 dark
           'dark-tertiary': '#8B8B95', // accessible zinc on dark surfaces
         },
         // Accent — restrained teal/slate
         accent: {
-          DEFAULT: '#0F766E',       // teal-700
-          hover: '#115E59',         // teal-800
-          subtle: '#F0FDFA',        // teal-50
-          'dark': '#2DD4BF',        // teal-400 dark
-          'dark-hover': '#5EEAD4',  // teal-300 dark
+          DEFAULT: '#0F766E', // teal-700
+          hover: '#115E59', // teal-800
+          subtle: '#F0FDFA', // teal-50
+          dark: '#2DD4BF', // teal-400 dark
+          'dark-hover': '#5EEAD4', // teal-300 dark
           'dark-subtle': '#042F2E', // teal-950 dark
         },
         // Status
@@ -76,17 +76,17 @@ export default {
         '2xs': ['0.6875rem', { lineHeight: '1rem' }],
       },
       boxShadow: {
-        'xs': '0 1px 2px rgba(0,0,0,0.03)',
-        'sm': '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)',
-        'md': '0 4px 6px -1px rgba(0,0,0,0.04), 0 2px 4px -2px rgba(0,0,0,0.03)',
-        'lg': '0 10px 15px -3px rgba(0,0,0,0.04), 0 4px 6px -4px rgba(0,0,0,0.03)',
-        'panel': '0 1px 3px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.02)',
+        xs: '0 1px 2px rgba(0,0,0,0.03)',
+        sm: '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)',
+        md: '0 4px 6px -1px rgba(0,0,0,0.04), 0 2px 4px -2px rgba(0,0,0,0.03)',
+        lg: '0 10px 15px -3px rgba(0,0,0,0.04), 0 4px 6px -4px rgba(0,0,0,0.03)',
+        panel: '0 1px 3px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.02)',
         'dark-sm': '0 1px 3px rgba(0,0,0,0.3)',
         'dark-md': '0 4px 6px -1px rgba(0,0,0,0.4)',
         'dark-lg': '0 10px 15px -3px rgba(0,0,0,0.5)',
       },
       borderRadius: {
-        'xl': '0.75rem',
+        xl: '0.75rem',
         '2xl': '1rem',
       },
       animation: {

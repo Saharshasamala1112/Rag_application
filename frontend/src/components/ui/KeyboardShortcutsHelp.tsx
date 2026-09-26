@@ -27,7 +27,7 @@ export function KeyboardShortcutsHelp({ open, onClose }: KeyboardShortcutsHelpPr
               {shortcut.keys.map((key) => (
                 <kbd
                   key={key}
-                  className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 text-2xs font-medium text-fg-secondary dark:text-fg-dark-secondary bg-surface-secondary dark:bg-surface-dark-elevated border border-edge dark:border-edge-dark rounded"
+                  className="inline-flex h-6 min-w-[24px] items-center justify-center rounded border border-edge bg-surface-secondary px-1.5 text-2xs font-medium text-fg-secondary dark:border-edge-dark dark:bg-surface-dark-elevated dark:text-fg-dark-secondary"
                 >
                   {key}
                 </kbd>
