@@ -6,6 +6,7 @@ import { Paperclip, PanelRightOpen, PanelRightClose, ArrowDown, Square, Sparkles
 import { useChat } from '../hooks/useChat'
 import { useUpload } from '../hooks/useUpload'
 import { useDocumentStore } from '../store/document.store'
+import type { ChatSource, ChatMessage } from '../types/chat'
 import { MessageBubble } from '../components/chat/MessageBubble'
 import { EmptyState } from '../components/chat/EmptyState'
 import { ChatComposer } from '../components/chat/ChatComposer'
@@ -16,10 +17,12 @@ import { Tooltip } from '../components/ui/Tooltip'
 interface LayoutContext {
   contextPanelOpen: boolean
   toggleContextPanel: () => void
+  selectSource: (source: ChatSource) => void
 }
 
 export const Chat = () => {
-  const { contextPanelOpen, toggleContextPanel } = useOutletContext<LayoutContext>()
+  const { contextPanelOpen, toggleContextPanel, selectSource } =
+    useOutletContext<LayoutContext>()
 
   const {
     messages,
@@ -34,6 +37,10 @@ export const Chat = () => {
   const activeDocument = useDocumentStore((s) => s.activeDocumentId)
   const documents = useDocumentStore((s) => s.documents)
   const setActiveDocument = useDocumentStore((s) => s.setActiveDocument)
+  const handleSelectSource = useCallback(
+    (source: ChatSource) => selectSource(source),
+    [selectSource],
+  )
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
@@ -45,6 +52,7 @@ export const Chat = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const latestIsAtBottomRef = useRef(isAtBottom)
   const loadingRef = useRef(loading)
+  const latestMessagesRef = useRef(messages)
   const hasMessages = messages.length > 0
 
   useEffect(() => {
@@ -54,6 +62,7 @@ export const Chat = () => {
   useEffect(() => {
     latestIsAtBottomRef.current = isAtBottom
     loadingRef.current = loading
+    latestMessagesRef.current = messages
   }, [messages, isAtBottom, loading])
 
   useEffect(() => {
@@ -157,6 +166,18 @@ export const Chat = () => {
     setInputValue('')
     void ask(q)
   }
+
+  const replayAssistantAnswer = useCallback((messageId: string) => {
+    const currentMessages = latestMessagesRef.current
+    const messageIndex = currentMessages.findIndex((message) => message.id === messageId)
+    if (messageIndex < 0) return
+
+    const previousUserMessage = currentMessages
+      .slice(0, messageIndex)
+      .reverse()
+      .find((message: ChatMessage) => message.role === 'user')
+    if (previousUserMessage) void ask(previousUserMessage.content)
+  }, [ask])
 
   const handleStopOrSubmit = () => {
     if (loading) {
@@ -278,6 +299,9 @@ export const Chat = () => {
               <MessageBubble
                 key={msg.id}
                 message={msg}
+                onSelectSource={handleSelectSource}
+                onRetry={replayAssistantAnswer}
+                onRegenerate={replayAssistantAnswer}
               />
             ))}
           </div>

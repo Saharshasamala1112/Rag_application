@@ -47,6 +47,25 @@ describe('useChat', () => {
     ])
   })
 
+  it('stores stream failures as structured error state', async () => {
+    streamMock.mockImplementation((...args) => {
+      args[6]('The service is unavailable.')
+      return Promise.resolve()
+    })
+    const { result } = renderHook(() => useChat())
+
+    await act(async () => {
+      await result.current.ask('question')
+    })
+
+    expect(result.current.messages.at(-1)).toMatchObject({
+      role: 'assistant',
+      content: 'The service is unavailable.',
+      error: true,
+      isStreaming: false,
+    })
+  })
+
   it('aborts the active stream and ignores late tokens and completion', async () => {
     let resolveStream: () => void = () => {}
     let capturedSignal: AbortSignal | undefined

@@ -27,3 +27,8 @@ data/uploads/
 
 # Logs
 *.log
+
+# Coverage / test artifacts
+.coverage
+coverage.xml
+junit.xml

@@ -33,6 +33,7 @@ export type ChatMessage = {
   createdAt: string
   isStreaming?: boolean
   interrupted?: boolean
+  error?: boolean
 }
 
 export type QueryRequest = ApiQueryRequest

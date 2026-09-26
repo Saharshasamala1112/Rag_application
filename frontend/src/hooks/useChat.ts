@@ -12,6 +12,7 @@ export const useChat = () => {
   const addUserMessage = useChatStore((state) => state.addUserMessage)
   const addAssistantMessage = useChatStore((state) => state.addAssistantMessage)
   const updateAssistantMessage = useChatStore((state) => state.updateAssistantMessage)
+  const setMessageError = useChatStore((state) => state.setMessageError)
   const setStreamingSources = useChatStore((state) => state.setStreamingSources)
   const setTrace = useChatStore((state) => state.setTrace)
   const finishStreaming = useChatStore((state) => state.finishStreaming)
@@ -132,7 +133,8 @@ export const useChat = () => {
         (errorMessage: string) => {
           if (!isActiveRequest()) return
           toast.error(errorMessage)
-          updateAssistantMessage(assistantId, `Error: ${errorMessage}`, sessionId)
+          updateAssistantMessage(assistantId, errorMessage, sessionId)
+          setMessageError(assistantId, true, sessionId)
           finishStreaming(assistantId, sessionId)
         },
         controller.signal,
@@ -142,13 +144,15 @@ export const useChat = () => {
       const message =
         error instanceof Error ? error.message : 'Unable to answer right now'
       toast.error(message)
-      updateAssistantMessage(assistantId, `Error: ${message}`, sessionId)
+      updateAssistantMessage(assistantId, message, sessionId)
+      setMessageError(assistantId, true, sessionId)
       finishStreaming(assistantId, sessionId)
     }
   }, [
     addUserMessage,
     addAssistantMessage,
     updateAssistantMessage,
+    setMessageError,
     setStreamingSources,
     setTrace,
     finishStreaming,
