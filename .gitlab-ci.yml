@@ -1,0 +1,30 @@
+stages:
+  - build
+  - test
+
+variables:
+  FF_NETWORK_PER_BUILD: "true"
+
+default:
+  interruptible: true
+
+.frontend-base:
+  image: node:22-alpine
+  cache:
+    key:
+      files:
+        - frontend/package-lock.json
+    paths:
+      - frontend/node_modules
+  before_script:
+    - cd frontend
+    - npm ci --no-audit --no-fund
+
+frontend-build:
+  extends: .frontend-base
+  stage: build
+  script:
+    - npm run build
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useChatStore } from '../../store/chat.store'
+import { useChatStore } from '../store/chat.store'
 
 let helpOpenSetter: ((v: boolean) => void) | null = null
 
