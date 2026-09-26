@@ -1,8 +1,18 @@
 from __future__ import annotations
 
+import subprocess
+import zipfile
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
-from app.rag.document_loader import DocumentLoader, normalize_text
+import pytest
+
+from app.config.settings import settings
+from app.rag.document_loader import (
+    DocumentLimitError,
+    DocumentLoader,
+    normalize_text,
+)
 
 
 class TestNormalizeText:
@@ -71,6 +81,16 @@ class TestExtractCsv:
         result = DocumentLoader._extract_csv(p)
         assert result == ""
 
+    def test_csv_rejects_file_over_configured_parser_limit(self, tmp_path: Path):
+        path = tmp_path / "large.csv"
+        path.write_bytes(b"name\nvalue\n")
+
+        with patch.object(settings, "max_tabular_file_mb", 1):
+            with patch.object(Path, "stat") as stat:
+                stat.return_value.st_size = 1024 * 1024 + 1
+                with pytest.raises(DocumentLimitError, match="CSV file"):
+                    DocumentLoader.extract_markdown(path)
+
 
 class TestExtractJson:
     def test_json_formatted(self, sample_json: Path):
@@ -83,6 +103,87 @@ class TestExtractJson:
         p.write_text("not valid json {{{")
         result = DocumentLoader._extract_json(p)
         assert "not valid json" in result
+
+    def test_json_rejects_file_over_configured_parser_limit(self, tmp_path: Path):
+        path = tmp_path / "large.json"
+        path.write_bytes(b"{}")
+
+        with patch.object(settings, "max_tabular_file_mb", 1):
+            with patch.object(Path, "stat") as stat:
+                stat.return_value.st_size = 1024 * 1024 + 1
+                with pytest.raises(DocumentLimitError, match="JSON file"):
+                    DocumentLoader.extract_markdown(path)
+
+
+class TestDocumentParserLimits:
+    def test_pdf_page_count_is_checked_before_markdown_parser(self, tmp_path: Path):
+        path = tmp_path / "large.pdf"
+        path.touch()
+        pdf = MagicMock()
+        pdf.page_count = 3
+        pdf_context = MagicMock()
+        pdf_context.__enter__.return_value = pdf
+
+        with (
+            patch("app.rag.document_loader.pymupdf.open", return_value=pdf_context),
+            patch.object(settings, "max_pdf_pages", 2),
+            patch("app.rag.document_loader.pymupdf4llm.to_markdown") as to_markdown,
+        ):
+            with pytest.raises(DocumentLimitError, match="2 page limit"):
+                DocumentLoader.extract_markdown(path)
+
+        to_markdown.assert_not_called()
+
+    def test_docx_uncompressed_member_size_is_checked_before_parser(
+        self, tmp_path: Path
+    ):
+        path = tmp_path / "large.docx"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr(
+                "word/document.xml",
+                "<document>" + "x" * (1024 * 1024) + "</document>",
+            )
+
+        with patch.object(settings, "max_docx_xml_mb", 1):
+            with patch(
+                "app.rag.document_loader.DocumentLoader._extract_docx"
+            ) as extract:
+                with pytest.raises(DocumentLimitError, match="XML"):
+                    DocumentLoader.extract_markdown(path)
+        extract.assert_not_called()
+
+    def test_external_parser_timeout_is_bounded(self, tmp_path: Path):
+        path = tmp_path / "legacy.doc"
+        path.write_bytes(b"\x00" * 100)
+        timeout_error = subprocess.TimeoutExpired(
+            cmd="antiword",
+            timeout=3,
+        )
+        with patch.object(settings, "external_parser_timeout_seconds", 3):
+            with patch(
+                "app.rag.document_loader.subprocess.run",
+                side_effect=[
+                    timeout_error,
+                    FileNotFoundError(),
+                ],
+            ) as run:
+                with pytest.raises(ValueError, match="Cannot extract text"):
+                    DocumentLoader._extract_doc_antiword(path)
+
+        assert [call.kwargs["timeout"] for call in run.call_args_list] == [3, 3]
+
+    def test_docx_archive_size_limit_prevents_parser_invocation(self, tmp_path: Path):
+        path = tmp_path / "large.docx"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr(
+                "word/document.xml",
+                "<document>" + "x" * (1024 * 1024) + "</document>",
+            )
+
+        with patch.object(settings, "max_docx_xml_mb", 2):
+            with patch.object(settings, "max_document_archive_mb", 1):
+                with pytest.raises(DocumentLimitError, match="archive"):
+                    DocumentLoader.extract_markdown(path)
 
 
 class TestExtractHtml:

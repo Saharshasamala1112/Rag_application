@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import tempfile
+import threading
 import time
 from io import BytesIO
 from pathlib import Path
@@ -17,6 +18,9 @@ from app.rag.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 DOCUMENT_ID_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{3}$")
+_document_processing_slots = threading.BoundedSemaphore(
+    settings.max_concurrent_document_processing
+)
 
 
 class UploadTooLargeError(ValueError):
@@ -122,7 +126,8 @@ class UploadService:
             document_info["file_size"] = file_size
             document_info["status"] = "processing"
             self._save_document_info(output_dir, document_info)
-            result = self.pipeline.process(file_path)
+            with _document_processing_slots:
+                result = self.pipeline.process(file_path)
         except UploadTooLargeError:
             try:
                 shutil.rmtree(output_dir)

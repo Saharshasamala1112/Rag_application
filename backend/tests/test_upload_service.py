@@ -1,4 +1,7 @@
 import json
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -9,6 +12,7 @@ import pytest
 from app.config.settings import settings
 from app.rag.pipeline import DocumentPipeline
 from app.rag.vector_store import VectorStore
+from app.services import upload_service as upload_service_module
 from app.services.upload_service import (
     UploadService,
     UploadTooLargeError,
@@ -26,6 +30,62 @@ def test_upload_stream_rejects_oversize_and_removes_partial_data(tmp_path: Path)
 
     assert list(tmp_path.iterdir()) == []
     service.pipeline.process.assert_not_called()
+
+
+def test_document_processing_is_limited_to_configured_concurrency(
+    tmp_path: Path,
+):
+    active = 0
+    maximum_active = 0
+    active_lock = threading.Lock()
+
+    concurrency_limit = settings.max_concurrent_document_processing
+
+    class TrackingContext:
+        def __init__(self):
+            self.gate = threading.BoundedSemaphore(concurrency_limit)
+
+        def __enter__(self):
+            nonlocal active, maximum_active
+            self.gate.acquire()
+            with active_lock:
+                active += 1
+                maximum_active = max(maximum_active, active)
+
+        def __exit__(self, *_exc_info):
+            nonlocal active
+            with active_lock:
+                active -= 1
+            self.gate.release()
+
+    service = UploadService.__new__(UploadService)
+
+    def process(path: Path) -> dict[str, int]:
+        assert path.is_file()
+        time.sleep(0.05)
+        return {"chunk_count": 1, "total_chars": 7}
+
+    service.pipeline = MagicMock()
+    service.pipeline.process.side_effect = process
+
+    with (
+        patch.object(settings, "upload_dir", tmp_path),
+        patch.object(upload_service_module, "_document_processing_slots", TrackingContext()),
+        patch("app.rag.retriever.Retriever.invalidate_corpus_cache"),
+    ):
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            results = list(
+                executor.map(
+                    lambda index: service.process_upload_stream(
+                        BytesIO(f"content-{index}".encode()), f"doc-{index}.txt"
+                    ),
+                    range(8),
+                )
+            )
+
+    assert maximum_active == concurrency_limit
+    assert len(results) == 8
+    assert all(result["status"] == "ready" for result in results)
 
 
 def test_document_path_helper_rejects_symlinks_escaping_upload_root(tmp_path: Path):

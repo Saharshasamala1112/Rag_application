@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     # Upload
     upload_dir: Path = Path("data/uploads")
     max_file_size_mb: int = 50
+    max_pdf_pages: int = 500
+    max_docx_xml_mb: int = 20
+    max_document_archive_mb: int = 100
+    max_tabular_file_mb: int = 10
+    max_concurrent_document_processing: int = 4
+    external_parser_timeout_seconds: int = 10
     _available_models: list[str] | None = PrivateAttr(default=None)
     _models_checked_at: float = PrivateAttr(default=0.0)
     _models_lock: threading.Lock = PrivateAttr(default_factory=threading.Lock)
@@ -65,6 +71,18 @@ class Settings(BaseSettings):
             )
         if self.max_file_size_mb < 1:
             raise ValueError("MAX_FILE_SIZE_MB must be at least 1.")
+        if any(
+            value < 1
+            for value in (
+                self.max_pdf_pages,
+                self.max_docx_xml_mb,
+                self.max_document_archive_mb,
+                self.max_tabular_file_mb,
+                self.max_concurrent_document_processing,
+                self.external_parser_timeout_seconds,
+            )
+        ):
+            raise ValueError("Document parser limits must be at least 1.")
         if self.max_context_tokens < 1:
             raise ValueError("MAX_CONTEXT_TOKENS must be at least 1.")
         if not 0.0 <= self.reranker_min_score <= 1.0:

@@ -1,12 +1,15 @@
+import logging
+
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.config.settings import settings
 from app.models.response import SupportedFileType, SupportedTypesResponse
-from app.rag.document_loader import SUPPORTED_EXTENSIONS
+from app.rag.document_loader import SUPPORTED_EXTENSIONS, DocumentLimitError
 from app.services.upload_service import UploadService, UploadTooLargeError
 
 router = APIRouter(tags=["Upload"])
+logger = logging.getLogger(__name__)
 
 upload_service = UploadService()
 
@@ -53,13 +56,20 @@ def upload_document(
             status_code=413,
             detail=f"File too large. Maximum size is {settings.max_file_size_mb}MB.",
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except DocumentLimitError as error:
+        raise HTTPException(status_code=413, detail=str(error)) from error
+    except ValueError as error:
+        logger.exception("Document upload was rejected.")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid document upload.",
+        ) from error
+    except Exception as error:
+        logger.exception("Document upload processing failed.")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to process document: {e}",
-        )
+            detail="Failed to process document. Check the server logs and retry.",
+        ) from error
 
     return {
         "message": "Document uploaded and processed successfully.",
@@ -96,13 +106,18 @@ def upload_text(request: TextUploadRequest) -> dict:
             file_content=content,
             filename=filename,
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except ValueError as error:
+        logger.exception("Text upload was rejected.")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid text upload.",
+        ) from error
+    except Exception as error:
+        logger.exception("Text upload processing failed.")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to process text: {e}",
-        )
+            detail="Failed to process text. Check the server logs and retry.",
+        ) from error
 
     return {
         "message": "Document created from text.",
