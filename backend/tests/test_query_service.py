@@ -234,6 +234,35 @@ def test_reranking_runs_when_candidate_count_is_below_top_k(tmp_path: Path):
     service.reranker.rerank.assert_called_once()
 
 
+def test_query_happy_path_retrieves_context_and_returns_citations(tmp_path: Path):
+    service = QueryService.__new__(QueryService)
+    service.resolve_document_dirs = lambda _document_id: [tmp_path]
+    service.retriever = MagicMock()
+    service.retriever.retrieve.return_value = [
+        {
+            "chunk_id": 7,
+            "content": "The handbook defines the review period as 30 days.",
+            "source": "handbook.txt",
+            "score": 0.02,
+            "page_number": 4,
+            "header": "Review",
+        }
+    ]
+    service.reranker = MagicMock()
+    service.llm = MagicMock()
+    service.llm.generate.return_value = "The review period is 30 days [Source 1]."
+
+    response = service.query(
+        QueryRequest(question="How long is the review period?", use_reranking=False)
+    )
+
+    assert response.answer == "The review period is 30 days [Source 1]."
+    assert response.sources[0].source == "handbook.txt"
+    assert response.sources[0].chunk_id == 7
+    service.llm.generate.assert_called_once()
+    assert "30 days" in service.llm.generate.call_args.kwargs["context"]
+
+
 def test_query_propagates_llm_errors(tmp_path: Path):
     service = QueryService.__new__(QueryService)
     service.resolve_document_dirs = lambda _document_id: [tmp_path]
