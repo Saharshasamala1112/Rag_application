@@ -41,14 +41,23 @@ export function SearchPage() {
   const [searched, setSearched] = useState(false)
   const [history, setHistory] = useState<string[]>(() => loadHistory())
   const inputRef = useRef<HTMLInputElement>(null)
+  const requestIdRef = useRef(0)
+  const requestControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
 
+  useEffect(() => () => requestControllerRef.current?.abort(), [])
+
   const handleSearch = async (searchText = query) => {
     const q = searchText.trim()
-    if (!q || loading) return
+    if (!q) return
+
+    requestControllerRef.current?.abort()
+    const controller = new AbortController()
+    requestControllerRef.current = controller
+    const requestId = ++requestIdRef.current
 
     setLoading(true)
     setResults([])
@@ -58,16 +67,25 @@ export function SearchPage() {
     setHistory(loadHistory())
 
     try {
-      const res = await queryDocuments({
-        question: q,
-        use_reranking: true,
-      })
+      const res = await queryDocuments(
+        {
+          question: q,
+          use_reranking: true,
+        },
+        {
+          signal: controller.signal,
+          timeout: 30000,
+        },
+      )
+      if (controller.signal.aborted || requestId !== requestIdRef.current) return
       setResults(res.sources)
       setAnswer(res.answer)
     } catch {
-      toast.error('Search failed')
+      if (!controller.signal.aborted && requestId === requestIdRef.current) {
+        toast.error('Search failed')
+      }
     } finally {
-      setLoading(false)
+      if (requestId === requestIdRef.current) setLoading(false)
     }
   }
 
@@ -101,7 +119,6 @@ export function SearchPage() {
             <button
               type="button"
               onClick={() => void handleSearch()}
-              disabled={loading}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-fg-tertiary hover:text-accent dark:hover:text-accent-dark transition-colors disabled:opacity-50"
             >
               <Send size={13} />
