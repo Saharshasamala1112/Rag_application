@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import re
 import threading
 import time
 import uuid
+from functools import lru_cache
 from pathlib import Path
+
+import tiktoken
 
 from app.config.settings import settings
 from app.exceptions import LLMError
@@ -25,9 +30,78 @@ from app.services.upload_service import resolve_document_dir
 logger = logging.getLogger(__name__)
 
 # Approximate token budget for context (leaves room for prompt + answer)
-MAX_CONTEXT_CHARS = 6000
 MAX_HISTORY_MESSAGES = 12
 MAX_HISTORY_MESSAGE_CHARS = 4000
+CONTEXT_SEPARATOR = "\n\n---\n\n"
+CITATION_PATTERN = re.compile(r"\[Source\s+(\d+)\]")
+INSUFFICIENT_CONTEXT_ANSWER = (
+    "I couldn't find sufficiently relevant information in the uploaded documents."
+)
+
+
+@lru_cache(maxsize=1)
+def _context_tokenizer():
+    return tiktoken.get_encoding("cl100k_base")
+
+
+class _CitationFilter:
+    def __init__(self, source_count: int) -> None:
+        self.source_count = source_count
+        self.buffer = ""
+
+    def feed(self, text: str) -> str:
+        self.buffer += text
+        output: list[str] = []
+        marker = "[Source"
+
+        while self.buffer:
+            start = self.buffer.find(marker)
+            if start < 0:
+                keep = 0
+                for size in range(min(len(self.buffer), len(marker) - 1), 0, -1):
+                    if self.buffer.endswith(marker[:size]):
+                        keep = size
+                        break
+                if keep:
+                    output.append(self.buffer[:-keep])
+                    self.buffer = self.buffer[-keep:]
+                else:
+                    output.append(self.buffer)
+                    self.buffer = ""
+                break
+
+            if start:
+                output.append(self.buffer[:start])
+                self.buffer = self.buffer[start:]
+
+            end = self.buffer.find("]")
+            if end < 0:
+                break
+
+            citation = self.buffer[: end + 1]
+            match = CITATION_PATTERN.fullmatch(citation)
+            if not match:
+                output.append(citation)
+            elif 1 <= int(match.group(1)) <= self.source_count:
+                output.append(citation)
+            else:
+                logger.warning("Removed invalid source citation %s.", citation)
+            self.buffer = self.buffer[end + 1 :]
+
+        return "".join(output)
+
+    def finish(self) -> str:
+        remaining = self.buffer
+        self.buffer = ""
+        if re.fullmatch(r"\[Source\s+\d*", remaining):
+            logger.warning("Removed incomplete source citation %s.", remaining)
+            return ""
+        return remaining
+
+
+def _validate_citations(answer: str, source_count: int) -> str:
+    citation_filter = _CitationFilter(source_count)
+    return citation_filter.feed(answer) + citation_filter.finish()
 
 
 class QueryService:
@@ -104,45 +178,91 @@ class QueryService:
         return dirs
 
     def _deduplicate_chunks(self, chunks: list[dict]) -> list[dict]:
-        """Remove duplicate chunks by content similarity."""
+        """Remove only exact, full-content duplicates."""
         seen: set[str] = set()
         unique: list[dict] = []
         for chunk in chunks:
-            key = chunk["content"][:200].strip().lower()
+            key = hashlib.sha256(chunk["content"].encode("utf-8")).hexdigest()
             if key not in seen:
                 seen.add(key)
                 unique.append(chunk)
         return unique
 
     def _build_context(self, context_chunks: list[dict]) -> str:
-        """Build context string with source metadata, respecting token budget."""
+        """Build context without exceeding the configured tokenizer budget."""
+        encoding = _context_tokenizer()
         parts: list[str] = []
-        total_chars = 0
 
         for i, chunk in enumerate(context_chunks):
             source = chunk.get("source", "unknown")
             page = chunk.get("page_number")
             header = chunk.get("header")
-            meta = f"[Source {i+1}] {source}"
+            meta = f"[Source {i+1}] {self._escape_untrusted_text(str(source))}"
             if page:
                 meta += f" (Page {page})"
             if header:
-                meta += f" \u2014 {header}"
+                meta += f" \u2014 {self._escape_untrusted_text(str(header))}"
 
+            context = CONTEXT_SEPARATOR.join(parts)
+            separator = CONTEXT_SEPARATOR if parts else ""
             content = chunk["content"]
-            part = f"{meta}\n{content}"
+            if not content.strip():
+                continue
+            prefix = f'{meta}\n<source_content trust="untrusted">\n'
+            suffix = "\n</source_content>"
+            escaped_content = self._escape_untrusted_text(content)
+            candidate = f"{separator}{prefix}{escaped_content}{suffix}"
+            if len(encoding.encode(context + candidate)) <= settings.max_context_tokens:
+                parts.append(f"{prefix}{escaped_content}{suffix}")
+                continue
 
-            if total_chars + len(part) > MAX_CONTEXT_CHARS:
-                remaining = MAX_CONTEXT_CHARS - total_chars
-                if remaining > 100:
-                    content = content[: remaining - len(meta) - 10] + "..."
-                    parts.append(f"{meta}\n{content}")
+            content_tokens = encoding.encode(escaped_content)
+            prefix_tokens = len(encoding.encode(context + separator + prefix))
+            marker = " …"
+            content_budget = (
+                settings.max_context_tokens
+                - prefix_tokens
+                - len(encoding.encode(suffix))
+                - len(encoding.encode(marker))
+            )
+            minimum_content = min(32, len(content_tokens))
+            if content_budget < minimum_content:
                 break
 
-            parts.append(part)
-            total_chars += len(part)
+            truncated = encoding.decode(content_tokens[:content_budget])
+            candidate = (
+                f"{context}{separator}{prefix}{truncated}{marker}{suffix}"
+            )
+            while (
+                content_budget > 0
+                and len(encoding.encode(candidate)) > settings.max_context_tokens
+            ):
+                content_budget -= 1
+                truncated = encoding.decode(content_tokens[:content_budget])
+                candidate = (
+                    f"{context}{separator}{prefix}{truncated}{marker}{suffix}"
+                )
+            if content_budget < minimum_content:
+                break
 
-        return "\n\n---\n\n".join(parts)
+            parts.append(f"{prefix}{truncated}{marker}{suffix}")
+            break
+
+        return CONTEXT_SEPARATOR.join(parts)
+
+    @staticmethod
+    def _escape_untrusted_text(content: str) -> str:
+        return content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    @staticmethod
+    def _apply_rerank_threshold(results: list[dict]) -> list[dict]:
+        if not results or not all("rerank_score" in chunk for chunk in results):
+            return results
+        return [
+            chunk
+            for chunk in results
+            if float(chunk["rerank_score"]) >= settings.reranker_min_score
+        ]
 
     def _build_sources(self, context_chunks: list[dict]) -> list[SourceChunk]:
         """Build SourceChunk list with normalized scores."""
@@ -153,13 +273,16 @@ class QueryService:
             c.get("rerank_score", c.get("score", 0.0))
             for c in context_chunks
         ]
+        has_rerank_scores = all("rerank_score" in chunk for chunk in context_chunks)
         max_score = max(scores) if scores else 1.0
         min_score = min(scores) if scores else 0.0
 
         sources = []
         for chunk in context_chunks:
             raw_score = chunk.get("rerank_score", chunk.get("score", 0.0))
-            if max_score > 0:
+            if has_rerank_scores:
+                normalized = min(max(raw_score, 0.0), 1.0)
+            elif max_score > 0:
                 normalized = min(max(raw_score / max_score, 0.0), 1.0)
             elif max_score > min_score:
                 normalized = (raw_score - min_score) / (max_score - min_score)
@@ -254,9 +377,28 @@ class QueryService:
                 chunks=results,
                 top_k=top_k,
             )
+            results = self._apply_rerank_threshold(results)
+            if not results:
+                return QueryResponse(
+                    answer=INSUFFICIENT_CONTEXT_ANSWER,
+                    sources=[],
+                    retrieval_time_ms=round(retrieval_time, 2),
+                    total_time_ms=round(
+                        (time.perf_counter() - total_start) * 1000,
+                        2,
+                    ),
+                )
 
         context_chunks = results[:top_k]
         context = self._build_context(context_chunks)
+        if not context:
+            return QueryResponse(
+                answer=INSUFFICIENT_CONTEXT_ANSWER,
+                sources=[],
+                retrieval_time_ms=round(retrieval_time, 2),
+                total_time_ms=round((time.perf_counter() - total_start) * 1000, 2),
+            )
+        sources = self._build_sources(context_chunks)
 
         logger.info(
             "[%s] Context: %d chars from %d chunks. Retrieval: %.0fms",
@@ -271,11 +413,10 @@ class QueryService:
             context=context,
             history=self._conversation_history(request),
         )
+        answer = _validate_citations(answer, len(sources))
 
         generation_time = (time.perf_counter() - llm_start) * 1000
         total_time = (time.perf_counter() - total_start) * 1000
-
-        sources = self._build_sources(context_chunks)
 
         logger.info(
             "[%s] Generation: %.0fms. Total: %.0fms. Sources: %d",
@@ -361,6 +502,7 @@ class QueryService:
                 chunks=results,
                 top_k=top_k,
             )
+            results = self._apply_rerank_threshold(results)
             rerank_time_ms = round((time.perf_counter() - rerank_start) * 1000, 1)
 
             # Trace: reranking complete
@@ -373,12 +515,25 @@ class QueryService:
                 },
             }
 
+            if not results:
+                yield {
+                    "type": QUERY_STREAM_EVENTS["error"],
+                    "content": INSUFFICIENT_CONTEXT_ANSWER,
+                }
+                return
+
         context_chunks = results[:top_k]
         yield {
             "type": QUERY_STREAM_EVENTS["status"],
             "content": QUERY_STREAM_STATUSES["context"]["text"],
         }
         context = self._build_context(context_chunks)
+        if not context:
+            yield {
+                "type": QUERY_STREAM_EVENTS["error"],
+                "content": INSUFFICIENT_CONTEXT_ANSWER,
+            }
+            return
         sources = self._build_sources(context_chunks)
 
         # Trace: context built
@@ -410,12 +565,24 @@ class QueryService:
 
         # Stream answer
         try:
+            citation_filter = _CitationFilter(len(sources))
             for chunk_text in self.llm.generate_stream(
                 question=request.question,
                 context=context,
                 history=self._conversation_history(request),
             ):
-                yield {"type": QUERY_STREAM_EVENTS["token"], "content": chunk_text}
+                filtered = citation_filter.feed(chunk_text)
+                if filtered:
+                    yield {
+                        "type": QUERY_STREAM_EVENTS["token"],
+                        "content": filtered,
+                    }
+            remainder = citation_filter.finish()
+            if remainder:
+                yield {
+                    "type": QUERY_STREAM_EVENTS["token"],
+                    "content": remainder,
+                }
         except LLMError:
             logger.exception("Streaming query generation failed.")
             yield {

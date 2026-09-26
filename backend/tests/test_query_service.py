@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+import tiktoken
 
 from app.config.settings import settings
 from app.exceptions import LLMError
@@ -14,7 +15,11 @@ from app.query_stream_contract import (
     QUERY_STREAM_STATUSES,
     QUERY_STREAM_TRACE_STEPS,
 )
-from app.services.query_service import QueryService
+from app.services.query_service import (
+    INSUFFICIENT_CONTEXT_ANSWER,
+    QueryService,
+    _validate_citations,
+)
 
 
 class TestResolveDocumentDirs:
@@ -80,6 +85,16 @@ class TestDeduplicateChunks:
         result = svc._deduplicate_chunks(chunks)
         assert len(result) == 2
 
+    def test_keeps_chunks_that_differ_after_the_first_two_hundred_characters(self):
+        svc = QueryService.__new__(QueryService)
+        prefix = "same " * 41
+        chunks = [
+            {"content": prefix + "first"},
+            {"content": prefix + "second"},
+        ]
+
+        assert len(svc._deduplicate_chunks(chunks)) == 2
+
     def test_empty_input(self):
         svc = QueryService.__new__(QueryService)
         assert svc._deduplicate_chunks([]) == []
@@ -102,15 +117,22 @@ class TestBuildContext:
 
     def test_respects_token_budget(self):
         svc = QueryService.__new__(QueryService)
-        big_content = "x" * 3000
+        big_content = "x " * 4000
         chunks = [
             {"content": big_content, "source": "a.txt", "page_number": 1},
             {"content": big_content, "source": "b.txt", "page_number": 2},
             {"content": big_content, "source": "c.txt", "page_number": 3},
         ]
         context = svc._build_context(chunks)
-        # Should be capped around MAX_CONTEXT_CHARS (6000)
-        assert len(context) <= 6200  # slight margin for metadata
+        encoding = tiktoken.get_encoding("cl100k_base")
+        assert len(encoding.encode(context)) <= settings.max_context_tokens
+        assert len(context) > 100
+
+    def test_does_not_emit_a_near_empty_partial_context(self):
+        svc = QueryService.__new__(QueryService)
+        chunks = [{"content": "evidence " * 100, "source": "long-name.txt"}]
+        with patch.object(settings, "max_context_tokens", 10):
+            assert svc._build_context(chunks) == ""
 
     def test_empty_chunks(self):
         svc = QueryService.__new__(QueryService)
@@ -152,20 +174,20 @@ class TestBuildSources:
                 "content": "best",
                 "source": "a.txt",
                 "score": 0.1,
-                "rerank_score": 8.0,
+                "rerank_score": 0.8,
             },
             {
                 "chunk_id": 1,
                 "content": "next",
                 "source": "b.txt",
                 "score": 0.2,
-                "rerank_score": 4.0,
+                "rerank_score": 0.4,
             },
         ])
 
-        assert [source.score for source in sources] == [1.0, 0.5]
+        assert [source.score for source in sources] == [0.8, 0.4]
 
-    def test_negative_rerank_scores_keep_relevance_order(self):
+    def test_negative_rerank_scores_are_clamped_to_the_api_range(self):
         svc = QueryService.__new__(QueryService)
         sources = svc._build_sources(
             [
@@ -184,7 +206,7 @@ class TestBuildSources:
             ]
         )
 
-        assert [source.score for source in sources] == [1.0, 0.0]
+        assert [source.score for source in sources] == [0.0, 0.0]
 
 
 class TestQueryNoDocuments:
@@ -266,6 +288,135 @@ def test_query_happy_path_retrieves_context_and_returns_citations(tmp_path: Path
     assert response.sources[0].chunk_id == 7
     service.llm.generate.assert_called_once()
     assert "30 days" in service.llm.generate.call_args.kwargs["context"]
+    assert 'trust="untrusted"' in service.llm.generate.call_args.kwargs["context"]
+
+
+def test_query_removes_model_citations_outside_source_range(tmp_path: Path):
+    service = QueryService.__new__(QueryService)
+    service.resolve_document_dirs = lambda _document_id: [tmp_path]
+    service.retriever = MagicMock()
+    service.retriever.retrieve.return_value = [
+        {
+            "chunk_id": 1,
+            "content": "Evidence.",
+            "source": "manual.txt",
+            "score": 0.02,
+        }
+    ]
+    service.reranker = MagicMock()
+    service.llm = MagicMock()
+    service.llm.generate.return_value = (
+        "Valid [Source 1], invalid [Source 2]."
+    )
+
+    response = service.query(
+        QueryRequest(question="Question?", use_reranking=False)
+    )
+
+    assert response.answer == "Valid [Source 1], invalid ."
+
+
+def test_query_reports_rerank_score_for_the_selected_source(tmp_path: Path):
+    service = QueryService.__new__(QueryService)
+    service.resolve_document_dirs = lambda _document_id: [tmp_path]
+    service.retriever = MagicMock()
+    service.retriever.retrieve.return_value = [
+        {
+            "chunk_id": 1,
+            "content": "Evidence.",
+            "source": "manual.txt",
+            "score": 0.0001,
+        }
+    ]
+    service.reranker = MagicMock()
+    service.reranker.rerank.return_value = [
+        {
+            "chunk_id": 1,
+            "content": "Evidence.",
+            "source": "manual.txt",
+            "score": 0.0001,
+            "rerank_score": 0.6,
+        }
+    ]
+    service.llm = MagicMock()
+    service.llm.generate.return_value = "Answer [Source 1]."
+
+    response = service.query(
+        QueryRequest(question="Question?", use_reranking=True)
+    )
+
+    assert response.sources[0].score == 0.6
+    assert service.llm.generate.call_args.kwargs["context"].find("Evidence.") >= 0
+
+
+def test_invalid_citations_are_removed_but_valid_citations_remain():
+    assert _validate_citations(
+        "Evidence [Source 1], unsupported [Source 3], and [Source 2].",
+        source_count=2,
+    ) == "Evidence [Source 1], unsupported , and [Source 2]."
+
+
+def test_citation_filter_preserves_non_citation_source_wording():
+    assert _validate_citations(
+        "The term [Source reliability] is a heading; see [Source 1].",
+        source_count=1,
+    ) == "The term [Source reliability] is a heading; see [Source 1]."
+
+
+def test_rerank_threshold_returns_insufficient_context_without_generation(
+    tmp_path: Path,
+):
+    service = QueryService.__new__(QueryService)
+    service.resolve_document_dirs = lambda _document_id: [tmp_path]
+    service.retriever = MagicMock()
+    service.retriever.retrieve.return_value = [
+        {
+            "chunk_id": 0,
+            "content": "weak evidence",
+            "source": "doc.txt",
+            "score": 0.02,
+        }
+    ]
+    service.reranker = MagicMock()
+    service.reranker.rerank.return_value = [
+        {"chunk_id": 0, "content": "weak evidence", "rerank_score": 0.1}
+    ]
+    service.llm = MagicMock()
+
+    response = service.query(
+        QueryRequest(question="question", use_reranking=True)
+    )
+
+    assert response.answer == INSUFFICIENT_CONTEXT_ANSWER
+    assert response.sources == []
+    service.llm.generate.assert_not_called()
+
+
+def test_tiny_context_budget_returns_insufficient_context_without_generation(
+    tmp_path: Path,
+):
+    service = QueryService.__new__(QueryService)
+    service.resolve_document_dirs = lambda _document_id: [tmp_path]
+    service.retriever = MagicMock()
+    service.retriever.retrieve.return_value = [
+        {
+            "chunk_id": 0,
+            "content": "evidence " * 100,
+            "source": "long-source-name.txt",
+            "score": 0.02,
+        }
+    ]
+    service.reranker = MagicMock()
+    service.llm = MagicMock()
+
+    with patch.object(settings, "max_context_tokens", 10):
+        response = service.query(
+            QueryRequest(question="question", use_reranking=False)
+        )
+
+    assert response.answer == INSUFFICIENT_CONTEXT_ANSWER
+    assert response.sources == []
+    service.llm.generate.assert_not_called()
 
 
 def test_query_stream_emits_all_contract_stages_in_order(tmp_path: Path):
@@ -302,6 +453,41 @@ def test_query_stream_emits_all_contract_stages_in_order(tmp_path: Path):
         for event in events
         if event["type"] == QUERY_STREAM_EVENTS["trace"]
     ] == list(QUERY_STREAM_TRACE_STEPS)
+    assert events[-1]["type"] == QUERY_STREAM_EVENTS["done"]
+
+
+def test_query_stream_filters_invalid_citations_across_token_boundaries(
+    tmp_path: Path,
+):
+    service = QueryService.__new__(QueryService)
+    service.resolve_document_dirs = lambda _document_id: [tmp_path]
+    service.retriever = MagicMock()
+    service.retriever.retrieve.return_value = [
+        {
+            "chunk_id": 1,
+            "content": "evidence",
+            "source": "manual.txt",
+            "score": 0.02,
+        }
+    ]
+    service.reranker = MagicMock()
+    service.llm = MagicMock()
+    service.llm.generate_stream.return_value = iter(
+        ["Answer [Sour", "ce 2] and [Source 1]."]
+    )
+
+    events = list(
+        service.query_stream(
+            QueryRequest(question="Question?", use_reranking=False)
+        )
+    )
+    streamed_answer = "".join(
+        event["content"]
+        for event in events
+        if event["type"] == QUERY_STREAM_EVENTS["token"]
+    )
+
+    assert streamed_answer == "Answer  and [Source 1]."
     assert events[-1]["type"] == QUERY_STREAM_EVENTS["done"]
 
 
