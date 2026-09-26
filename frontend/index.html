@@ -12,7 +12,9 @@
     <script>
       (function() {
         var saved = localStorage.getItem('docuchat-theme');
-        var dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        // 'system' (or nothing) follows the OS preference; only 'light' forces light.
+        var dark = saved === 'dark' || (saved !== 'light' && prefersDark);
         if (dark) document.documentElement.classList.add('dark');
       })();
     </script>

@@ -1,58 +1,17 @@
-import { useEffect, useState } from 'react'
 import { Sun, Moon, Monitor } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { Tooltip } from './Tooltip'
+import { themeModeLabel, useThemeStore, type ThemeMode } from '../../store/theme.store'
 
-export type ThemeMode = 'light' | 'dark' | 'system'
-
-function applyTheme(isDark: boolean) {
-  if (isDark) {
-    document.documentElement.classList.add('dark')
-  } else {
-    document.documentElement.classList.remove('dark')
-  }
-}
-
-function getInitialMode(): ThemeMode {
-  if (typeof window === 'undefined') return 'system'
-  return (localStorage.getItem('docuchat-theme') as ThemeMode) || 'system'
-}
-
-function resolveDark(mode: ThemeMode): boolean {
-  if (mode === 'dark') return true
-  if (mode === 'light') return false
-  return window.matchMedia('(prefers-color-scheme: dark)').matches
-}
-
-const MODE_LABELS: Record<ThemeMode, string> = {
-  light: 'Light mode',
-  dark: 'Dark mode',
-  system: 'System theme',
-}
+export type { ThemeMode }
 
 interface ThemeToggleProps {
   collapsed?: boolean
 }
 
 export function ThemeToggle({ collapsed }: ThemeToggleProps) {
-  const [mode, setMode] = useState<ThemeMode>(getInitialMode)
-
-  useEffect(() => {
-    applyTheme(resolveDark(mode))
-
-    if (mode === 'system') {
-      const mq = window.matchMedia('(prefers-color-scheme: dark)')
-      const handler = (e: MediaQueryListEvent) => applyTheme(e.matches)
-      mq.addEventListener('change', handler)
-      return () => mq.removeEventListener('change', handler)
-    }
-  }, [mode])
-
-  const cycle = () => {
-    const next: ThemeMode = mode === 'light' ? 'dark' : mode === 'dark' ? 'system' : 'light'
-    setMode(next)
-    localStorage.setItem('docuchat-theme', next)
-  }
+  const mode = useThemeStore((state) => state.mode)
+  const cycle = useThemeStore((state) => state.cycle)
 
   const icon = mode === 'system' ? (
     <Monitor size={14} />
@@ -66,7 +25,7 @@ export function ThemeToggle({ collapsed }: ThemeToggleProps) {
     <button
       type="button"
       onClick={cycle}
-      aria-label={MODE_LABELS[mode]}
+      aria-label={themeModeLabel(mode)}
       className={cn(
         'flex items-center justify-center rounded-md transition-colors',
         'text-fg-tertiary hover:text-fg hover:bg-surface-secondary',
@@ -82,7 +41,7 @@ export function ThemeToggle({ collapsed }: ThemeToggleProps) {
   )
 
   if (collapsed) {
-    return <Tooltip content={MODE_LABELS[mode]} side="right">{button}</Tooltip>
+    return <Tooltip content={themeModeLabel(mode)} side="right">{button}</Tooltip>
   }
 
   return button
