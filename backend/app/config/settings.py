@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
@@ -14,9 +16,12 @@ class Settings(BaseSettings):
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     # Server
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     port: int = 8000
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    cors_allow_credentials: bool = True
+    api_key: SecretStr | None = None
+    environment: str = Field(default="development", validation_alias="ENV")
 
     # Ollama
     ollama_host: str = "http://localhost:11434"
@@ -43,6 +48,18 @@ class Settings(BaseSettings):
     # Upload
     upload_dir: Path = Path("data/uploads")
     max_file_size_mb: int = 50
+
+    @model_validator(mode="after")
+    def validate_security_settings(self) -> "Settings":
+        if self.cors_allow_credentials and "*" in self.cors_origins:
+            raise ValueError(
+                "CORS credentials cannot be enabled with a wildcard origin."
+            )
+        if self.max_file_size_mb < 1:
+            raise ValueError("MAX_FILE_SIZE_MB must be at least 1.")
+        if not re.fullmatch(r"development|production", self.environment, re.IGNORECASE):
+            raise ValueError("ENV must be either 'development' or 'production'.")
+        return self
 
     def get_available_ollama_models(self) -> list[str]:
         """Query Ollama for available model names (cached for 60s)."""

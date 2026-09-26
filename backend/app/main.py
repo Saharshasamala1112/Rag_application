@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from app.api.router import api_router
 from app.config.settings import settings
 from app.exceptions import LLMError
+from app.middleware import APIKeyMiddleware, RequestBodyLimitMiddleware
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,18 +19,27 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+is_production = settings.environment.lower() == "production"
+
 app = FastAPI(
     title="DocuChat RAG API",
     description="Production RAG with hybrid search, reranking, and streaming",
     version="3.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None if is_production else "/docs",
+    redoc_url=None if is_production else "/redoc",
+    openapi_url=None if is_production else "/openapi.json",
 )
+
+app.add_middleware(
+    RequestBodyLimitMiddleware,
+    max_body_size=settings.max_file_size_mb * 1024 * 1024 + 1024 * 1024,
+)
+app.add_middleware(APIKeyMiddleware, get_api_key=lambda: settings.api_key)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_credentials=True,
+    allow_credentials=settings.cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -91,5 +101,9 @@ def on_startup() -> None:
 
 
 @app.get("/")
-def root() -> dict:
-    return {"name": "DocuChat RAG API", "version": "3.1.0", "docs": "/docs"}
+def root() -> dict[str, str | None]:
+    return {
+        "name": "DocuChat RAG API",
+        "version": "3.1.0",
+        "docs": None if is_production else "/docs",
+    }

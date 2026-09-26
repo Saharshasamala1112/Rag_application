@@ -5,7 +5,7 @@ import { ConfirmationDialog } from '../components/ui/ConfirmationDialog'
 
 export function HistoryPage() {
   const sessions = useChatStore((s) => s.sessions)
-  const activeSession = useChatStore((s) => s.activeSession)
+  const activeSessionId = useChatStore((s) => s.activeSessionId)
   const setActiveSession = useChatStore((s) => s.setActiveSession)
   const deleteSession = useChatStore((s) => s.deleteSession)
   const [search, setSearch] = useState('')
@@ -65,7 +65,7 @@ export function HistoryPage() {
                 <div
                   key={session.id}
                   className={`group flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors cursor-pointer ${
-                    activeSession === session.id
+                    activeSessionId === session.id
                       ? 'border-accent/30 dark:border-accent-dark/30 bg-accent-subtle dark:bg-accent-dark-subtle'
                       : 'border-edge dark:border-edge-dark hover:border-edge-strong dark:hover:border-edge-dark-strong bg-surface dark:bg-surface-dark'
                   }`}

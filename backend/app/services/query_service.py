@@ -12,6 +12,7 @@ from app.models.response import QueryResponse, SourceChunk
 from app.rag.llm import LocalLLM
 from app.rag.reranker import Reranker
 from app.rag.retriever import Retriever
+from app.services.upload_service import resolve_document_dir
 
 logger = logging.getLogger(__name__)
 
@@ -32,15 +33,22 @@ class QueryService:
         upload_dir = settings.upload_dir
 
         if document_id:
-            doc_dir = upload_dir / document_id
+            try:
+                doc_dir = resolve_document_dir(document_id)
+            except ValueError:
+                return []
             if doc_dir.exists():
                 return [doc_dir]
             return []
 
         dirs = []
         for child in sorted(upload_dir.iterdir()):
-            if child.is_dir() and (child / "chunks.json").exists():
-                dirs.append(child)
+            try:
+                document_dir = resolve_document_dir(child.name)
+            except ValueError:
+                continue
+            if document_dir.is_dir() and (document_dir / "chunks.json").exists():
+                dirs.append(document_dir)
         return dirs
 
     def _deduplicate_chunks(self, chunks: list[dict]) -> list[dict]:
@@ -95,7 +103,11 @@ class QueryService:
         sources = []
         for chunk in context_chunks:
             raw_score = chunk.get("score", 0.0)
-            normalized = round((raw_score / max_score) * 100) if max_score > 0 else 0
+            normalized = (
+                round(min(max(raw_score / max_score, 0.0), 1.0), 4)
+                if max_score > 0
+                else 0.0
+            )
             sources.append(
                 SourceChunk(
                     chunk_id=chunk.get("chunk_id", 0),

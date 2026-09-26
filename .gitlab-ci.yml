@@ -1,6 +1,5 @@
 stages:
-  - build
-  - test
+  - quality
 
 variables:
   FF_NETWORK_PER_BUILD: "true"
@@ -20,10 +19,13 @@ default:
     - cd frontend
     - npm ci --no-audit --no-fund
 
-frontend-build:
+frontend-quality:
   extends: .frontend-base
-  stage: build
+  stage: quality
   script:
+    - npm run typecheck
+    - npm run lint
+    - npm test
     - npm run build
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"

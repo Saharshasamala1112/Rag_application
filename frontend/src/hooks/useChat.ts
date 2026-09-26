@@ -20,12 +20,10 @@ export const useChat = () => {
   const deleteSession = useChatStore((state) => state.deleteSession)
   const getServerConversationId = useChatStore((state) => state.getServerConversationId)
 
-  const activeDocumentId = useDocumentStore((state) => state.activeDocumentId)
-
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [traceSteps, setTraceSteps] = useState<string[]>([])
-  const abortRef = useRef<AbortController | null>(null)
+  const abortRef = useRef<{ controller: AbortController; assistantId: string } | null>(null)
 
   const messages = useMemo(() => {
     const active = sessions.find((s) => s.id === activeSessionId)
@@ -33,14 +31,24 @@ export const useChat = () => {
   }, [sessions, activeSessionId])
 
   const cancel = useCallback(() => {
-    abortRef.current?.abort()
+    const activeRequest = abortRef.current
+    if (!activeRequest) return
+    activeRequest.controller.abort()
     abortRef.current = null
+    finishStreaming(activeRequest.assistantId)
     setLoading(false)
     setStatus(null)
-  }, [])
+  }, [finishStreaming])
 
   const ask = useCallback(async (question: string) => {
+    const previousRequest = abortRef.current
+    if (previousRequest) {
+      previousRequest.controller.abort()
+      finishStreaming(previousRequest.assistantId)
+    }
+
     const serverConversationId = getServerConversationId()
+    const documentId = useDocumentStore.getState().activeDocumentId
 
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -66,13 +74,13 @@ export const useChat = () => {
 
     const traceSteps: RagTraceStep[] = []
     const controller = new AbortController()
-    abortRef.current = controller
+    abortRef.current = { controller, assistantId }
 
     try {
       await queryDocumentsStream(
         {
           question,
-          document_id: activeDocumentId,
+          document_id: documentId,
           conversation_id: serverConversationId,
           use_reranking: true,
         },
@@ -99,6 +107,7 @@ export const useChat = () => {
           setTrace(assistantId, { steps: [...traceSteps] })
         },
         (totalTimeMs?: number) => {
+          if (controller.signal.aborted || abortRef.current?.controller !== controller) return
           if (traceSteps.length > 0) {
             setTrace(assistantId, { steps: [...traceSteps], total_time_ms: totalTimeMs })
           }
@@ -108,7 +117,7 @@ export const useChat = () => {
           abortRef.current = null
         },
         (errorMsg: string) => {
-          if (controller.signal.aborted) return
+          if (controller.signal.aborted || abortRef.current?.controller !== controller) return
           toast.error(errorMsg)
           updateAssistantMessage(assistantId, `Error: ${errorMsg}`)
           finishStreaming(assistantId)
@@ -116,9 +125,10 @@ export const useChat = () => {
           setStatus(null)
           abortRef.current = null
         },
+        controller.signal,
       )
     } catch (err) {
-      if (controller.signal.aborted) return
+      if (controller.signal.aborted || abortRef.current?.controller !== controller) return
       const message = err instanceof Error ? err.message : 'Unable to answer right now'
       toast.error(message)
       updateAssistantMessage(assistantId, `Error: ${message}`)
@@ -127,7 +137,7 @@ export const useChat = () => {
       setStatus(null)
       abortRef.current = null
     }
-  }, [activeDocumentId, addUserMessage, addAssistantMessage, updateAssistantMessage, setStreamingSources, setTrace, finishStreaming, getServerConversationId])
+  }, [addUserMessage, addAssistantMessage, updateAssistantMessage, setStreamingSources, setTrace, finishStreaming, getServerConversationId])
 
   return {
     messages,

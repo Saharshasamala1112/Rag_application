@@ -4,6 +4,7 @@ export type ChatSource = {
   chunk_id: number
   content: string
   source: string
+  /** Relative relevance score normalized to the inclusive range 0.0–1.0. */
   score: number
   page_number: number | null
   header: string | null

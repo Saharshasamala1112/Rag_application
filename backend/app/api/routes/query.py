@@ -2,6 +2,7 @@ import json
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from starlette.concurrency import iterate_in_threadpool
 
 from app.models.request import QueryRequest
 from app.services import conversation_service
@@ -66,7 +67,7 @@ async def query_stream(request: QueryRequest):
     async def event_generator():
         nonlocal full_answer, saved_sources
 
-        for event in query_service.query_stream(request):
+        async for event in iterate_in_threadpool(query_service.query_stream(request)):
             yield f"data: {json.dumps(event)}\n\n"
 
             if event["type"] == "token":

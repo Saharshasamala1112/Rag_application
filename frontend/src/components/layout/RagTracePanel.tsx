@@ -142,7 +142,9 @@ function SourceCard({ source, index }: { source: { source: string; content: stri
 }
 
 export function RagTracePanel() {
-  const messages = useChatStore((s) => s.messages)
+  const sessions = useChatStore((s) => s.sessions)
+  const activeSessionId = useChatStore((s) => s.activeSessionId)
+  const messages = sessions.find((session) => session.id === activeSessionId)?.messages ?? []
   const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant')
 
   if (!lastAssistant) {
