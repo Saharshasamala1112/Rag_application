@@ -28,6 +28,7 @@ type ChatState = {
   addUserMessage: (message: ChatMessage, sessionId?: string) => void
   addAssistantMessage: (message: ChatMessage, sessionId?: string) => void
   updateAssistantMessage: (messageId: string, content: string, sessionId?: string) => void
+  setMessageError: (messageId: string, error: boolean, sessionId?: string) => void
   setStreamingSources: (messageId: string, sources: ChatSource[], sessionId?: string) => void
   setTrace: (messageId: string, trace: RagTrace, sessionId?: string) => void
   finishStreaming: (messageId: string, sessionId?: string) => void
@@ -160,6 +161,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
             ...session,
             messages: session.messages.map((msg) =>
               msg.id === messageId ? { ...msg, content } : msg,
+            ),
+          }
+        : session,
+    )
+    saveSessionsDebounced(updated)
+    set({ sessions: updated })
+  },
+
+  setMessageError: (messageId, error, sessionId) => {
+    const { sessions, activeSessionId } = get()
+    const targetSessionId = sessionId ?? activeSessionId
+    const updated = sessions.map((session) =>
+      session.id === targetSessionId
+        ? {
+            ...session,
+            messages: session.messages.map((msg) =>
+              msg.id === messageId ? { ...msg, error } : msg,
             ),
           }
         : session,

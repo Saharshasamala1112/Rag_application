@@ -25,6 +25,8 @@ default:
     paths:
       - frontend/node_modules
   before_script:
+    # node:22-alpine ships without git; the job diffs generated API types
+    - apk add --no-cache git
     - cd frontend
     - npm ci --no-audit --no-fund
 
