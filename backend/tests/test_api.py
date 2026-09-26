@@ -96,8 +96,14 @@ class TestHealthEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "healthy"
-        assert "model" in data
-        assert "embedding_model" in data
+        assert set(data) == {
+            "status",
+            "version",
+            "model",
+            "embedding_model",
+            "ollama_available",
+            "document_count",
+        }
 
     def test_health_does_not_require_api_key(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch
@@ -268,6 +274,8 @@ class TestUploadSupportedTypesEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         assert "types" in data
+        assert data["total"] == len(data["types"])
+        assert all(set(item) == {"extension", "description"} for item in data["types"])
         exts = [t["extension"] for t in data["types"]]
         assert ".pdf" in exts
         assert ".txt" in exts
@@ -281,6 +289,13 @@ class TestQueryEndpoint:
         )
         assert resp.status_code == 200
         data = resp.json()
+        assert set(data) == {
+            "answer",
+            "sources",
+            "retrieval_time_ms",
+            "generation_time_ms",
+            "total_time_ms",
+        }
         assert "No documents" in data["answer"] or (
             "no documents" in data["answer"].lower()
         )
@@ -354,6 +369,8 @@ def test_query_stream_emits_events_and_persists_completed_conversation(
         "token",
         "done",
     ]
+    assert set(events[0]) == {"type", "content"}
+    assert set(events[-1]) == {"type", "content", "total_time_ms"}
     assert stored is not None
     assert [message["role"] for message in stored["messages"]] == [
         "user",

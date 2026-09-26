@@ -2,6 +2,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.config.settings import settings
+from app.models.response import SupportedFileType, SupportedTypesResponse
 from app.rag.document_loader import SUPPORTED_EXTENSIONS
 from app.services.upload_service import UploadService, UploadTooLargeError
 
@@ -111,13 +112,11 @@ def upload_text(request: TextUploadRequest) -> dict:
     }
 
 
-@router.get("/upload/supported-types")
-def supported_types() -> dict:
+@router.get("/upload/supported-types", response_model=SupportedTypesResponse)
+def supported_types() -> SupportedTypesResponse:
     """List all supported file types."""
-    return {
-        "types": [
-            {"extension": ext, "description": desc}
-            for ext, desc in sorted(SUPPORTED_EXTENSIONS.items())
-        ],
-        "total": len(SUPPORTED_EXTENSIONS),
-    }
+    types = [
+        SupportedFileType(extension=ext, description=desc)
+        for ext, desc in sorted(SUPPORTED_EXTENSIONS.items())
+    ]
+    return SupportedTypesResponse(types=types, total=len(types))

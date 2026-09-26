@@ -1,4 +1,8 @@
 import { Search, ArrowUpDown, LayoutGrid, MessageSquare, Check } from 'lucide-react'
+import {
+  QUERY_STREAM_STATUS_TO_STAGE,
+  QUERY_STREAM_TRACE_STEPS,
+} from '../../contracts/queryStream'
 
 interface RagLoadingIndicatorProps {
   status: string | null
@@ -12,24 +16,15 @@ const STAGE_MAP: Record<string, { icon: typeof Search; label: string }> = {
   'generation': { icon: MessageSquare, label: 'Generating answer' },
 }
 
-const STATUS_TO_STAGE: Record<string, string> = {
-  'Preparing...': 'retrieval',
-  'Searching documents...': 'retrieval',
-  'Searching...': 'retrieval',
-  'Reranking...': 'reranking',
-  'Ranking sources...': 'reranking',
-  'Building context...': 'context',
-  'Assembling context...': 'context',
-  'Generating...': 'generation',
-  'Generating answer...': 'generation',
-  'Thinking...': 'generation',
-}
-
 export function RagLoadingIndicator({ status, traceSteps }: RagLoadingIndicatorProps) {
-  // Determine current stage from status
-  const currentStage = status ? (STATUS_TO_STAGE[status] || 'retrieval') : 'retrieval'
+  const currentStage = status
+    ? QUERY_STREAM_STATUS_TO_STAGE[status]
+    : QUERY_STREAM_TRACE_STEPS[0]
+  if (status && !currentStage) {
+    console.warn(`Unknown RAG status: ${status}`)
+  }
 
-  const stages = ['retrieval', 'reranking', 'context', 'generation'] as const
+  const stages = QUERY_STREAM_TRACE_STEPS
 
   return (
     <div className="flex items-center gap-2 px-4 py-2">
@@ -66,6 +61,7 @@ export function RagLoadingIndicator({ status, traceSteps }: RagLoadingIndicatorP
                   )}
                 </div>
                 <span
+                  aria-current={stageKey === currentStage ? 'step' : undefined}
                   className={`text-2xs transition-colors duration-200 ${
                     isActive
                       ? 'text-fg-secondary dark:text-fg-dark-secondary font-medium'

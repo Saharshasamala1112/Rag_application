@@ -1,5 +1,6 @@
 import { Layers, Search, ArrowUpDown, LayoutGrid, MessageSquare, Clock, FileText, BarChart3 } from 'lucide-react'
 import { useChatStore } from '../../store/chat.store'
+import type { ApiSourceChunk } from '../../types/api'
 import type { RagTraceStep } from '../../types/chat'
 
 const STEP_CONFIG: Record<string, { icon: typeof Search; label: string; description: string; color: string }> = {
@@ -95,7 +96,7 @@ function StepCard({ step, index }: { step: RagTraceStep; index: number }) {
   )
 }
 
-function SourceCard({ source, index }: { source: { source: string; content: string; score: number; page_number: number | null; header: string | null }; index: number }) {
+function SourceCard({ source, index }: { source: ApiSourceChunk; index: number }) {
   return (
     <div className="rounded-xl border border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark p-3.5">
       <div className="flex items-center justify-between mb-2">

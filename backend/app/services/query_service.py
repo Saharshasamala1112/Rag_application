@@ -11,6 +11,11 @@ from app.config.settings import settings
 from app.exceptions import LLMError
 from app.models.request import QueryRequest
 from app.models.response import QueryResponse, SourceChunk
+from app.query_stream_contract import (
+    QUERY_STREAM_EVENTS,
+    QUERY_STREAM_STATUSES,
+    QUERY_STREAM_TRACE_STEPS,
+)
 from app.rag.llm import LocalLLM
 from app.rag.reranker import Reranker
 from app.rag.retriever import Retriever
@@ -295,11 +300,17 @@ class QueryService:
         document_dirs = self.resolve_document_dirs(request.document_id)
 
         if not document_dirs:
-            yield {"type": "error", "content": "No documents found. Please upload a document first."}
+            yield {
+                "type": QUERY_STREAM_EVENTS["error"],
+                "content": "No documents found. Please upload a document first.",
+            }
             return
 
         # Progress: retrieving
-        yield {"type": "status", "content": "Retrieving relevant chunks..."}
+        yield {
+            "type": QUERY_STREAM_EVENTS["status"],
+            "content": QUERY_STREAM_STATUSES["retrieving"]["text"],
+        }
 
         top_k = request.top_k or settings.final_top_k
 
@@ -316,14 +327,17 @@ class QueryService:
         if not results:
             if request.use_reranking:
                 logger.warning("Reranking requested but no candidates were retrieved.")
-            yield {"type": "error", "content": "No relevant information found in the documents."}
+            yield {
+                "type": QUERY_STREAM_EVENTS["error"],
+                "content": "No relevant information found in the documents.",
+            }
             return
 
         # Trace: retrieval complete
         yield {
-            "type": "trace",
+            "type": QUERY_STREAM_EVENTS["trace"],
             "content": {
-                "step": "retrieval",
+                "step": QUERY_STREAM_TRACE_STEPS[0],
                 "timing_ms": retrieval_time_ms,
                 "chunks_found": len(results),
                 "documents_searched": len(document_dirs),
@@ -331,7 +345,10 @@ class QueryService:
         }
 
         # Progress: processing
-        yield {"type": "status", "content": "Processing and ranking results..."}
+        yield {
+            "type": QUERY_STREAM_EVENTS["status"],
+            "content": QUERY_STREAM_STATUSES["reranking"]["text"],
+        }
 
         # Deduplicate
         results = self._deduplicate_chunks(results)
@@ -348,23 +365,27 @@ class QueryService:
 
             # Trace: reranking complete
             yield {
-                "type": "trace",
+                "type": QUERY_STREAM_EVENTS["trace"],
                 "content": {
-                    "step": "reranking",
+                    "step": QUERY_STREAM_TRACE_STEPS[1],
                     "timing_ms": rerank_time_ms,
                     "chunks_after_rerank": len(results),
                 },
             }
 
         context_chunks = results[:top_k]
+        yield {
+            "type": QUERY_STREAM_EVENTS["status"],
+            "content": QUERY_STREAM_STATUSES["context"]["text"],
+        }
         context = self._build_context(context_chunks)
         sources = self._build_sources(context_chunks)
 
         # Trace: context built
         yield {
-            "type": "trace",
+            "type": QUERY_STREAM_EVENTS["trace"],
             "content": {
-                "step": "context",
+                "step": QUERY_STREAM_TRACE_STEPS[2],
                 "context_chars": len(context),
                 "context_chunks": len(context_chunks),
                 "sources_count": len(sources),
@@ -375,12 +396,15 @@ class QueryService:
 
         # Send sources first
         yield {
-            "type": "sources",
+            "type": QUERY_STREAM_EVENTS["sources"],
             "content": [s.model_dump() for s in sources],
         }
 
         # Progress: generating
-        yield {"type": "status", "content": "Generating answer..."}
+        yield {
+            "type": QUERY_STREAM_EVENTS["status"],
+            "content": QUERY_STREAM_STATUSES["generating"]["text"],
+        }
 
         generation_start = time.perf_counter()
 
@@ -391,11 +415,11 @@ class QueryService:
                 context=context,
                 history=self._conversation_history(request),
             ):
-                yield {"type": "token", "content": chunk_text}
+                yield {"type": QUERY_STREAM_EVENTS["token"], "content": chunk_text}
         except LLMError:
             logger.exception("Streaming query generation failed.")
             yield {
-                "type": "error",
+                "type": QUERY_STREAM_EVENTS["error"],
                 "content": "The language model is temporarily unavailable.",
             }
             return
@@ -405,15 +429,15 @@ class QueryService:
 
         # Trace: generation complete
         yield {
-            "type": "trace",
+            "type": QUERY_STREAM_EVENTS["trace"],
             "content": {
-                "step": "generation",
+                "step": QUERY_STREAM_TRACE_STEPS[3],
                 "timing_ms": generation_time_ms,
             },
         }
 
         yield {
-            "type": "done",
+            "type": QUERY_STREAM_EVENTS["done"],
             "content": "",
             "total_time_ms": total_time_ms,
         }

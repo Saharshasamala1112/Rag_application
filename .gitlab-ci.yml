@@ -24,6 +24,8 @@ frontend-quality:
   extends: .frontend-base
   stage: quality
   script:
+    - npm run generate:api-types
+    - git diff --exit-code -- src/types/api.generated.ts
     - npm run typecheck
     - npm run lint
     - npm test
@@ -40,6 +42,7 @@ backend-quality:
     - cd backend
     - uv sync --frozen --extra dev
   script:
+    - uv run python -m scripts.update_openapi_schema --check
     - uv run ruff check app tests
     - uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=70
   rules:

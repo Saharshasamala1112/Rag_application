@@ -2,18 +2,14 @@ import { useEffect, useState } from 'react'
 import { Settings, Cpu, FileText, CheckCircle2, XCircle } from 'lucide-react'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
 import axiosInstance, { ApiError } from '../lib/axios'
+import type {
+  ApiHealthData,
+  ApiSupportedTypesResponse,
+} from '../types/api'
 
-interface HealthData {
-  status: string
-  model: string
-  embedding_model: string
-  ollama_available: boolean
-  document_count: number
-}
-
-function isHealthData(value: unknown): value is HealthData {
+function isHealthData(value: unknown): value is ApiHealthData {
   if (!value || typeof value !== 'object') return false
-  const data = value as Partial<HealthData>
+  const data = value as Partial<ApiHealthData>
   return (
     typeof data.status === 'string'
     && typeof data.model === 'string'
@@ -23,22 +19,17 @@ function isHealthData(value: unknown): value is HealthData {
   )
 }
 
-type SupportedType = {
-  extension: string
-  description: string
-}
-
 export function SettingsPage() {
-  const [health, setHealth] = useState<HealthData | null>(null)
+  const [health, setHealth] = useState<ApiHealthData | null>(null)
   const [healthLoading, setHealthLoading] = useState(true)
-  const [supportedTypes, setSupportedTypes] = useState<SupportedType[] | null>(null)
+  const [supportedTypes, setSupportedTypes] = useState<ApiSupportedTypesResponse | null>(null)
 
   useEffect(() => {
     let cancelled = false
     const load = async () => {
       const [healthResult, typesResult] = await Promise.allSettled([
-        axiosInstance.get<HealthData>('/health'),
-        axiosInstance.get<{ types: SupportedType[] }>('/upload/supported-types'),
+        axiosInstance.get<ApiHealthData>('/health'),
+        axiosInstance.get<ApiSupportedTypesResponse>('/upload/supported-types'),
       ])
       if (cancelled) return
 
@@ -57,13 +48,14 @@ export function SettingsPage() {
       }
       if (
         typesResult.status === 'fulfilled'
+        &&         Array.isArray(typesResult.value.data.types)
         && typesResult.value.data.types.every(
           (item) =>
             typeof item.extension === 'string'
             && typeof item.description === 'string',
         )
       ) {
-        setSupportedTypes(typesResult.value.data.types)
+        setSupportedTypes(typesResult.value.data)
       }
       setHealthLoading(false)
     }
@@ -153,7 +145,7 @@ export function SettingsPage() {
               </h2>
               <div className="rounded-xl border border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark p-4">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {supportedTypes.map(({ extension, description }) => (
+                  {supportedTypes.types.map(({ extension, description }) => (
                     <div key={extension} className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-surface-secondary dark:bg-surface-dark-elevated">
                       <FileText size={11} className="text-fg-tertiary dark:text-fg-dark-tertiary shrink-0" />
                       <div className="min-w-0">
