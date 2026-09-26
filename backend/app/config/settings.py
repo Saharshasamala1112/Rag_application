@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
+import time
 from pathlib import Path
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, PrivateAttr, SecretStr, model_validator
 from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
@@ -22,6 +24,7 @@ class Settings(BaseSettings):
     cors_allow_credentials: bool = True
     api_key: SecretStr | None = None
     environment: str = Field(default="development", validation_alias="ENV")
+    log_level: str = "INFO"
 
     # Ollama
     ollama_host: str = "http://localhost:11434"
@@ -48,6 +51,9 @@ class Settings(BaseSettings):
     # Upload
     upload_dir: Path = Path("data/uploads")
     max_file_size_mb: int = 50
+    _available_models: list[str] | None = PrivateAttr(default=None)
+    _models_checked_at: float = PrivateAttr(default=0.0)
+    _models_lock: threading.Lock = PrivateAttr(default_factory=threading.Lock)
 
     @model_validator(mode="after")
     def validate_security_settings(self) -> "Settings":
@@ -57,21 +63,41 @@ class Settings(BaseSettings):
             )
         if self.max_file_size_mb < 1:
             raise ValueError("MAX_FILE_SIZE_MB must be at least 1.")
+        if self.log_level.upper() not in {
+            "CRITICAL",
+            "ERROR",
+            "WARNING",
+            "INFO",
+            "DEBUG",
+            "NOTSET",
+        }:
+            raise ValueError("LOG_LEVEL must be a valid standard logging level.")
         if not re.fullmatch(r"development|production", self.environment, re.IGNORECASE):
             raise ValueError("ENV must be either 'development' or 'production'.")
         return self
 
-    def get_available_ollama_models(self) -> list[str]:
-        """Query Ollama for available model names (cached for 60s)."""
-        try:
-            from ollama import Client
+    def get_available_ollama_models(self, force_refresh: bool = False) -> list[str]:
+        """Query Ollama for available model names, caching results for 60 seconds."""
+        with self._models_lock:
+            if (
+                not force_refresh
+                and self._available_models is not None
+                and time.monotonic() - self._models_checked_at < 60
+            ):
+                return self._available_models.copy()
 
-            client = Client(host=self.ollama_host)
-            response = client.list()
-            return [m.model for m in response.models]
-        except Exception as e:
-            logger.warning("Could not list Ollama models: %s", e)
-            return []
+            try:
+                from ollama import Client
+
+                response = Client(host=self.ollama_host).list()
+                models = [model.model for model in response.models]
+            except Exception as error:
+                logger.warning("Could not list Ollama models: %s", error)
+                models = []
+
+            self._available_models = models
+            self._models_checked_at = time.monotonic()
+            return models.copy()
 
     def resolve_model(self) -> str:
         """Return the configured model if available, else fall back to the first available model."""

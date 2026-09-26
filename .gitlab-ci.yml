@@ -1,4 +1,5 @@
 stages:
+  - backend
   - quality
 
 variables:
@@ -27,6 +28,20 @@ frontend-quality:
     - npm run lint
     - npm test
     - npm run build
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+backend-quality:
+  image: python:3.12-slim
+  stage: backend
+  before_script:
+    - python -m pip install --no-cache-dir uv==0.11.29
+    - cd backend
+    - uv sync --frozen --extra dev
+  script:
+    - uv run ruff check app tests
+    - uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=70
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

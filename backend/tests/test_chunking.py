@@ -73,6 +73,17 @@ class TestDocumentChunker:
         # Each chunk content should be unique after dedup
         assert len(contents) == len(set(contents))
 
+    def test_duplicate_content_is_kept_across_documents(self):
+        chunker = DocumentChunker(chunk_size=200, chunk_overlap=20)
+        content = "A paragraph shared by independent documents."
+
+        first = chunker.split(content, document_id="first", source="first.txt")
+        second = chunker.split(content, document_id="second", source="second.txt")
+
+        assert len(first) == len(second) == 1
+        assert first[0].document_id == "first"
+        assert second[0].document_id == "second"
+
     def test_large_document_many_chunks(self, large_txt: Path):
         md = large_txt.read_text()
         chunker = DocumentChunker(chunk_size=200, chunk_overlap=50)

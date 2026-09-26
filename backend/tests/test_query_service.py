@@ -4,7 +4,10 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from app.config.settings import settings
+from app.exceptions import LLMError
 from app.models.request import QueryRequest
 from app.services.query_service import QueryService
 
@@ -17,6 +20,7 @@ class TestResolveDocumentDirs:
             doc_dir = Path(td) / document_id
             doc_dir.mkdir()
             (doc_dir / "chunks.json").write_text("[]")
+            (doc_dir / "faiss.index").write_bytes(b"index")
 
             with patch.object(settings, "upload_dir", Path(td)):
                 result = svc.resolve_document_dirs(document_id)
@@ -37,6 +41,7 @@ class TestResolveDocumentDirs:
                 d = Path(td) / name
                 d.mkdir()
                 (d / "chunks.json").write_text("[]")
+                (d / "faiss.index").write_bytes(b"index")
             # Add a dir without chunks.json (should be excluded)
             (Path(td) / "no_chunks").mkdir()
 
@@ -134,6 +139,48 @@ class TestBuildSources:
         sources = svc._build_sources(chunks)
         assert len(sources[0].content) <= 500
 
+    def test_rerank_score_is_used_for_reported_relevance(self):
+        svc = QueryService.__new__(QueryService)
+        sources = svc._build_sources([
+            {
+                "chunk_id": 0,
+                "content": "best",
+                "source": "a.txt",
+                "score": 0.1,
+                "rerank_score": 8.0,
+            },
+            {
+                "chunk_id": 1,
+                "content": "next",
+                "source": "b.txt",
+                "score": 0.2,
+                "rerank_score": 4.0,
+            },
+        ])
+
+        assert [source.score for source in sources] == [1.0, 0.5]
+
+    def test_negative_rerank_scores_keep_relevance_order(self):
+        svc = QueryService.__new__(QueryService)
+        sources = svc._build_sources(
+            [
+                {
+                    "chunk_id": 0,
+                    "content": "best",
+                    "source": "a.txt",
+                    "rerank_score": -1.0,
+                },
+                {
+                    "chunk_id": 1,
+                    "content": "next",
+                    "source": "b.txt",
+                    "rerank_score": -3.0,
+                },
+            ]
+        )
+
+        assert [source.score for source in sources] == [1.0, 0.0]
+
 
 class TestQueryNoDocuments:
     def test_returns_no_docs_message(self):
@@ -162,3 +209,62 @@ class TestQueryStreamNoDocuments:
                 assert len(events) == 1
                 assert events[0]["type"] == "error"
                 assert "No documents" in events[0]["content"]
+
+
+def test_reranking_runs_when_candidate_count_is_below_top_k(tmp_path: Path):
+    service = QueryService.__new__(QueryService)
+    service.resolve_document_dirs = lambda _document_id: [tmp_path]
+    service.retriever = MagicMock()
+    service.reranker = MagicMock()
+    service.llm = MagicMock()
+    service.retriever.retrieve.return_value = [
+        {
+            "chunk_id": index,
+            "content": f"Unique candidate {index}",
+            "source": "doc.txt",
+            "score": 0.5,
+        }
+        for index in range(12)
+    ]
+    service.reranker.rerank.side_effect = lambda **kwargs: kwargs["chunks"]
+    service.llm.generate.return_value = "answer"
+
+    service.query(QueryRequest(question="question", top_k=20))
+
+    service.reranker.rerank.assert_called_once()
+
+
+def test_query_propagates_llm_errors(tmp_path: Path):
+    service = QueryService.__new__(QueryService)
+    service.resolve_document_dirs = lambda _document_id: [tmp_path]
+    service.retriever = MagicMock()
+    service.retriever.retrieve.return_value = [
+        {"chunk_id": 0, "content": "evidence", "source": "doc.txt", "score": 1.0}
+    ]
+    service.reranker = MagicMock()
+    service.llm = MagicMock()
+    service.llm.generate.side_effect = LLMError("model unavailable")
+
+    with pytest.raises(LLMError, match="model unavailable"):
+        service.query(QueryRequest(question="question", use_reranking=False))
+
+
+def test_conversation_history_excludes_current_question_and_limits_message_size():
+    service = QueryService.__new__(QueryService)
+    messages = [
+        {"role": "user", "content": "previous question"},
+        {"role": "assistant", "content": "previous answer"},
+        {"role": "user", "content": "current question"},
+    ]
+    with patch(
+        "app.services.query_service.conversation_service.get_conversation",
+        return_value={"messages": messages},
+    ):
+        history = service._conversation_history(
+            QueryRequest(
+                question="current question",
+                conversation_id="conv-123456789abc",
+            )
+        )
+
+    assert history == messages[:2]

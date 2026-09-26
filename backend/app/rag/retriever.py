@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
+import threading
+from collections import OrderedDict
 from pathlib import Path
 
+import faiss
 import numpy as np
 
 from app.config.settings import settings
@@ -53,9 +57,12 @@ class BM25Scorer:
 
     def score(self, query: str, doc_idx: int) -> float:
         """Score a query against a specific document."""
-        query_tokens = self._tokenize(query)
-        if doc_idx >= len(self.doc_tfs):
+        if not 0 <= doc_idx < len(self.doc_tfs):
+            raise IndexError(f"BM25 document index out of range: {doc_idx}")
+        if self.avg_doc_len == 0:
             return 0.0
+
+        query_tokens = self._tokenize(query)
 
         tf = self.doc_tfs[doc_idx]
         doc_len = self.doc_lens[doc_idx]
@@ -85,11 +92,41 @@ class BM25Scorer:
 class Retriever:
     """Hybrid retriever with semantic search, BM25, and RRF fusion."""
 
+    _bm25_cache: OrderedDict[str, BM25Scorer] = OrderedDict()
+    _bm25_cache_lock = threading.RLock()
+    _bm25_cache_limit = 16
+
     def __init__(self) -> None:
         self.embedding_service = EmbeddingService.get_instance()
         self.vector_store = VectorStore()
-        self.bm25 = BM25Scorer()
-        self._fitted_docs_key: str | None = None
+
+    @classmethod
+    def _get_bm25_scorer(cls, chunks: list[dict]) -> BM25Scorer:
+        fingerprint = hashlib.sha256()
+        for chunk in chunks:
+            content = chunk["content"].encode("utf-8")
+            fingerprint.update(len(content).to_bytes(8, "big"))
+            fingerprint.update(content)
+        cache_key = fingerprint.hexdigest()
+
+        with cls._bm25_cache_lock:
+            scorer = cls._bm25_cache.get(cache_key)
+            if scorer is not None:
+                cls._bm25_cache.move_to_end(cache_key)
+                return scorer
+
+            scorer = BM25Scorer()
+            scorer.fit([chunk["content"] for chunk in chunks])
+            cls._bm25_cache[cache_key] = scorer
+            if len(cls._bm25_cache) > cls._bm25_cache_limit:
+                cls._bm25_cache.popitem(last=False)
+            return scorer
+
+    @classmethod
+    def invalidate_corpus_cache(cls) -> None:
+        with cls._bm25_cache_lock:
+            cls._bm25_cache.clear()
+        VectorStore.invalidate_cache()
 
     def _load_chunks(self, document_dir: Path) -> list[dict]:
         """Load chunks from a document directory."""
@@ -107,7 +144,8 @@ class Retriever:
         """Retrieve relevant chunks using hybrid search with RRF fusion."""
 
         all_chunks: list[dict] = []
-        all_embeddings: list[np.ndarray] = []
+        valid_document_dirs: list[Path] = []
+        stored_indexes: list[faiss.Index] = []
 
         for doc_dir in document_dirs:
             chunks = self._load_chunks(doc_dir)
@@ -117,10 +155,18 @@ class Retriever:
             index = self.vector_store.load(doc_dir)
             if index is None:
                 continue
+            if index.ntotal != len(chunks):
+                logger.error(
+                    "Skipping stale document index %s: index has %d vectors for %d chunks.",
+                    doc_dir,
+                    index.ntotal,
+                    len(chunks),
+                )
+                continue
 
             all_chunks.extend(chunks)
-            stored_embeddings = self.vector_store.get_embeddings(index)
-            all_embeddings.append(stored_embeddings)
+            valid_document_dirs.append(doc_dir)
+            stored_indexes.append(index)
 
         if not all_chunks:
             return []
@@ -128,22 +174,19 @@ class Retriever:
         # Semantic search
         question_embedding = self.embedding_service.encode([question])
 
-        if all_embeddings:
-            combined_embeddings = np.vstack(all_embeddings)
-            faiss_index = self.vector_store.build_index(combined_embeddings)
+        faiss_index = self.vector_store.search_index(
+            valid_document_dirs,
+            stored_indexes,
+        )
+        if faiss_index is not None:
             search_k = min(top_k * 2, len(all_chunks))
             _, indices = faiss_index.search(question_embedding.astype(np.float32), search_k)
             semantic_results = [(int(idx), 1.0) for idx in indices[0] if idx != -1]
         else:
             semantic_results = []
 
-        # BM25 search — fit only once per unique document set
-        docs_key = "|".join(str(c.get("chunk_id", i)) for i, c in enumerate(all_chunks[:10]))
-        if self._fitted_docs_key != docs_key:
-            self.bm25.fit([c["content"] for c in all_chunks])
-            self._fitted_docs_key = docs_key
-
-        bm25_scores = self.bm25.batch_score(question, list(range(len(all_chunks))))
+        bm25 = self._get_bm25_scorer(all_chunks)
+        bm25_scores = bm25.batch_score(question, list(range(len(all_chunks))))
         bm25_search_k = min(top_k * 2, len(all_chunks))
         bm25_top = sorted(enumerate(bm25_scores), key=lambda x: x[1], reverse=True)[:bm25_search_k]
 

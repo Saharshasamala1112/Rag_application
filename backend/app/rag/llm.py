@@ -28,13 +28,20 @@ class LocalLLM:
 
     def __init__(self) -> None:
         self.client = Client(host=settings.ollama_host)
-        self.model = settings.resolve_model()
-        logger.info("LLM initialized with model: %s", self.model)
+        self._model: str | None = None
+
+    @property
+    def model(self) -> str:
+        if self._model is None:
+            self._model = settings.resolve_model()
+            logger.info("LLM initialized with model: %s", self._model)
+        return self._model
 
     def _build_messages(
         self,
         question: str,
         context: str,
+        history: list[dict[str, str]] | None = None,
     ) -> list[dict[str, str]]:
         """Build the full message array with system + user messages."""
 
@@ -54,6 +61,7 @@ INSTRUCTIONS:
 
         return [
             {"role": "system", "content": SYSTEM_PROMPT},
+            *(history or []),
             {"role": "user", "content": user_content},
         ]
 
@@ -61,10 +69,11 @@ INSTRUCTIONS:
         self,
         question: str,
         context: str,
+        history: list[dict[str, str]] | None = None,
     ) -> str:
         """Generate a complete answer. Raises LLMError on failure."""
 
-        messages = self._build_messages(question, context)
+        messages = self._build_messages(question, context, history)
 
         try:
             response = self.client.chat(
@@ -87,10 +96,11 @@ INSTRUCTIONS:
         self,
         question: str,
         context: str,
+        history: list[dict[str, str]] | None = None,
     ) -> Generator[str, None, None]:
         """Stream answer tokens. Raises LLMError on connection failure."""
 
-        messages = self._build_messages(question, context)
+        messages = self._build_messages(question, context, history)
 
         try:
             stream = self.client.chat(

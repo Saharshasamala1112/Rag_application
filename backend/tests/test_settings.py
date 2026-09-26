@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
 from pydantic import ValidationError
 
@@ -16,3 +18,19 @@ def test_wildcard_cors_rejects_credentials():
 def test_wildcard_cors_is_allowed_without_credentials():
     settings = Settings(cors_origins=["*"], cors_allow_credentials=False)
     assert settings.cors_origins == ["*"]
+
+
+def test_ollama_model_list_uses_the_configured_ttl_cache():
+    settings = Settings()
+    settings._available_models = None
+    response = MagicMock()
+    response.models = [MagicMock(model="llama3.2:latest")]
+    ollama_client = MagicMock()
+    ollama_client.list.return_value = response
+
+    with patch("ollama.Client", return_value=ollama_client):
+        assert settings.get_available_ollama_models() == ["llama3.2:latest"]
+        assert settings.get_available_ollama_models() == ["llama3.2:latest"]
+        settings.get_available_ollama_models(force_refresh=True)
+
+    assert ollama_client.list.call_count == 2

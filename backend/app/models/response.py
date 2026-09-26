@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -45,6 +47,8 @@ class DocumentInfo(BaseModel):
     total_chars: int = 0
     file_size: int = 0
     uploaded_at: str = ""
+    status: Literal["uploading", "processing", "ready", "failed"] = "ready"
+    error: str | None = None
 
 
 class DocumentListResponse(BaseModel):

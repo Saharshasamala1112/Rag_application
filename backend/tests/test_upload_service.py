@@ -1,10 +1,14 @@
+import json
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pytest
 
 from app.config.settings import settings
+from app.rag.pipeline import DocumentPipeline
+from app.rag.vector_store import VectorStore
 from app.services.upload_service import (
     UploadService,
     UploadTooLargeError,
@@ -48,3 +52,62 @@ def test_document_path_helper_rejects_invalid_ids(document_id: str, tmp_path: Pa
     with patch.object(settings, "upload_dir", tmp_path):
         with pytest.raises(ValueError, match="Invalid document ID"):
             resolve_document_dir(document_id)
+
+
+def test_reconciliation_marks_interrupted_uploads_failed(tmp_path: Path):
+    document_dir = tmp_path / "12345678-abc"
+    document_dir.mkdir()
+    (document_dir / "original.txt").write_text("content")
+    (document_dir / "document_info.json").write_text(
+        json.dumps({
+            "document_id": document_dir.name,
+            "filename": "original.txt",
+            "chunk_count": 0,
+            "status": "processing",
+        }),
+        encoding="utf-8",
+    )
+
+    with patch.object(settings, "upload_dir", tmp_path):
+        UploadService.reconcile_documents()
+
+    info = json.loads((document_dir / "document_info.json").read_text())
+    assert info["status"] == "failed"
+    assert "complete searchable index" in info["error"]
+
+
+def test_ready_document_requires_matching_chunks_and_index(tmp_path: Path):
+    document_dir = tmp_path / "12345678-abc"
+    document_dir.mkdir()
+    (document_dir / "chunks.json").write_text(json.dumps([{"content": "one"}]))
+    (document_dir / "document_info.json").write_text(
+        json.dumps({
+            "document_id": document_dir.name,
+            "filename": "original.txt",
+            "chunk_count": 1,
+            "status": "ready",
+        }),
+        encoding="utf-8",
+    )
+    store = UploadService.__new__(UploadService)
+
+    with patch.object(settings, "upload_dir", tmp_path):
+        status_without_index = store.get_document_status(document_dir.name)
+        VectorStore.save(np.array([[1.0, 0.0]], dtype=np.float32), document_dir)
+        status_with_index = store.get_document_status(document_dir.name)
+
+    assert status_without_index is not None
+    assert status_without_index["status"] == "failed"
+    assert status_with_index is not None
+    assert status_with_index["status"] == "ready"
+
+
+def test_document_pipeline_rejects_zero_chunk_documents(tmp_path: Path):
+    pipeline = DocumentPipeline.__new__(DocumentPipeline)
+    pipeline.loader = MagicMock()
+    pipeline.loader.extract_markdown.return_value = "valid text"
+    pipeline.chunker = MagicMock()
+    pipeline.chunker.split.return_value = []
+
+    with pytest.raises(ValueError, match="No text chunks"):
+        pipeline.process(tmp_path / "12345678-abc" / "original.txt")
