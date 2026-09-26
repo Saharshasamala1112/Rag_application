@@ -52,7 +52,9 @@ export function useHelpDialog() {
 
   useEffect(() => {
     helpOpenSetter = setOpen
-    return () => { helpOpenSetter = null }
+    return () => {
+      helpOpenSetter = null
+    }
   }, [])
 
   return { open, setOpen }

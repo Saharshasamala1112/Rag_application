@@ -1,9 +1,21 @@
-import { Layers, Search, ArrowUpDown, LayoutGrid, MessageSquare, Clock, FileText, BarChart3 } from 'lucide-react'
+import {
+  Layers,
+  Search,
+  ArrowUpDown,
+  LayoutGrid,
+  MessageSquare,
+  Clock,
+  FileText,
+  BarChart3,
+} from 'lucide-react'
 import { useChatStore } from '../../store/chat.store'
 import type { ApiSourceChunk } from '../../types/api'
 import type { RagTraceStep } from '../../types/chat'
 
-const STEP_CONFIG: Record<string, { icon: typeof Search; label: string; description: string; color: string }> = {
+const STEP_CONFIG: Record<
+  string,
+  { icon: typeof Search; label: string; description: string; color: string }
+> = {
   retrieval: {
     icon: Search,
     label: 'Retrieval',
@@ -35,12 +47,12 @@ function StepCard({ step, index }: { step: RagTraceStep; index: number }) {
   const Icon = config.icon
 
   return (
-    <div className="rounded-xl border border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark p-3.5">
-      <div className="flex items-center gap-2.5 mb-2">
-        <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-surface-secondary dark:bg-surface-dark-elevated">
+    <div className="rounded-xl border border-edge bg-surface p-3.5 dark:border-edge-dark dark:bg-surface-dark">
+      <div className="mb-2 flex items-center gap-2.5">
+        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-surface-secondary dark:bg-surface-dark-elevated">
           <Icon size={12} className={config.color} />
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="text-2xs font-semibold text-fg-secondary dark:text-fg-dark-secondary">
               {config.label}
@@ -50,13 +62,13 @@ function StepCard({ step, index }: { step: RagTraceStep; index: number }) {
             </span>
           </div>
         </div>
-        <span className="flex items-center gap-1 text-2xs text-fg-tertiary dark:text-fg-dark-tertiary shrink-0">
+        <span className="flex shrink-0 items-center gap-1 text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
           <Clock size={9} />
           {step.timing_ms.toFixed(0)}ms
         </span>
       </div>
 
-      <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary mb-2">
+      <p className="mb-2 text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
         {config.description}
       </p>
 
@@ -64,31 +76,41 @@ function StepCard({ step, index }: { step: RagTraceStep; index: number }) {
         {step.chunks_found != null && (
           <div className="flex justify-between text-2xs">
             <span className="text-fg-tertiary dark:text-fg-dark-tertiary">Chunks found</span>
-            <span className="text-fg-secondary dark:text-fg-dark-secondary font-medium">{step.chunks_found}</span>
+            <span className="font-medium text-fg-secondary dark:text-fg-dark-secondary">
+              {step.chunks_found}
+            </span>
           </div>
         )}
         {step.documents_searched != null && (
           <div className="flex justify-between text-2xs">
             <span className="text-fg-tertiary dark:text-fg-dark-tertiary">Documents searched</span>
-            <span className="text-fg-secondary dark:text-fg-dark-secondary font-medium">{step.documents_searched}</span>
+            <span className="font-medium text-fg-secondary dark:text-fg-dark-secondary">
+              {step.documents_searched}
+            </span>
           </div>
         )}
         {step.chunks_after_rerank != null && (
           <div className="flex justify-between text-2xs">
             <span className="text-fg-tertiary dark:text-fg-dark-tertiary">After reranking</span>
-            <span className="text-fg-secondary dark:text-fg-dark-secondary font-medium">{step.chunks_after_rerank}</span>
+            <span className="font-medium text-fg-secondary dark:text-fg-dark-secondary">
+              {step.chunks_after_rerank}
+            </span>
           </div>
         )}
         {step.context_chars != null && (
           <div className="flex justify-between text-2xs">
             <span className="text-fg-tertiary dark:text-fg-dark-tertiary">Context size</span>
-            <span className="text-fg-secondary dark:text-fg-dark-secondary font-medium">{step.context_chars.toLocaleString()} chars</span>
+            <span className="font-medium text-fg-secondary dark:text-fg-dark-secondary">
+              {step.context_chars.toLocaleString()} chars
+            </span>
           </div>
         )}
         {step.sources_count != null && (
           <div className="flex justify-between text-2xs">
             <span className="text-fg-tertiary dark:text-fg-dark-tertiary">Sources used</span>
-            <span className="text-fg-secondary dark:text-fg-dark-secondary font-medium">{step.sources_count}</span>
+            <span className="font-medium text-fg-secondary dark:text-fg-dark-secondary">
+              {step.sources_count}
+            </span>
           </div>
         )}
       </div>
@@ -98,39 +120,39 @@ function StepCard({ step, index }: { step: RagTraceStep; index: number }) {
 
 function SourceCard({ source, index }: { source: ApiSourceChunk; index: number }) {
   return (
-    <div className="rounded-xl border border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark p-3.5">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-accent/10 dark:bg-accent-dark/10 text-2xs font-semibold text-accent dark:text-accent-dark">
+    <div className="rounded-xl border border-edge bg-surface p-3.5 dark:border-edge-dark dark:bg-surface-dark">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-accent/10 text-2xs font-semibold text-accent dark:bg-accent-dark/10 dark:text-accent-dark">
             {index + 1}
           </span>
-          <div className="flex items-center gap-1.5 min-w-0">
-            <FileText size={11} className="text-fg-tertiary dark:text-fg-dark-tertiary shrink-0" />
-            <span className="text-2xs font-medium text-fg-secondary dark:text-fg-dark-secondary truncate">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <FileText size={11} className="shrink-0 text-fg-tertiary dark:text-fg-dark-tertiary" />
+            <span className="truncate text-2xs font-medium text-fg-secondary dark:text-fg-dark-secondary">
               {source.source}
             </span>
           </div>
         </div>
         {source.score != null && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <div className="w-14 h-1.5 rounded-full bg-surface-secondary dark:bg-surface-dark-elevated overflow-hidden">
+          <div className="flex shrink-0 items-center gap-1.5">
+            <div className="h-1.5 w-14 overflow-hidden rounded-full bg-surface-secondary dark:bg-surface-dark-elevated">
               <div
-                className="h-full rounded-full bg-accent dark:bg-accent-dark transition-all duration-300"
+                className="h-full rounded-full bg-accent transition-all duration-300 dark:bg-accent-dark"
                 style={{ width: `${Math.min(source.score * 100, 100)}%` }}
               />
             </div>
-            <span className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary w-7 text-right">
+            <span className="w-7 text-right text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
               {Math.round(source.score * 100)}%
             </span>
           </div>
         )}
       </div>
       {source.header && (
-        <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary mb-1.5 italic truncate">
+        <p className="mb-1.5 truncate text-2xs italic text-fg-tertiary dark:text-fg-dark-tertiary">
           {source.header}
         </p>
       )}
-      <p className="text-[11px] text-fg-secondary dark:text-fg-dark-secondary leading-relaxed line-clamp-3">
+      <p className="line-clamp-3 text-[11px] leading-relaxed text-fg-secondary dark:text-fg-dark-secondary">
         {source.content}
       </p>
       {source.page_number != null && (
@@ -150,14 +172,14 @@ export function RagTracePanel() {
 
   if (!lastAssistant) {
     return (
-      <div className="flex flex-col items-center justify-center h-full px-6 text-center">
+      <div className="flex h-full flex-col items-center justify-center px-6 text-center">
         <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-secondary dark:bg-surface-dark-elevated">
           <Layers size={20} className="text-fg-tertiary dark:text-fg-dark-tertiary" />
         </div>
-        <p className="text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary mb-1">
+        <p className="mb-1 text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary">
           RAG Trace
         </p>
-        <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary max-w-[200px] leading-relaxed">
+        <p className="max-w-[200px] text-2xs leading-relaxed text-fg-tertiary dark:text-fg-dark-tertiary">
           Send a message to see the retrieval pipeline and sources
         </p>
       </div>
@@ -168,11 +190,11 @@ export function RagTracePanel() {
   const sources = lastAssistant.sources || []
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="space-y-6 p-4">
       {/* Pipeline */}
       {trace && trace.steps.length > 0 && (
         <section>
-          <div className="flex items-center gap-2 mb-3">
+          <div className="mb-3 flex items-center gap-2">
             <BarChart3 size={12} className="text-fg-tertiary dark:text-fg-dark-tertiary" />
             <h4 className="text-2xs font-semibold uppercase tracking-wider text-fg-tertiary dark:text-fg-dark-tertiary">
               Pipeline
@@ -184,8 +206,10 @@ export function RagTracePanel() {
             ))}
           </div>
           {trace.total_time_ms != null && (
-            <div className="flex items-center justify-between mt-3 px-1">
-              <span className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">Total time</span>
+            <div className="mt-3 flex items-center justify-between px-1">
+              <span className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
+                Total time
+              </span>
               <span className="text-2xs font-semibold text-fg-secondary dark:text-fg-dark-secondary">
                 {trace.total_time_ms.toFixed(0)}ms
               </span>
@@ -196,14 +220,14 @@ export function RagTracePanel() {
 
       {/* Sources */}
       <section>
-        <div className="flex items-center gap-2 mb-3">
+        <div className="mb-3 flex items-center gap-2">
           <FileText size={12} className="text-fg-tertiary dark:text-fg-dark-tertiary" />
           <h4 className="text-2xs font-semibold uppercase tracking-wider text-fg-tertiary dark:text-fg-dark-tertiary">
             Sources · {sources.length}
           </h4>
         </div>
         {sources.length === 0 ? (
-          <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary italic">
+          <p className="text-2xs italic text-fg-tertiary dark:text-fg-dark-tertiary">
             No sources retrieved
           </p>
         ) : (

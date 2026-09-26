@@ -1,6 +1,6 @@
 import api from '../lib/axios'
 
-export type ConversationMessage = {
+type ConversationMessage = {
   role: 'user' | 'assistant'
   content: string
   sources?: Record<string, unknown>[]
@@ -8,7 +8,7 @@ export type ConversationMessage = {
   interrupted?: boolean
 }
 
-export type ConversationSummary = {
+type ConversationSummary = {
   conversation_id: string
   title: string
   created_at: string
@@ -41,11 +41,6 @@ export const getConversation = async (id: string): Promise<ConversationDetail> =
 
 export const createConversation = async (title?: string): Promise<ConversationDetail> => {
   const res = await api.post<ConversationDetail>('/conversations', { title: title ?? null })
-  return res.data
-}
-
-export const updateConversationTitle = async (id: string, title: string): Promise<ConversationDetail> => {
-  const res = await api.patch<ConversationDetail>(`/conversations/${id}`, { title })
   return res.data
 }
 

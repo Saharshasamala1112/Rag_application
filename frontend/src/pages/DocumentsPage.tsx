@@ -79,12 +79,15 @@ export function DocumentsPage() {
     }
   }
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
-    const files = Array.from(e.dataTransfer.files)
-    if (files.length > 0) void uploadBatch(files)
-  }, [uploadBatch])
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      setIsDragOver(false)
+      const files = Array.from(e.dataTransfer.files)
+      if (files.length > 0) void uploadBatch(files)
+    },
+    [uploadBatch],
+  )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -112,8 +115,8 @@ export function DocumentsPage() {
   const doneCount = uploadQueue.filter((q) => q.progress === 'done').length
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex items-center justify-between px-6 h-12 border-b border-edge dark:border-edge-dark shrink-0">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-edge px-6 dark:border-edge-dark">
         <div>
           <h1 className="text-sm font-semibold text-fg dark:text-fg-dark">Documents</h1>
           <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
@@ -127,14 +130,14 @@ export function DocumentsPage() {
               <button
                 type="button"
                 onClick={() => setSelectedIds([])}
-                className="px-2.5 py-1.5 text-xs text-fg-secondary dark:text-fg-dark-secondary hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated rounded-md transition-colors"
+                className="rounded-md px-2.5 py-1.5 text-xs text-fg-secondary transition-colors hover:bg-surface-secondary dark:text-fg-dark-secondary dark:hover:bg-surface-dark-elevated"
               >
                 Clear selection
               </button>
               <button
                 type="button"
                 onClick={() => setBulkDeleteOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger-subtle dark:text-danger-dark dark:hover:bg-danger-dark-subtle rounded-md transition-colors"
+                className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger-subtle dark:text-danger-dark dark:hover:bg-danger-dark-subtle"
               >
                 <Trash2 size={13} />
                 Delete ({selectedIds.length})
@@ -142,14 +145,14 @@ export function DocumentsPage() {
             </>
           ) : (
             <>
-              <div className="flex rounded-md border border-edge dark:border-edge-dark overflow-hidden">
+              <div className="flex overflow-hidden rounded-md border border-edge dark:border-edge-dark">
                 <button
                   type="button"
                   onClick={() => setView('grid')}
                   className={cn(
                     'p-1.5 transition-colors',
                     view === 'grid'
-                      ? 'bg-surface-secondary dark:bg-surface-dark-elevated text-fg dark:text-fg-dark'
+                      ? 'bg-surface-secondary text-fg dark:bg-surface-dark-elevated dark:text-fg-dark'
                       : 'text-fg-tertiary hover:text-fg dark:text-fg-dark-tertiary dark:hover:text-fg-dark',
                   )}
                   aria-label="Grid view"
@@ -162,7 +165,7 @@ export function DocumentsPage() {
                   className={cn(
                     'p-1.5 transition-colors',
                     view === 'list'
-                      ? 'bg-surface-secondary dark:bg-surface-dark-elevated text-fg dark:text-fg-dark'
+                      ? 'bg-surface-secondary text-fg dark:bg-surface-dark-elevated dark:text-fg-dark'
                       : 'text-fg-tertiary hover:text-fg dark:text-fg-dark-tertiary dark:hover:text-fg-dark',
                   )}
                   aria-label="List view"
@@ -170,7 +173,7 @@ export function DocumentsPage() {
                   <List size={14} />
                 </button>
               </div>
-              <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-accent hover:bg-accent-hover dark:bg-accent-dark dark:text-app-dark dark:hover:bg-accent-dark-hover rounded-lg cursor-pointer transition-colors">
+              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover dark:bg-accent-dark dark:text-app-dark dark:hover:bg-accent-dark-hover">
                 <Upload size={13} />
                 Upload
                 <input
@@ -189,22 +192,30 @@ export function DocumentsPage() {
 
       {/* Upload progress bar */}
       {uploadQueue.length > 0 && (
-        <div className="px-6 py-2 border-b border-edge dark:border-edge-dark bg-surface-secondary/50 dark:bg-surface-dark-elevated/50">
+        <div className="border-b border-edge bg-surface-secondary/50 px-6 py-2 dark:border-edge-dark dark:bg-surface-dark-elevated/50">
           <div className="flex items-center gap-2 text-2xs text-fg-secondary dark:text-fg-dark-secondary">
-            <Loader2 size={12} className={uploading ? 'animate-spin text-accent dark:text-accent-dark' : 'text-success dark:text-success-dark'} />
+            <Loader2
+              size={12}
+              className={
+                uploading
+                  ? 'animate-spin text-accent dark:text-accent-dark'
+                  : 'text-success dark:text-success-dark'
+              }
+            />
             <span>
               {uploading
                 ? `Uploading ${uploadingCount} file${uploadingCount !== 1 ? 's' : ''}...`
                 : `Uploaded ${doneCount} file${doneCount !== 1 ? 's' : ''}`}
             </span>
           </div>
-          <div className="mt-1.5 h-1 rounded-full bg-edge dark:bg-edge-dark overflow-hidden">
+          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-edge dark:bg-edge-dark">
             <div
-              className="h-full bg-accent dark:bg-accent-dark rounded-full transition-all duration-300"
+              className="h-full rounded-full bg-accent transition-all duration-300 dark:bg-accent-dark"
               style={{
-                width: uploadQueue.length > 0
-                  ? `${(uploadQueue.filter((q) => q.progress === 'done' || q.progress === 'error').length / uploadQueue.length) * 100}%`
-                  : '0%',
+                width:
+                  uploadQueue.length > 0
+                    ? `${(uploadQueue.filter((q) => q.progress === 'done' || q.progress === 'error').length / uploadQueue.length) * 100}%`
+                    : '0%',
               }}
             />
           </div>
@@ -219,12 +230,10 @@ export function DocumentsPage() {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
         >
-          <div className="rounded-xl border-2 border-dashed border-accent bg-surface dark:bg-surface-dark px-12 py-10 text-center shadow-lg">
+          <div className="rounded-xl border-2 border-dashed border-accent bg-surface px-12 py-10 text-center shadow-lg dark:bg-surface-dark">
             <Upload size={36} className="mx-auto mb-3 text-accent dark:text-accent-dark" />
-            <p className="text-sm font-medium text-fg dark:text-fg-dark">
-              Drop files to upload
-            </p>
-            <p className="text-xs text-fg-secondary dark:text-fg-dark-secondary mt-1">
+            <p className="text-sm font-medium text-fg dark:text-fg-dark">Drop files to upload</p>
+            <p className="mt-1 text-xs text-fg-secondary dark:text-fg-dark-secondary">
               Multiple files supported
             </p>
           </div>
@@ -243,7 +252,7 @@ export function DocumentsPage() {
             title="No documents yet"
             description="Upload files or drag and drop to get started"
             action={
-              <label className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-accent hover:bg-accent-hover dark:bg-accent-dark dark:text-app-dark rounded-lg cursor-pointer transition-colors">
+              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-accent-hover dark:bg-accent-dark dark:text-app-dark">
                 <Upload size={13} />
                 Upload files
                 <input
@@ -257,7 +266,7 @@ export function DocumentsPage() {
             }
           />
         ) : view === 'grid' ? (
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">
             {documents.map((doc) => {
               const isSelected = selectedIds.includes(doc.document_id)
               const isEditing = editingId === doc.document_id
@@ -266,27 +275,27 @@ export function DocumentsPage() {
                 <div
                   key={doc.document_id}
                   className={cn(
-                    'group relative rounded-xl border bg-surface dark:bg-surface-dark p-4 transition-colors',
+                    'group relative rounded-xl border bg-surface p-4 transition-colors dark:bg-surface-dark',
                     isSelected
-                      ? 'border-accent/50 dark:border-accent-dark/50 ring-1 ring-accent/20 dark:ring-accent-dark/20'
-                      : 'border-edge dark:border-edge-dark hover:border-edge-strong dark:hover:border-edge-dark-strong',
+                      ? 'border-accent/50 ring-1 ring-accent/20 dark:border-accent-dark/50 dark:ring-accent-dark/20'
+                      : 'border-edge hover:border-edge-strong dark:border-edge-dark dark:hover:border-edge-dark-strong',
                   )}
                 >
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="mb-3 flex items-start justify-between">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         aria-label={`Select ${doc.filename}`}
                         checked={isSelected}
                         onChange={() => toggleSelect(doc.document_id)}
-                        className="rounded border-edge dark:border-edge-dark text-accent focus:ring-accent/40"
+                        className="rounded border-edge text-accent focus:ring-accent/40 dark:border-edge-dark"
                       />
                       <FileIconLarge extension={doc.filename.split('.').pop() || ''} />
                     </div>
                     <button
                       type="button"
                       onClick={() => setDeleteTarget(doc.document_id)}
-                      className="p-1 rounded text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark transition-colors"
+                      className="rounded p-1 text-fg-muted transition-colors hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark"
                       title="Delete"
                       aria-label={`Delete ${doc.filename}`}
                     >
@@ -305,7 +314,7 @@ export function DocumentsPage() {
                           if (e.key === 'Escape') setEditingId(null)
                         }}
                         autoFocus
-                        className="flex-1 min-w-0 px-1.5 py-0.5 text-xs bg-surface-secondary dark:bg-surface-dark-elevated border border-accent dark:border-accent-dark rounded text-fg dark:text-fg-dark focus:outline-none"
+                        className="min-w-0 flex-1 rounded border border-accent bg-surface-secondary px-1.5 py-0.5 text-xs text-fg focus:outline-none dark:border-accent-dark dark:bg-surface-dark-elevated dark:text-fg-dark"
                       />
                       <button
                         type="button"
@@ -328,7 +337,7 @@ export function DocumentsPage() {
                     <div className="flex items-center gap-1">
                       <Link
                         to={`/documents/${doc.document_id}`}
-                        className="text-xs font-medium text-fg dark:text-fg-dark truncate flex-1"
+                        className="flex-1 truncate text-xs font-medium text-fg dark:text-fg-dark"
                         title={doc.filename}
                       >
                         {doc.filename}
@@ -339,7 +348,7 @@ export function DocumentsPage() {
                           setEditingId(doc.document_id)
                           setEditName(doc.filename)
                         }}
-                        className="p-0.5 rounded text-fg-muted hover:text-fg dark:text-fg-dark-tertiary dark:hover:text-fg-dark"
+                        className="rounded p-0.5 text-fg-muted hover:text-fg dark:text-fg-dark-tertiary dark:hover:text-fg-dark"
                         title="Rename"
                         aria-label={`Rename ${doc.filename}`}
                       >
@@ -348,7 +357,7 @@ export function DocumentsPage() {
                     </div>
                   )}
 
-                  <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary mt-1">
+                  <p className="mt-1 text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
                     {doc.chunk_count} chunks · {new Date(doc.uploaded_at).toLocaleDateString()}
                   </p>
                 </div>
@@ -365,7 +374,7 @@ export function DocumentsPage() {
                 <div
                   key={doc.document_id}
                   className={cn(
-                    'group flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
+                    'group flex items-center gap-3 rounded-lg px-4 py-3 transition-colors',
                     isSelected
                       ? 'bg-accent-subtle dark:bg-accent-dark-subtle'
                       : 'hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated',
@@ -376,10 +385,10 @@ export function DocumentsPage() {
                     aria-label={`Select ${doc.filename}`}
                     checked={isSelected}
                     onChange={() => toggleSelect(doc.document_id)}
-                    className="rounded border-edge dark:border-edge-dark text-accent focus:ring-accent/40"
+                    className="rounded border-edge text-accent focus:ring-accent/40 dark:border-edge-dark"
                   />
                   <FileIconLarge extension={doc.filename.split('.').pop() || ''} />
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     {isEditing ? (
                       <div className="flex items-center gap-1">
                         <input
@@ -391,7 +400,7 @@ export function DocumentsPage() {
                             if (e.key === 'Escape') setEditingId(null)
                           }}
                           autoFocus
-                          className="flex-1 min-w-0 px-1.5 py-0.5 text-xs bg-surface-secondary dark:bg-surface-dark-elevated border border-accent dark:border-accent-dark rounded text-fg dark:text-fg-dark focus:outline-none"
+                          className="min-w-0 flex-1 rounded border border-accent bg-surface-secondary px-1.5 py-0.5 text-xs text-fg focus:outline-none dark:border-accent-dark dark:bg-surface-dark-elevated dark:text-fg-dark"
                         />
                         <button
                           type="button"
@@ -414,7 +423,7 @@ export function DocumentsPage() {
                       <div className="flex items-center gap-1.5">
                         <Link
                           to={`/documents/${doc.document_id}`}
-                          className="text-xs font-medium text-fg dark:text-fg-dark truncate"
+                          className="truncate text-xs font-medium text-fg dark:text-fg-dark"
                         >
                           {doc.filename}
                         </Link>
@@ -424,7 +433,7 @@ export function DocumentsPage() {
                             setEditingId(doc.document_id)
                             setEditName(doc.filename)
                           }}
-                          className="p-0.5 rounded text-fg-muted hover:text-fg dark:text-fg-dark-tertiary dark:hover:text-fg-dark"
+                          className="rounded p-0.5 text-fg-muted hover:text-fg dark:text-fg-dark-tertiary dark:hover:text-fg-dark"
                           title="Rename"
                           aria-label={`Rename ${doc.filename}`}
                         >
@@ -439,7 +448,7 @@ export function DocumentsPage() {
                   <button
                     type="button"
                     onClick={() => setDeleteTarget(doc.document_id)}
-                    className="p-1.5 rounded text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark"
+                    className="rounded p-1.5 text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark"
                     title="Delete"
                     aria-label={`Delete ${doc.filename}`}
                   >

@@ -57,9 +57,7 @@ const loadSessions = (): ChatSession[] => {
       ? parsed.map((session) => ({
           ...session,
           messages: session.messages.map((message) =>
-            message.isStreaming
-              ? { ...message, isStreaming: false, interrupted: true }
-              : message,
+            message.isStreaming ? { ...message, isStreaming: false, interrupted: true } : message,
           ),
         }))
       : []
@@ -90,7 +88,8 @@ const createSessionData = (title?: string, serverId?: string): ChatSession => {
   return {
     id: `session-${Date.now()}`,
     serverConversationId: serverId ?? null,
-    title: title || `Session ${new Date().toLocaleString([], { hour: 'numeric', minute: '2-digit' })}`,
+    title:
+      title || `Session ${new Date().toLocaleString([], { hour: 'numeric', minute: '2-digit' })}`,
     messages: [],
     createdAt: now,
     updatedAt: now,
@@ -107,7 +106,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeStream: null,
 
   getMessages: (sessionId) => {
-    const active = get().sessions.find((session) => session.id === (sessionId ?? get().activeSessionId))
+    const active = get().sessions.find(
+      (session) => session.id === (sessionId ?? get().activeSessionId),
+    )
     return active?.messages ?? []
   },
 
@@ -122,9 +123,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const updated = sessions.map((session) => {
       if (session.id !== targetSessionId) return session
       const newMessages = [...session.messages, message]
-      const title = session.messages.length === 0
-        ? message.content.slice(0, 50) + (message.content.length > 50 ? '...' : '')
-        : session.title
+      const title =
+        session.messages.length === 0
+          ? message.content.slice(0, 50) + (message.content.length > 50 ? '...' : '')
+          : session.title
       return {
         ...session,
         title,
@@ -237,8 +239,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     saveSessionsImmediate(updated)
     set({
       sessions: updated,
-      activeStream:
-        get().activeStream?.assistantId === messageId ? null : get().activeStream,
+      activeStream: get().activeStream?.assistantId === messageId ? null : get().activeStream,
     })
   },
 
@@ -250,9 +251,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ? {
             ...session,
             messages: session.messages.map((msg) =>
-              msg.id === messageId
-                ? { ...msg, isStreaming: false, interrupted: true }
-                : msg,
+              msg.id === messageId ? { ...msg, isStreaming: false, interrupted: true } : msg,
             ),
             updatedAt: new Date().toISOString(),
           }
@@ -261,8 +260,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     saveSessionsImmediate(updated)
     set({
       sessions: updated,
-      activeStream:
-        get().activeStream?.assistantId === messageId ? null : get().activeStream,
+      activeStream: get().activeStream?.assistantId === messageId ? null : get().activeStream,
     })
   },
 
@@ -308,15 +306,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ sessions: updated, activeSessionId: nextSession.id })
 
     // Create server conversation in background
-    conversationService.createConversation().then((conv) => {
-      set((state) => ({
-        sessions: state.sessions.map((s) =>
-          s.id === nextSession.id ? { ...s, serverConversationId: conv.conversation_id } : s,
-        ),
-      }))
-    }).catch(() => {
-      // Server unavailable — local-only mode still works
-    })
+    conversationService
+      .createConversation()
+      .then((conv) => {
+        set((state) => ({
+          sessions: state.sessions.map((s) =>
+            s.id === nextSession.id ? { ...s, serverConversationId: conv.conversation_id } : s,
+          ),
+        }))
+      })
+      .catch(() => {
+        // Server unavailable — local-only mode still works
+      })
     return nextSession.id
   },
 
@@ -339,13 +340,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       saveSessionsImmediate([newSession])
       set({ sessions: [newSession], activeSessionId: newSession.id })
       // Create server conversation
-      conversationService.createConversation().then((conv) => {
-        set((state) => ({
-          sessions: state.sessions.map((s) =>
-            s.id === newSession.id ? { ...s, serverConversationId: conv.conversation_id } : s,
-          ),
-        }))
-      }).catch(() => {})
+      conversationService
+        .createConversation()
+        .then((conv) => {
+          set((state) => ({
+            sessions: state.sessions.map((s) =>
+              s.id === newSession.id ? { ...s, serverConversationId: conv.conversation_id } : s,
+            ),
+          }))
+        })
+        .catch(() => {})
       return
     }
 
@@ -363,7 +367,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const { sessions } = get()
 
         const existingServerIds = new Set(
-          sessions.filter((session) => session.serverConversationId)
+          sessions
+            .filter((session) => session.serverConversationId)
             .map((session) => session.serverConversationId),
         )
 
@@ -382,9 +387,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const merged = [...newSessions, ...get().sessions]
           saveSessionsImmediate(merged)
           set({ sessions: merged })
-          await Promise.all(
-            newSessions.map((session) => get().syncSessionFromServer(session.id)),
-          )
+          await Promise.all(newSessions.map((session) => get().syncSessionFromServer(session.id)))
         }
       } catch {
         // Server unavailable — local-only mode

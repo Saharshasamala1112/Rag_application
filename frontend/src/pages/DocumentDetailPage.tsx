@@ -43,7 +43,9 @@ export function DocumentDetailPage() {
       }
     }
     void load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [id])
 
   const handleDelete = async () => {
@@ -64,18 +66,15 @@ export function DocumentDetailPage() {
   if (!id) return null
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="px-6 h-12 border-b border-edge dark:border-edge-dark shrink-0 flex flex-col justify-center gap-1">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-12 shrink-0 flex-col justify-center gap-1 border-b border-edge px-6 dark:border-edge-dark">
         <Breadcrumbs
-          items={[
-            { label: 'Documents', to: '/documents' },
-            { label: doc?.filename || 'Document' },
-          ]}
+          items={[{ label: 'Documents', to: '/documents' }, { label: doc?.filename || 'Document' }]}
         />
         <div className="flex items-center gap-3">
           <FileIconLarge extension={doc?.filename.split('.').pop() || ''} />
-          <div className="flex-1 min-w-0">
-            <h1 className="text-sm font-semibold text-fg dark:text-fg-dark truncate">
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-sm font-semibold text-fg dark:text-fg-dark">
               {doc?.filename || 'Document'}
             </h1>
             <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
@@ -86,7 +85,7 @@ export function DocumentDetailPage() {
           <button
             type="button"
             onClick={() => setDeleteOpen(true)}
-            className="p-2 rounded-md text-fg-tertiary hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated transition-colors"
+            className="rounded-md p-2 text-fg-tertiary transition-colors hover:bg-surface-secondary hover:text-danger dark:text-fg-dark-tertiary dark:hover:bg-surface-dark-elevated dark:hover:text-danger-dark"
             title="Delete document"
           >
             <Trash2 size={15} />
@@ -98,26 +97,29 @@ export function DocumentDetailPage() {
         {loading ? (
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-24 rounded-xl bg-surface-secondary dark:bg-surface-dark-elevated animate-pulse" />
+              <div
+                key={i}
+                className="h-24 animate-pulse rounded-xl bg-surface-secondary dark:bg-surface-dark-elevated"
+              />
             ))}
           </div>
         ) : error ? (
-          <div className="flex items-center justify-center h-full">
+          <div className="flex h-full items-center justify-center">
             <p className="text-sm text-danger dark:text-danger-dark">{error}</p>
           </div>
         ) : chunks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <FileText size={24} className="text-fg-muted dark:text-fg-dark-tertiary mb-3" />
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <FileText size={24} className="mb-3 text-fg-muted dark:text-fg-dark-tertiary" />
             <p className="text-sm text-fg-secondary dark:text-fg-dark-secondary">No chunks found</p>
           </div>
         ) : (
-          <div className="max-w-3xl mx-auto space-y-3">
+          <div className="mx-auto max-w-3xl space-y-3">
             {chunks.map((chunk, i) => (
               <div
                 key={chunk.chunk_id || i}
-                className="rounded-xl border border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark p-4"
+                className="rounded-xl border border-edge bg-surface p-4 dark:border-edge-dark dark:bg-surface-dark"
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="mb-2 flex items-center justify-between">
                   <span className="text-2xs font-medium text-accent dark:text-accent-dark">
                     Chunk #{i + 1}
                   </span>
@@ -128,11 +130,11 @@ export function DocumentDetailPage() {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-fg-secondary dark:text-fg-dark-secondary leading-relaxed whitespace-pre-wrap">
+                <p className="whitespace-pre-wrap text-xs leading-relaxed text-fg-secondary dark:text-fg-dark-secondary">
                   {chunk.content}
                 </p>
                 {chunk.header && (
-                  <p className="mt-2 text-2xs text-fg-tertiary dark:text-fg-dark-tertiary italic">
+                  <p className="mt-2 text-2xs italic text-fg-tertiary dark:text-fg-dark-tertiary">
                     {chunk.header}
                   </p>
                 )}

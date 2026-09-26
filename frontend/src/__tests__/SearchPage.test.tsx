@@ -41,13 +41,15 @@ describe('SearchPage', () => {
   })
 
   it('aborts an older search and ignores its late response', async () => {
-    let resolveOlder: ((value: {
-      answer: string
-      sources: []
-      retrieval_time_ms: number
-      generation_time_ms: number
-      total_time_ms: number
-    }) => void) | undefined
+    let resolveOlder:
+      | ((value: {
+          answer: string
+          sources: []
+          retrieval_time_ms: number
+          generation_time_ms: number
+          total_time_ms: number
+        }) => void)
+      | undefined
     queryDocumentsMock
       .mockImplementationOnce((_payload, options) => {
         expect(options?.signal?.aborted).toBe(false)

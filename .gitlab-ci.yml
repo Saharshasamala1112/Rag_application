@@ -40,6 +40,9 @@ backend-quality:
   script:
     - uv run python -m scripts.update_openapi_schema --check
     - uv run ruff check app tests scripts
+    # Dead-code scan: decorators cover FastAPI/pydantic wiring, whitelist covers
+    # reflection-only fields (see backend/scripts/vulture_whitelist.py).
+    - uv run vulture app scripts/vulture_whitelist.py --min-confidence 60 --ignore-decorators "@router.get,@router.post,@router.patch,@router.delete,@router.put,@app.get,@app.post,@app.exception_handler,@app.on_event,@field_validator,@model_validator,@app.middleware"
     - uv run pytest --cov=app --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=junit.xml --cov-fail-under=70
   coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+(?:\.\d+)?)%/'
   artifacts:
@@ -61,6 +64,7 @@ frontend-quality:
     - git diff --exit-code -- src/types/api.generated.ts
     - npm run typecheck
     - npm run lint
+    - npm run knip
     - npm test -- --reporter=default --reporter=junit --outputFile.junit=junit.xml
     - npm run build
   artifacts:

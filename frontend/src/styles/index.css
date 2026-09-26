@@ -3,13 +3,19 @@
 @tailwind utilities;
 
 @layer base {
-  html, body, #root {
+  html,
+  body,
+  #root {
     @apply h-full;
   }
 
   body {
     @apply m-0 bg-app text-fg antialiased;
-    font-family: Inter, system-ui, -apple-system, sans-serif;
+    font-family:
+      Inter,
+      system-ui,
+      -apple-system,
+      sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -20,11 +26,13 @@
   }
 
   *:focus-visible {
-    @apply outline-2 outline-offset-2 outline-accent rounded-sm;
+    @apply rounded-sm outline-2 outline-offset-2 outline-accent;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
+    *,
+    *::before,
+    *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
@@ -43,12 +51,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D6D3D1;
+  background: #d6d3d1;
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #A8A29E;
+  background: #a8a29e;
 }
 
 .dark ::-webkit-scrollbar-thumb {
@@ -69,16 +77,18 @@
 }
 
 .prose h1 {
-  @apply text-xl font-semibold text-fg mt-6 mb-3;
+  @apply mb-3 mt-6 text-xl font-semibold text-fg;
 }
 .prose h2 {
-  @apply text-lg font-semibold text-fg mt-5 mb-2;
+  @apply mb-2 mt-5 text-lg font-semibold text-fg;
 }
 .prose h3 {
-  @apply text-base font-semibold text-fg mt-4 mb-2;
+  @apply mb-2 mt-4 text-base font-semibold text-fg;
 }
-.prose h4, .prose h5, .prose h6 {
-  @apply text-sm font-semibold text-fg mt-3 mb-1;
+.prose h4,
+.prose h5,
+.prose h6 {
+  @apply mb-1 mt-3 text-sm font-semibold text-fg;
 }
 .dark .prose h1,
 .dark .prose h2,
@@ -93,7 +103,8 @@
   @apply my-2;
 }
 
-.prose ul, .prose ol {
+.prose ul,
+.prose ol {
   @apply my-2 pl-5;
 }
 
@@ -110,7 +121,7 @@
 }
 
 .prose blockquote {
-  @apply border-l-[3px] border-accent/40 pl-4 italic text-fg-secondary my-3;
+  @apply my-3 border-l-[3px] border-accent/40 pl-4 italic text-fg-secondary;
 }
 
 .dark .prose blockquote {
@@ -118,15 +129,15 @@
 }
 
 .prose a {
-  @apply text-accent underline underline-offset-2 decoration-accent/30 hover:decoration-accent transition-colors;
+  @apply text-accent underline decoration-accent/30 underline-offset-2 transition-colors hover:decoration-accent;
 }
 
 .dark .prose a {
-  @apply text-accent-dark decoration-accent-dark/30 hover:decoration-accent-dark transition-colors;
+  @apply text-accent-dark decoration-accent-dark/30 transition-colors hover:decoration-accent-dark;
 }
 
 .prose strong {
-  @apply text-fg font-semibold;
+  @apply font-semibold text-fg;
 }
 
 .dark .prose strong {
@@ -142,19 +153,19 @@
 }
 
 .prose table {
-  @apply w-full text-sm my-3;
+  @apply my-3 w-full text-sm;
 }
 
 .prose th {
-  @apply text-left font-semibold text-fg pb-2 border-b border-edge;
+  @apply border-b border-edge pb-2 text-left font-semibold text-fg;
 }
 
 .dark .prose th {
-  @apply text-fg-dark border-edge-dark;
+  @apply border-edge-dark text-fg-dark;
 }
 
 .prose td {
-  @apply py-1.5 border-b border-edge/50;
+  @apply border-b border-edge/50 py-1.5;
 }
 
 .dark .prose td {
@@ -162,7 +173,7 @@
 }
 
 .prose code {
-  @apply text-[0.8125rem] bg-surface-secondary text-fg px-1.5 py-0.5 rounded font-normal;
+  @apply rounded bg-surface-secondary px-1.5 py-0.5 text-[0.8125rem] font-normal text-fg;
 }
 
 .dark .prose code {
@@ -175,7 +186,7 @@
 }
 
 .prose pre {
-  @apply overflow-x-auto rounded-lg border border-edge bg-surface-elevated p-4 my-3;
+  @apply my-3 overflow-x-auto rounded-lg border border-edge bg-surface-elevated p-4;
 }
 
 .dark .prose pre {

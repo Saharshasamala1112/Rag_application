@@ -97,9 +97,7 @@ describe('sidebar at lg and wider', () => {
     expect(screen.queryByRole('button', { name: 'Open navigation menu' })).toBeNull()
     expect(screen.getByRole('navigation', NAV)).toBeInTheDocument()
     expect(screen.queryByTestId('sidebar-backdrop')).toBeNull()
-    expect(
-      screen.getByRole('button', { name: 'Collapse sidebar' }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toBeInTheDocument()
   })
 })
 

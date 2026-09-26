@@ -7,30 +7,36 @@ describe('RagTracePanel', () => {
   beforeEach(() => {
     useChatStore.setState({
       activeSessionId: 'session-1',
-      sessions: [{
-        id: 'session-1',
-        serverConversationId: null,
-        title: 'Test session',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        messages: [{
-          id: 'assistant-1',
-          role: 'assistant',
-          content: 'Answer text',
+      sessions: [
+        {
+          id: 'session-1',
+          serverConversationId: null,
+          title: 'Test session',
           createdAt: new Date().toISOString(),
-          trace: {
-            steps: [{ step: 'retrieval', timing_ms: 12, chunks_found: 2 }],
-          },
-          sources: [{
-            chunk_id: 1,
-            content: 'Retrieved evidence',
-            source: 'guide.md',
-            score: 1,
-            page_number: null,
-            header: null,
-          }],
-        }],
-      }],
+          updatedAt: new Date().toISOString(),
+          messages: [
+            {
+              id: 'assistant-1',
+              role: 'assistant',
+              content: 'Answer text',
+              createdAt: new Date().toISOString(),
+              trace: {
+                steps: [{ step: 'retrieval', timing_ms: 12, chunks_found: 2 }],
+              },
+              sources: [
+                {
+                  chunk_id: 1,
+                  content: 'Retrieved evidence',
+                  source: 'guide.md',
+                  score: 1,
+                  page_number: null,
+                  header: null,
+                },
+              ],
+            },
+          ],
+        },
+      ],
     })
   })
 

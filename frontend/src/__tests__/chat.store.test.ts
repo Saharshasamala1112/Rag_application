@@ -6,9 +6,15 @@ const localStorageMock = (() => {
   let store: Record<string, string> = {}
   return {
     getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: string) => { store[key] = value },
-    removeItem: (key: string) => { delete store[key] },
-    clear: () => { store = {} },
+    setItem: (key: string, value: string) => {
+      store[key] = value
+    },
+    removeItem: (key: string) => {
+      delete store[key]
+    },
+    clear: () => {
+      store = {}
+    },
   }
 })()
 
@@ -19,14 +25,16 @@ describe('ChatStore', () => {
     localStorageMock.clear()
     // Reset store to initial state
     useChatStore.setState({
-      sessions: [{
-        id: 'session-init',
-        serverConversationId: null,
-        title: 'Initial Session',
-        messages: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }],
+      sessions: [
+        {
+          id: 'session-init',
+          serverConversationId: null,
+          title: 'Initial Session',
+          messages: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
       activeSessionId: 'session-init',
     })
   })
@@ -87,7 +95,9 @@ describe('ChatStore', () => {
       content: '',
       createdAt: new Date().toISOString(),
     })
-    const sources = [{ chunk_id: 1, content: 'test', source: 'doc.pdf', score: 0.9, page_number: 1, header: null }]
+    const sources = [
+      { chunk_id: 1, content: 'test', source: 'doc.pdf', score: 0.9, page_number: 1, header: null },
+    ]
     setStreamingSources('msg-4', sources)
     const messages = useChatStore.getState().getMessages()
     expect(messages[0].sources).toEqual(sources)

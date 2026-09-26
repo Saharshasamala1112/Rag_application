@@ -23,31 +23,59 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            element: <Suspense fallback={<PageLoadingFallback />}><Chat /></Suspense>,
+            element: (
+              <Suspense fallback={<PageLoadingFallback />}>
+                <Chat />
+              </Suspense>
+            ),
           },
           {
             path: 'documents',
-            element: <Suspense fallback={<PageLoadingFallback />}><DocumentsPage /></Suspense>,
+            element: (
+              <Suspense fallback={<PageLoadingFallback />}>
+                <DocumentsPage />
+              </Suspense>
+            ),
           },
           {
             path: 'documents/:id',
-            element: <Suspense fallback={<PageLoadingFallback />}><DocumentDetailPage /></Suspense>,
+            element: (
+              <Suspense fallback={<PageLoadingFallback />}>
+                <DocumentDetailPage />
+              </Suspense>
+            ),
           },
           {
             path: 'collections',
-            element: <Suspense fallback={<PageLoadingFallback />}><CollectionsPage /></Suspense>,
+            element: (
+              <Suspense fallback={<PageLoadingFallback />}>
+                <CollectionsPage />
+              </Suspense>
+            ),
           },
           {
             path: 'search',
-            element: <Suspense fallback={<PageLoadingFallback />}><SearchPage /></Suspense>,
+            element: (
+              <Suspense fallback={<PageLoadingFallback />}>
+                <SearchPage />
+              </Suspense>
+            ),
           },
           {
             path: 'history',
-            element: <Suspense fallback={<PageLoadingFallback />}><HistoryPage /></Suspense>,
+            element: (
+              <Suspense fallback={<PageLoadingFallback />}>
+                <HistoryPage />
+              </Suspense>
+            ),
           },
           {
             path: 'settings',
-            element: <Suspense fallback={<PageLoadingFallback />}><SettingsPage /></Suspense>,
+            element: (
+              <Suspense fallback={<PageLoadingFallback />}>
+                <SettingsPage />
+              </Suspense>
+            ),
           },
         ],
       },

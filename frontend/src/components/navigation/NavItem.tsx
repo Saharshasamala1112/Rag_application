@@ -15,7 +15,9 @@ interface NavItemProps {
 
 export function NavItem({ to, icon: Icon, label, collapsed, exact, onClick }: NavItemProps) {
   const location = useLocation()
-  const isActive = exact ? location.pathname === to : location.pathname.startsWith(to) && (to !== '/' || location.pathname === '/')
+  const isActive = exact
+    ? location.pathname === to
+    : location.pathname.startsWith(to) && (to !== '/' || location.pathname === '/')
 
   const content = (
     <NavLink
@@ -26,7 +28,7 @@ export function NavItem({ to, icon: Icon, label, collapsed, exact, onClick }: Na
         collapsed && 'justify-center px-0',
         isActive
           ? 'bg-surface-secondary text-fg dark:bg-surface-dark-elevated dark:text-fg-dark'
-          : 'text-fg-secondary hover:text-fg hover:bg-surface-secondary/60 dark:text-fg-dark-secondary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated/60',
+          : 'text-fg-secondary hover:bg-surface-secondary/60 hover:text-fg dark:text-fg-dark-secondary dark:hover:bg-surface-dark-elevated/60 dark:hover:text-fg-dark',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
       )}
       aria-label={label}
@@ -45,7 +47,11 @@ export function NavItem({ to, icon: Icon, label, collapsed, exact, onClick }: Na
   )
 
   if (collapsed) {
-    return <Tooltip content={label} side="right">{content}</Tooltip>
+    return (
+      <Tooltip content={label} side="right">
+        {content}
+      </Tooltip>
+    )
   }
 
   return content

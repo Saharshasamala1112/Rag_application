@@ -2,12 +2,9 @@
 
 
 class LLMError(Exception):
-    """Raised when the LLM fails to generate a response."""
+    """Raised when the LLM fails to generate a response.
 
-
-class DocumentNotFoundError(Exception):
-    """Raised when a requested document does not exist."""
-
-
-class PipelineError(Exception):
-    """Raised when document processing fails."""
+    Caught in ``app.api.routes.query`` (HTTP 503) and inside
+    ``QueryService.query_stream`` (SSE ``error`` event), so it never reaches
+    the app-level exception handlers. See issue #48.
+    """

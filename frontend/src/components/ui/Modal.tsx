@@ -19,7 +19,15 @@ const sizeStyles = {
   lg: 'max-w-lg',
 }
 
-export function Modal({ open, onClose, title, description, children, footer, size = 'sm' }: ModalProps) {
+export function Modal({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  footer,
+  size = 'sm',
+}: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
   const descriptionId = useId()
@@ -30,7 +38,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
+        className="fixed inset-0 animate-fade-in bg-black/40 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -42,34 +50,35 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={cn(
-          'relative z-10 w-full mx-4 bg-surface border border-edge rounded-xl shadow-lg animate-scale-in',
-          'dark:bg-surface-dark dark:border-edge-dark',
+          'relative z-10 mx-4 w-full animate-scale-in rounded-xl border border-edge bg-surface shadow-lg',
+          'dark:border-edge-dark dark:bg-surface-dark',
           'focus:outline-none',
           sizeStyles[size],
         )}
       >
         {(title || description) && (
-          <div className="px-5 pt-5 pb-0">
+          <div className="px-5 pb-0 pt-5">
             {title && (
               <h2 id={titleId} className="text-sm font-semibold text-fg dark:text-fg-dark">
                 {title}
               </h2>
             )}
             {description && (
-              <p id={descriptionId} className="mt-1 text-xs text-fg-secondary dark:text-fg-dark-secondary leading-relaxed">
+              <p
+                id={descriptionId}
+                className="mt-1 text-xs leading-relaxed text-fg-secondary dark:text-fg-dark-secondary"
+              >
                 {description}
               </p>
             )}
           </div>
         )}
         <div className="px-5 py-4">{children}</div>
-        {footer && (
-          <div className="flex justify-end gap-2 px-5 pb-5">{footer}</div>
-        )}
+        {footer && <div className="flex justify-end gap-2 px-5 pb-5">{footer}</div>}
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-3 right-3 p-1 rounded-md text-fg-tertiary hover:text-fg hover:bg-surface-secondary dark:text-fg-dark-tertiary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated transition-colors"
+          className="absolute right-3 top-3 rounded-md p-1 text-fg-tertiary transition-colors hover:bg-surface-secondary hover:text-fg dark:text-fg-dark-tertiary dark:hover:bg-surface-dark-elevated dark:hover:text-fg-dark"
           aria-label="Close"
         >
           <X size={14} />

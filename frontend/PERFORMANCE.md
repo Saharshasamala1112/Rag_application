@@ -4,10 +4,10 @@
 
 Measured with `npm run build` on Vite 8.1.4:
 
-| Build | Initial JS | Gzip | Lazy chat route | Lazy Markdown |
-| --- | ---: | ---: | ---: | ---: |
-| Before route/code splitting | 686.49 kB | 204.55 kB | — | included |
-| After route/code splitting | 444.03 kB | 139.91 kB | 28.30 kB | 161.76 kB |
+| Build                       | Initial JS |      Gzip | Lazy chat route | Lazy Markdown |
+| --------------------------- | ---------: | --------: | --------------: | ------------: |
+| Before route/code splitting |  686.49 kB | 204.55 kB |               — |      included |
+| After route/code splitting  |  444.03 kB | 139.91 kB |        28.30 kB |     161.76 kB |
 
 The initial JavaScript is 35% smaller uncompressed and 32% smaller over gzip.
 Route-specific page code is loaded on navigation, and the Markdown renderer is

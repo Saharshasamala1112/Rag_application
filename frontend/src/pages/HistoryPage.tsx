@@ -20,11 +20,11 @@ export function HistoryPage() {
   }, [loadServerConversations])
 
   const sorted = useMemo(() => {
-    const filtered = sessions.filter((s) =>
-      search.trim() === '' || s.title.toLowerCase().includes(search.toLowerCase())
+    const filtered = sessions.filter(
+      (s) => search.trim() === '' || s.title.toLowerCase().includes(search.toLowerCase()),
     )
     return [...filtered].sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
     )
   }, [sessions, search])
 
@@ -35,30 +35,33 @@ export function HistoryPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="px-6 h-12 border-b border-edge dark:border-edge-dark shrink-0 flex items-center gap-3">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-12 shrink-0 items-center gap-3 border-b border-edge px-6 dark:border-edge-dark">
         <h1 className="text-sm font-semibold text-fg dark:text-fg-dark">Chat History</h1>
         {sessions.length > 0 && (
-          <div className="relative ml-4 flex-1 max-w-xs">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-tertiary dark:text-fg-dark-tertiary" />
+          <div className="relative ml-4 max-w-xs flex-1">
+            <Search
+              size={12}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-tertiary dark:text-fg-dark-tertiary"
+            />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Search conversations"
               placeholder="Search conversations..."
-              className="w-full pl-8 pr-3 py-1.5 text-[11px] bg-surface-secondary dark:bg-surface-dark-elevated border border-edge dark:border-edge-dark rounded-md text-fg dark:text-fg-dark placeholder-fg-tertiary focus:outline-none focus:ring-1 focus:ring-accent/40"
+              className="w-full rounded-md border border-edge bg-surface-secondary py-1.5 pl-8 pr-3 text-[11px] text-fg placeholder-fg-tertiary focus:outline-none focus:ring-1 focus:ring-accent/40 dark:border-edge-dark dark:bg-surface-dark-elevated dark:text-fg-dark"
             />
           </div>
         )}
       </div>
       <div className="flex-1 overflow-y-auto">
         {sorted.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-surface-secondary dark:bg-surface-dark-elevated mx-auto">
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-surface-secondary dark:bg-surface-dark-elevated">
               <Clock size={24} className="text-fg-muted dark:text-fg-dark-tertiary" />
             </div>
-            <p className="text-sm font-medium text-fg-secondary dark:text-fg-dark-secondary mb-1">
+            <p className="mb-1 text-sm font-medium text-fg-secondary dark:text-fg-dark-secondary">
               {search ? 'No matching conversations' : 'No conversations yet'}
             </p>
             <p className="text-xs text-fg-tertiary dark:text-fg-dark-tertiary">
@@ -66,17 +69,17 @@ export function HistoryPage() {
             </p>
           </div>
         ) : (
-          <div className="max-w-2xl mx-auto px-6 py-4 space-y-2">
+          <div className="mx-auto max-w-2xl space-y-2 px-6 py-4">
             {sorted.map((session) => {
               const lastMsg = session.messages[session.messages.length - 1]
               const preview = lastMsg?.content?.slice(0, 100) || ''
               return (
                 <div
                   key={session.id}
-                  className={`group flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
+                  className={`group flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors ${
                     activeSessionId === session.id
-                      ? 'border-accent/30 dark:border-accent-dark/30 bg-accent-subtle dark:bg-accent-dark-subtle'
-                      : 'border-edge dark:border-edge-dark hover:border-edge-strong dark:hover:border-edge-dark-strong bg-surface dark:bg-surface-dark'
+                      ? 'border-accent/30 bg-accent-subtle dark:border-accent-dark/30 dark:bg-accent-dark-subtle'
+                      : 'border-edge bg-surface hover:border-edge-strong dark:border-edge-dark dark:bg-surface-dark dark:hover:border-edge-dark-strong'
                   }`}
                 >
                   <button
@@ -89,18 +92,22 @@ export function HistoryPage() {
                     }}
                     className="flex min-w-0 flex-1 items-center gap-3 text-left"
                   >
-                    <MessageSquare size={14} className="text-fg-tertiary dark:text-fg-dark-tertiary shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-fg dark:text-fg-dark truncate">
+                    <MessageSquare
+                      size={14}
+                      className="shrink-0 text-fg-tertiary dark:text-fg-dark-tertiary"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium text-fg dark:text-fg-dark">
                         {session.title || 'Untitled conversation'}
                       </p>
                       {preview && (
-                        <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary truncate mt-0.5">
+                        <p className="mt-0.5 truncate text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
                           {preview}
                         </p>
                       )}
-                      <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary mt-0.5">
-                        {session.messages.length} message{session.messages.length !== 1 ? 's' : ''} · {new Date(session.updatedAt).toLocaleDateString()}
+                      <p className="mt-0.5 text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
+                        {session.messages.length} message{session.messages.length !== 1 ? 's' : ''}{' '}
+                        · {new Date(session.updatedAt).toLocaleDateString()}
                       </p>
                     </div>
                   </button>
@@ -110,7 +117,7 @@ export function HistoryPage() {
                       e.stopPropagation()
                       setDeleteTarget(session.id)
                     }}
-                    className="p-1.5 rounded text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark"
+                    className="rounded p-1.5 text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark"
                     title="Delete conversation"
                     aria-label={`Delete ${session.title || 'conversation'}`}
                   >

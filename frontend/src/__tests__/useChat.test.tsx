@@ -16,14 +16,16 @@ beforeEach(() => {
   useChatStore.setState({
     activeStream: null,
     activeSessionId: 'session-1',
-    sessions: [{
-      id: 'session-1',
-      serverConversationId: null,
-      title: 'Test session',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      messages: [],
-    }],
+    sessions: [
+      {
+        id: 'session-1',
+        serverConversationId: null,
+        title: 'Test session',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        messages: [],
+      },
+    ],
   })
   useDocumentStore.setState({ activeDocumentId: 'focused-document' })
 })
@@ -166,8 +168,10 @@ describe('useChat', () => {
     await act(async () => request)
 
     const sessions = useChatStore.getState().sessions
-    expect(sessions.find((session) => session.id === 'session-1')?.messages.at(-1))
-      .toMatchObject({ content: 'answer', isStreaming: false })
+    expect(sessions.find((session) => session.id === 'session-1')?.messages.at(-1)).toMatchObject({
+      content: 'answer',
+      isStreaming: false,
+    })
     expect(sessions.find((session) => session.id === 'session-2')?.messages).toEqual([])
   })
 })

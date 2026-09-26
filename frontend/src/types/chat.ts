@@ -1,10 +1,6 @@
-import type {
-  ApiQueryRequest,
-  ApiQueryResponse,
-  ApiSourceChunk,
-} from './api'
+import type { ApiQueryRequest, ApiQueryResponse, ApiSourceChunk } from './api'
 
-export type ChatRole = 'user' | 'assistant'
+type ChatRole = 'user' | 'assistant'
 
 export type ChatSource = ApiSourceChunk
 

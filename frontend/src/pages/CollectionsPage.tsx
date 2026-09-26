@@ -43,14 +43,20 @@ export function CollectionsPage() {
       }
     }
     void load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const handleCreate = async () => {
     if (!newName.trim()) return
     setCreating(true)
     try {
-      const col = await collectionService.createCollection(newName.trim(), newDescription.trim(), selectedDocs)
+      const col = await collectionService.createCollection(
+        newName.trim(),
+        newDescription.trim(),
+        selectedDocs,
+      )
       setCollections((prev) => [col, ...prev])
       setCreateOpen(false)
       setNewName('')
@@ -88,7 +94,9 @@ export function CollectionsPage() {
       setCollections((prev) => prev.filter((c) => !selectedIds.includes(c.collection_id)))
       setSelectedIds([])
       setBulkDeleteOpen(false)
-      toast.success(`Deleted ${selectedIds.length} collection${selectedIds.length !== 1 ? 's' : ''}`)
+      toast.success(
+        `Deleted ${selectedIds.length} collection${selectedIds.length !== 1 ? 's' : ''}`,
+      )
     } catch {
       toast.error('Failed to delete some collections')
     } finally {
@@ -102,7 +110,8 @@ export function CollectionsPage() {
       return
     }
     try {
-      const field = editField === 'name' ? { name: editValue.trim() } : { description: editValue.trim() }
+      const field =
+        editField === 'name' ? { name: editValue.trim() } : { description: editValue.trim() }
       await collectionService.updateCollection(colId, field)
       setCollections((prev) =>
         prev.map((c) =>
@@ -117,32 +126,36 @@ export function CollectionsPage() {
     }
   }
 
-  const handleAddDocumentToCollection = useCallback(async (colId: string, docId: string) => {
-    const collection = collections.find((item) => item.collection_id === colId)
-    const membershipKey = `${colId}:${docId}`
-    if (
-      !collection
-      || collection.document_ids.includes(docId)
-      || pendingMemberships.current.has(membershipKey)
-    ) return
-
-    pendingMemberships.current.add(membershipKey)
-    const updatedIds = [...collection.document_ids, docId]
-    try {
-      const updated = await collectionService.updateCollection(colId, {
-        document_ids: updatedIds,
-      })
-      setCollections((previous) =>
-        previous.map((item) => item.collection_id === colId ? updated : item),
+  const handleAddDocumentToCollection = useCallback(
+    async (colId: string, docId: string) => {
+      const collection = collections.find((item) => item.collection_id === colId)
+      const membershipKey = `${colId}:${docId}`
+      if (
+        !collection ||
+        collection.document_ids.includes(docId) ||
+        pendingMemberships.current.has(membershipKey)
       )
-      const document = documents.find((item) => item.document_id === docId)
-      toast.success(`Added "${document?.filename ?? 'document'}" to "${collection.name}"`)
-    } catch {
-      toast.error('Failed to add document')
-    } finally {
-      pendingMemberships.current.delete(membershipKey)
-    }
-  }, [collections, documents])
+        return
+
+      pendingMemberships.current.add(membershipKey)
+      const updatedIds = [...collection.document_ids, docId]
+      try {
+        const updated = await collectionService.updateCollection(colId, {
+          document_ids: updatedIds,
+        })
+        setCollections((previous) =>
+          previous.map((item) => (item.collection_id === colId ? updated : item)),
+        )
+        const document = documents.find((item) => item.document_id === docId)
+        toast.success(`Added "${document?.filename ?? 'document'}" to "${collection.name}"`)
+      } catch {
+        toast.error('Failed to add document')
+      } finally {
+        pendingMemberships.current.delete(membershipKey)
+      }
+    },
+    [collections, documents],
+  )
 
   const toggleDoc = (docId: string) => {
     setSelectedDocs((prev) =>
@@ -166,19 +179,22 @@ export function CollectionsPage() {
     setDragOverId(null)
   }, [])
 
-  const handleDrop = useCallback((e: React.DragEvent, colId: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOverId(null)
-    const docId = e.dataTransfer.getData('text/doc-id')
-    if (docId) {
-      void handleAddDocumentToCollection(colId, docId)
-    }
-  }, [handleAddDocumentToCollection])
+  const handleDrop = useCallback(
+    (e: React.DragEvent, colId: string) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setDragOverId(null)
+      const docId = e.dataTransfer.getData('text/doc-id')
+      if (docId) {
+        void handleAddDocumentToCollection(colId, docId)
+      }
+    },
+    [handleAddDocumentToCollection],
+  )
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex items-center justify-between px-6 h-12 border-b border-edge dark:border-edge-dark shrink-0">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-edge px-6 dark:border-edge-dark">
         <div>
           <h1 className="text-sm font-semibold text-fg dark:text-fg-dark">Collections</h1>
           <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
@@ -192,14 +208,14 @@ export function CollectionsPage() {
               <button
                 type="button"
                 onClick={() => setSelectedIds([])}
-                className="px-2.5 py-1.5 text-xs text-fg-secondary dark:text-fg-dark-secondary hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated rounded-md transition-colors"
+                className="rounded-md px-2.5 py-1.5 text-xs text-fg-secondary transition-colors hover:bg-surface-secondary dark:text-fg-dark-secondary dark:hover:bg-surface-dark-elevated"
               >
                 Clear selection
               </button>
               <button
                 type="button"
                 onClick={() => setBulkDeleteOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger-subtle dark:text-danger-dark dark:hover:bg-danger-dark-subtle rounded-md transition-colors"
+                className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger-subtle dark:text-danger-dark dark:hover:bg-danger-dark-subtle"
               >
                 <Trash2 size={13} />
                 Delete ({selectedIds.length})
@@ -216,18 +232,23 @@ export function CollectionsPage() {
 
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-32 rounded-xl bg-surface-secondary dark:bg-surface-dark-elevated animate-pulse" />
+              <div
+                key={i}
+                className="h-32 animate-pulse rounded-xl bg-surface-secondary dark:bg-surface-dark-elevated"
+              />
             ))}
           </div>
         ) : collections.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-surface-secondary dark:bg-surface-dark-elevated mx-auto">
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-surface-secondary dark:bg-surface-dark-elevated">
               <FolderOpen size={24} className="text-fg-muted dark:text-fg-dark-tertiary" />
             </div>
-            <p className="text-sm font-medium text-fg-secondary dark:text-fg-dark-secondary mb-1">No collections yet</p>
-            <p className="text-xs text-fg-tertiary dark:text-fg-dark-tertiary mb-4">
+            <p className="mb-1 text-sm font-medium text-fg-secondary dark:text-fg-dark-secondary">
+              No collections yet
+            </p>
+            <p className="mb-4 text-xs text-fg-tertiary dark:text-fg-dark-tertiary">
               Create a collection to organize related documents
             </p>
             <Button variant="primary" size="md" onClick={() => setCreateOpen(true)}>
@@ -236,7 +257,7 @@ export function CollectionsPage() {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
             {collections.map((col) => {
               const isSelected = selectedIds.includes(col.collection_id)
               const isEditing = editingId === col.collection_id
@@ -248,27 +269,30 @@ export function CollectionsPage() {
                   role="region"
                   aria-label={`Collection ${col.name}`}
                   className={cn(
-                    'group rounded-xl border bg-surface dark:bg-surface-dark p-4 transition-all',
+                    'group rounded-xl border bg-surface p-4 transition-all dark:bg-surface-dark',
                     isSelected
-                      ? 'border-accent/50 dark:border-accent-dark/50 ring-1 ring-accent/20 dark:ring-accent-dark/20'
+                      ? 'border-accent/50 ring-1 ring-accent/20 dark:border-accent-dark/50 dark:ring-accent-dark/20'
                       : isDragOverTarget
-                        ? 'border-accent dark:border-accent-dark bg-accent-subtle/50 dark:bg-accent-dark-subtle/50 scale-[1.02]'
-                        : 'border-edge dark:border-edge-dark hover:border-edge-strong dark:hover:border-edge-dark-strong',
+                        ? 'scale-[1.02] border-accent bg-accent-subtle/50 dark:border-accent-dark dark:bg-accent-dark-subtle/50'
+                        : 'border-edge hover:border-edge-strong dark:border-edge-dark dark:hover:border-edge-dark-strong',
                   )}
                   onDragOver={(e) => handleDragOver(e, col.collection_id)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, col.collection_id)}
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2 min-w-0">
+                  <div className="mb-3 flex items-start justify-between">
+                    <div className="flex min-w-0 items-center gap-2">
                       <input
                         type="checkbox"
                         aria-label={`Select ${col.name}`}
                         checked={isSelected}
                         onChange={() => toggleSelect(col.collection_id)}
-                        className="rounded border-edge dark:border-edge-dark text-accent focus:ring-accent/40"
+                        className="rounded border-edge text-accent focus:ring-accent/40 dark:border-edge-dark"
                       />
-                      <FolderOpen size={16} className="text-warning dark:text-warning-dark shrink-0" />
+                      <FolderOpen
+                        size={16}
+                        className="shrink-0 text-warning dark:text-warning-dark"
+                      />
                       {isEditing && editField === 'name' ? (
                         <div className="flex items-center gap-1">
                           <input
@@ -280,19 +304,19 @@ export function CollectionsPage() {
                               if (e.key === 'Escape') setEditingId(null)
                             }}
                             autoFocus
-                            className="w-full min-w-0 px-1.5 py-0.5 text-xs font-semibold bg-surface-secondary dark:bg-surface-dark-elevated border border-accent dark:border-accent-dark rounded text-fg dark:text-fg-dark focus:outline-none"
+                            className="w-full min-w-0 rounded border border-accent bg-surface-secondary px-1.5 py-0.5 text-xs font-semibold text-fg focus:outline-none dark:border-accent-dark dark:bg-surface-dark-elevated dark:text-fg-dark"
                           />
                           <button
                             type="button"
                             onClick={() => void handleRename(col.collection_id)}
-                            className="p-0.5 text-success dark:text-success-dark shrink-0"
+                            className="shrink-0 p-0.5 text-success dark:text-success-dark"
                           >
                             <Check size={12} />
                           </button>
                           <button
                             type="button"
                             onClick={() => setEditingId(null)}
-                            className="p-0.5 text-fg-tertiary dark:text-fg-dark-tertiary shrink-0"
+                            className="shrink-0 p-0.5 text-fg-tertiary dark:text-fg-dark-tertiary"
                           >
                             <X size={12} />
                           </button>
@@ -300,7 +324,7 @@ export function CollectionsPage() {
                       ) : (
                         <button
                           type="button"
-                          className="text-left text-xs font-semibold text-fg dark:text-fg-dark truncate hover:text-accent dark:hover:text-accent-dark transition-colors"
+                          className="truncate text-left text-xs font-semibold text-fg transition-colors hover:text-accent dark:text-fg-dark dark:hover:text-accent-dark"
                           aria-label={`Rename ${col.name}`}
                           onClick={() => {
                             setEditingId(col.collection_id)
@@ -316,7 +340,7 @@ export function CollectionsPage() {
                     <button
                       type="button"
                       onClick={() => setDeleteTarget(col.collection_id)}
-                      className="p-1 rounded text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark"
+                      className="rounded p-1 text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark"
                       title="Delete"
                       aria-label={`Delete ${col.name}`}
                     >
@@ -336,13 +360,13 @@ export function CollectionsPage() {
                         }}
                         autoFocus
                         placeholder="Add description..."
-                        className="w-full px-1.5 py-0.5 text-2xs bg-surface-secondary dark:bg-surface-dark-elevated border border-accent dark:border-accent-dark rounded text-fg-secondary dark:text-fg-dark-secondary focus:outline-none"
+                        className="w-full rounded border border-accent bg-surface-secondary px-1.5 py-0.5 text-2xs text-fg-secondary focus:outline-none dark:border-accent-dark dark:bg-surface-dark-elevated dark:text-fg-dark-secondary"
                       />
                     </div>
                   ) : col.description ? (
                     <button
                       type="button"
-                      className="mb-2 block w-full text-left text-2xs text-fg-tertiary dark:text-fg-dark-tertiary line-clamp-2 hover:text-fg-secondary dark:hover:text-fg-dark-secondary transition-colors"
+                      className="mb-2 line-clamp-2 block w-full text-left text-2xs text-fg-tertiary transition-colors hover:text-fg-secondary dark:text-fg-dark-tertiary dark:hover:text-fg-dark-secondary"
                       onClick={() => {
                         setEditingId(col.collection_id)
                         setEditField('description')
@@ -355,7 +379,7 @@ export function CollectionsPage() {
                   ) : (
                     <button
                       type="button"
-                      className="mb-2 block w-full text-left text-2xs text-fg-muted dark:text-fg-dark-tertiary italic hover:text-fg-tertiary dark:hover:text-fg-dark-tertiary transition-colors"
+                      className="mb-2 block w-full text-left text-2xs italic text-fg-muted transition-colors hover:text-fg-tertiary dark:text-fg-dark-tertiary dark:hover:text-fg-dark-tertiary"
                       onClick={() => {
                         setEditingId(col.collection_id)
                         setEditField('description')
@@ -368,10 +392,11 @@ export function CollectionsPage() {
 
                   <div className="flex items-center justify-between">
                     <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
-                      {col.document_ids.length} document{col.document_ids.length !== 1 ? 's' : ''} · {new Date(col.updated_at).toLocaleDateString()}
+                      {col.document_ids.length} document{col.document_ids.length !== 1 ? 's' : ''} ·{' '}
+                      {new Date(col.updated_at).toLocaleDateString()}
                     </p>
                     {isDragOverTarget && (
-                      <span className="text-2xs text-accent dark:text-accent-dark font-medium animate-pulse">
+                      <span className="animate-pulse text-2xs font-medium text-accent dark:text-accent-dark">
                         Drop to add
                       </span>
                     )}
@@ -390,7 +415,9 @@ export function CollectionsPage() {
         size="md"
         footer={
           <>
-            <Button variant="ghost" size="sm" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button variant="ghost" size="sm" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </Button>
             <Button
               variant="primary"
               size="sm"
@@ -405,44 +432,50 @@ export function CollectionsPage() {
       >
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary mb-1">Name</label>
+            <label className="mb-1 block text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary">
+              Name
+            </label>
             <input
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="e.g., Research Papers"
-              className="w-full px-3 py-2 text-xs bg-surface-secondary dark:bg-surface-dark-elevated border border-edge dark:border-edge-dark rounded-lg text-fg dark:text-fg-dark placeholder-fg-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40"
+              className="w-full rounded-lg border border-edge bg-surface-secondary px-3 py-2 text-xs text-fg placeholder-fg-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40 dark:border-edge-dark dark:bg-surface-dark-elevated dark:text-fg-dark"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary mb-1">Description</label>
+            <label className="mb-1 block text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary">
+              Description
+            </label>
             <input
               type="text"
               value={newDescription}
               onChange={(e) => setNewDescription(e.target.value)}
               placeholder="Optional description"
-              className="w-full px-3 py-2 text-xs bg-surface-secondary dark:bg-surface-dark-elevated border border-edge dark:border-edge-dark rounded-lg text-fg dark:text-fg-dark placeholder-fg-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40"
+              className="w-full rounded-lg border border-edge bg-surface-secondary px-3 py-2 text-xs text-fg placeholder-fg-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40 dark:border-edge-dark dark:bg-surface-dark-elevated dark:text-fg-dark"
             />
           </div>
           {documents.length > 0 && (
             <div>
-              <label className="block text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary mb-1">
+              <label className="mb-1 block text-xs font-medium text-fg-secondary dark:text-fg-dark-secondary">
                 Add documents ({selectedDocs.length} selected)
               </label>
-              <div className="max-h-32 overflow-y-auto border border-edge dark:border-edge-dark rounded-lg">
+              <div className="max-h-32 overflow-y-auto rounded-lg border border-edge dark:border-edge-dark">
                 {documents.map((doc) => (
                   <label
                     key={doc.document_id}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated cursor-pointer"
+                    className="flex cursor-pointer items-center gap-2 px-3 py-2 hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated"
                   >
                     <input
                       type="checkbox"
                       checked={selectedDocs.includes(doc.document_id)}
                       onChange={() => toggleDoc(doc.document_id)}
-                      className="rounded border-edge dark:border-edge-dark text-accent focus:ring-accent/40"
+                      className="rounded border-edge text-accent focus:ring-accent/40 dark:border-edge-dark"
                     />
                     <FileText size={12} className="text-fg-tertiary dark:text-fg-dark-tertiary" />
-                    <span className="text-xs text-fg-secondary dark:text-fg-dark-secondary truncate">{doc.filename}</span>
+                    <span className="truncate text-xs text-fg-secondary dark:text-fg-dark-secondary">
+                      {doc.filename}
+                    </span>
                   </label>
                 ))}
               </div>

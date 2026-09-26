@@ -27,7 +27,6 @@ vi.mock('../services/conversation.service', () => ({
   getConversation: vi.fn(),
   createConversation: vi.fn(),
   deleteConversation: vi.fn(),
-  updateConversationTitle: vi.fn(),
 }))
 
 afterEach(cleanup)
@@ -105,7 +104,9 @@ describe('core-screen accessibility', () => {
       const [open, setOpen] = useState(false)
       return (
         <>
-          <button type="button" onClick={() => setOpen(true)}>Open dialog</button>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open dialog
+          </button>
           <Modal open={open} onClose={() => setOpen(false)} title="Focus test">
             <button type="button">First action</button>
             <button type="button">Last action</button>
@@ -150,13 +151,15 @@ describe('core-screen accessibility', () => {
   it('loads and synchronizes server conversations on the history screen', async () => {
     useChatStore.setState({ sessions: [], activeSessionId: '' })
     vi.mocked(conversationService.listConversations).mockResolvedValueOnce({
-      conversations: [{
-        conversation_id: 'server-1',
-        title: 'Server conversation',
-        created_at: '2025-01-01T00:00:00Z',
-        updated_at: '2025-01-01T00:00:00Z',
-        message_count: 1,
-      }],
+      conversations: [
+        {
+          conversation_id: 'server-1',
+          title: 'Server conversation',
+          created_at: '2025-01-01T00:00:00Z',
+          updated_at: '2025-01-01T00:00:00Z',
+          message_count: 1,
+        },
+      ],
       total: 1,
     })
     vi.mocked(conversationService.getConversation).mockResolvedValueOnce({
@@ -164,11 +167,13 @@ describe('core-screen accessibility', () => {
       title: 'Server conversation',
       created_at: '2025-01-01T00:00:00Z',
       updated_at: '2025-01-01T00:00:00Z',
-      messages: [{
-        role: 'assistant',
-        content: 'Synchronized answer',
-        created_at: '2025-01-01T00:00:00Z',
-      }],
+      messages: [
+        {
+          role: 'assistant',
+          content: 'Synchronized answer',
+          created_at: '2025-01-01T00:00:00Z',
+        },
+      ],
     })
 
     const history = render(
@@ -215,20 +220,24 @@ describe('core-screen accessibility', () => {
         status: null,
         traceSteps: [],
       },
-      sessions: [{
-        id: 'session-escape',
-        serverConversationId: null,
-        title: 'Escape test',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        messages: [{
-          id: 'assistant-escape',
-          role: 'assistant',
-          content: 'Partial answer',
+      sessions: [
+        {
+          id: 'session-escape',
+          serverConversationId: null,
+          title: 'Escape test',
           createdAt: new Date().toISOString(),
-          isStreaming: true,
-        }],
-      }],
+          updatedAt: new Date().toISOString(),
+          messages: [
+            {
+              id: 'assistant-escape',
+              role: 'assistant',
+              content: 'Partial answer',
+              createdAt: new Date().toISOString(),
+              isStreaming: true,
+            },
+          ],
+        },
+      ],
     })
     render(
       <MemoryRouter>

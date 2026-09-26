@@ -47,7 +47,6 @@ class Settings(BaseSettings):
 
     # Retrieval
     retrieval_top_k: int = 12
-    final_top_k: int = 5
     max_context_tokens: int = 1500
 
     # Upload

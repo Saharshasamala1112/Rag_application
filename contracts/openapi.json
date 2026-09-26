@@ -41,6 +41,24 @@
         "title": "CollectionCreate",
         "type": "object"
       },
+      "CollectionDeleteResponse": {
+        "properties": {
+          "collection_id": {
+            "title": "Collection Id",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "collection_id"
+        ],
+        "title": "CollectionDeleteResponse",
+        "type": "object"
+      },
       "CollectionListResponse": {
         "properties": {
           "collections": {
@@ -145,6 +163,39 @@
         "title": "CollectionUpdate",
         "type": "object"
       },
+      "Conversation": {
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "message_count": {
+            "default": 0,
+            "title": "Message Count",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Conversation",
+        "type": "object"
+      },
       "ConversationCreate": {
         "properties": {
           "title": {
@@ -163,6 +214,127 @@
         "title": "ConversationCreate",
         "type": "object"
       },
+      "ConversationDeleteResponse": {
+        "description": "Response returned when a conversation is deleted.",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "conversation_id"
+        ],
+        "title": "ConversationDeleteResponse",
+        "type": "object"
+      },
+      "ConversationDetail": {
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationMessage"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "title",
+          "messages",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ConversationDetail",
+        "type": "object"
+      },
+      "ConversationListResponse": {
+        "description": "Response for listing conversations.",
+        "properties": {
+          "conversations": {
+            "items": {
+              "$ref": "#/components/schemas/Conversation"
+            },
+            "title": "Conversations",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "conversations",
+          "total"
+        ],
+        "title": "ConversationListResponse",
+        "type": "object"
+      },
+      "ConversationMessage": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "interrupted": {
+            "default": false,
+            "title": "Interrupted",
+            "type": "boolean"
+          },
+          "role": {
+            "pattern": "^(user|assistant)$",
+            "title": "Role",
+            "type": "string"
+          },
+          "sources": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sources"
+          }
+        },
+        "required": [
+          "role",
+          "content",
+          "created_at"
+        ],
+        "title": "ConversationMessage",
+        "type": "object"
+      },
       "ConversationUpdate": {
         "properties": {
           "title": {
@@ -176,6 +348,118 @@
           "title"
         ],
         "title": "ConversationUpdate",
+        "type": "object"
+      },
+      "DocumentChunk": {
+        "description": "One chunk of a document with metadata.",
+        "properties": {
+          "chunk_id": {
+            "title": "Chunk Id",
+            "type": "integer"
+          },
+          "chunk_length": {
+            "title": "Chunk Length",
+            "type": "integer"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "end_pos": {
+            "default": 0,
+            "title": "End Pos",
+            "type": "integer"
+          },
+          "header": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header"
+          },
+          "page_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Number"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "start_pos": {
+            "default": 0,
+            "title": "Start Pos",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chunk_id",
+          "document_id",
+          "source",
+          "chunk_length",
+          "content"
+        ],
+        "title": "DocumentChunk",
+        "type": "object"
+      },
+      "DocumentChunksResponse": {
+        "description": "All chunks stored for a document.",
+        "properties": {
+          "chunks": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentChunk"
+            },
+            "title": "Chunks",
+            "type": "array"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "document_id",
+          "chunks",
+          "total"
+        ],
+        "title": "DocumentChunksResponse",
+        "type": "object"
+      },
+      "DocumentDeleteResponse": {
+        "description": "Response returned when a document is deleted.",
+        "properties": {
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "document_id"
+        ],
+        "title": "DocumentDeleteResponse",
         "type": "object"
       },
       "DocumentInfo": {
@@ -266,6 +550,71 @@
         "title": "DocumentListResponse",
         "type": "object"
       },
+      "DocumentPreviewResponse": {
+        "description": "Text preview of a document.",
+        "properties": {
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "preview": {
+            "title": "Preview",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "preview"
+        ],
+        "title": "DocumentPreviewResponse",
+        "type": "object"
+      },
+      "DocumentStatusResponse": {
+        "description": "Processing status of a single document.",
+        "properties": {
+          "chunk_count": {
+            "default": 0,
+            "title": "Chunk Count",
+            "type": "integer"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "filename": {
+            "default": "unknown",
+            "title": "Filename",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "uploading",
+              "processing",
+              "ready",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "status"
+        ],
+        "title": "DocumentStatusResponse",
+        "type": "object"
+      },
       "DocumentUpdate": {
         "properties": {
           "filename": {
@@ -296,6 +645,18 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthLiveResponse": {
+        "description": "Liveness probe response.",
+        "properties": {
+          "status": {
+            "default": "alive",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "HealthLiveResponse",
         "type": "object"
       },
       "HealthResponse": {
@@ -427,6 +788,36 @@
         "title": "QueryResponse",
         "type": "object"
       },
+      "RootResponse": {
+        "description": "Service identity returned by the API root.",
+        "properties": {
+          "docs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docs"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version"
+        ],
+        "title": "RootResponse",
+        "type": "object"
+      },
       "SourceChunk": {
         "description": "A retrieved source chunk.",
         "properties": {
@@ -537,6 +928,35 @@
         "title": "TextUploadRequest",
         "type": "object"
       },
+      "UploadResponse": {
+        "description": "Response returned by the document upload endpoints.",
+        "properties": {
+          "chunk_count": {
+            "title": "Chunk Count",
+            "type": "integer"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "document_id",
+          "filename",
+          "chunk_count"
+        ],
+        "title": "UploadResponse",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -594,18 +1014,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "title": "Response Root  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/RootResponse"
                 }
               }
             },
@@ -694,9 +1103,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Collection Api V1 Collections  Collection Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CollectionDeleteResponse"
                 }
               }
             },
@@ -817,9 +1224,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Conversations Api V1 Conversations Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConversationListResponse"
                 }
               }
             },
@@ -855,9 +1260,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Conversation Api V1 Conversations Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConversationDetail"
                 }
               }
             },
@@ -899,9 +1302,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Conversation Api V1 Conversations  Conversation Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConversationDeleteResponse"
                 }
               }
             },
@@ -941,9 +1342,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Conversation Api V1 Conversations  Conversation Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConversationDetail"
                 }
               }
             },
@@ -993,9 +1392,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Update Conversation Api V1 Conversations  Conversation Id  Patch",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConversationDetail"
                 }
               }
             },
@@ -1058,9 +1455,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Document Api V1 Documents  Document Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DocumentDeleteResponse"
                 }
               }
             },
@@ -1100,9 +1495,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Document Api V1 Documents  Document Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DocumentInfo"
                 }
               }
             },
@@ -1152,9 +1545,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Update Document Api V1 Documents  Document Id  Patch",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DocumentInfo"
                 }
               }
             },
@@ -1197,9 +1588,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Document Chunks Api V1 Documents  Document Id  Chunks Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DocumentChunksResponse"
                 }
               }
             },
@@ -1241,9 +1630,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Document Preview Api V1 Documents  Document Id  Preview Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DocumentPreviewResponse"
                 }
               }
             },
@@ -1286,9 +1673,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Document Status Api V1 Documents  Document Id  Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DocumentStatusResponse"
                 }
               }
             },
@@ -1340,11 +1725,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Health Live Api V1 Health Live Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HealthLiveResponse"
                 }
               }
             },
@@ -1481,9 +1862,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Upload Document Api V1 Upload Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/UploadResponse"
                 }
               }
             },
@@ -1547,9 +1926,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Upload Text Api V1 Upload Text Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/UploadResponse"
                 }
               }
             },

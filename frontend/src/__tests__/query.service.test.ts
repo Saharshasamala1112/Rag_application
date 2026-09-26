@@ -14,25 +14,25 @@ describe('queryDocumentsStream', () => {
         controller.close()
       },
     })
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(body, { status: 200 })),
-    )
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status: 200 })))
   }
 
   it('combines the caller AbortSignal with a request timeout', async () => {
     const controller = new AbortController()
     let requestSignal: AbortSignal | null | undefined
-    vi.stubGlobal('fetch', vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
-      requestSignal = init?.signal
-      return new Promise<Response>((_resolve, reject) => {
-        init?.signal?.addEventListener(
-          'abort',
-          () => reject(new DOMException('The operation was aborted.', 'AbortError')),
-          { once: true },
-        )
-      })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+        requestSignal = init?.signal
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            'abort',
+            () => reject(new DOMException('The operation was aborted.', 'AbortError')),
+            { once: true },
+          )
+        })
+      }),
+    )
 
     const stream = queryDocumentsStream(
       { question: 'cancel this query' },
@@ -54,16 +54,19 @@ describe('queryDocumentsStream', () => {
 
   it('aborts a stalled stream when its per-request deadline expires', async () => {
     let requestSignal: AbortSignal | null | undefined
-    vi.stubGlobal('fetch', vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
-      requestSignal = init?.signal
-      return new Promise<Response>((_resolve, reject) => {
-        init?.signal?.addEventListener(
-          'abort',
-          () => reject(new DOMException('The operation was aborted.', 'AbortError')),
-          { once: true },
-        )
-      })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+        requestSignal = init?.signal
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            'abort',
+            () => reject(new DOMException('The operation was aborted.', 'AbortError')),
+            { once: true },
+          )
+        })
+      }),
+    )
 
     const stream = queryDocumentsStream(
       { question: 'deadline test' },
@@ -142,8 +145,6 @@ describe('queryDocumentsStream', () => {
     )
 
     expect(onDone).not.toHaveBeenCalled()
-    expect(onError).toHaveBeenCalledWith(
-      'The response stream ended before completion.',
-    )
+    expect(onError).toHaveBeenCalledWith('The response stream ended before completion.')
   })
 })

@@ -60,9 +60,7 @@ export const useUpload = () => {
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
       setUploadQueue((prev) =>
-        prev.map((item, idx) =>
-          idx === i ? { ...item, progress: 'uploading' as const } : item,
-        ),
+        prev.map((item, idx) => (idx === i ? { ...item, progress: 'uploading' as const } : item)),
       )
 
       try {
@@ -80,16 +78,12 @@ export const useUpload = () => {
         addDocument(docInfo)
         successCount++
         setUploadQueue((prev) =>
-          prev.map((item, idx) =>
-            idx === i ? { ...item, progress: 'done' as const } : item,
-          ),
+          prev.map((item, idx) => (idx === i ? { ...item, progress: 'done' as const } : item)),
         )
       } catch {
         errorCount++
         setUploadQueue((prev) =>
-          prev.map((item, idx) =>
-            idx === i ? { ...item, progress: 'error' as const } : item,
-          ),
+          prev.map((item, idx) => (idx === i ? { ...item, progress: 'error' as const } : item)),
         )
       }
     }

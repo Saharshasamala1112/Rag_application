@@ -69,7 +69,8 @@ function notifyAll(): void {
   for (const instance of instances) instance.dispatchEvent()
 }
 
-window.matchMedia = ((media: string) => new MockMediaQueryList(media)) as unknown as typeof window.matchMedia
+window.matchMedia = ((media: string) =>
+  new MockMediaQueryList(media)) as unknown as typeof window.matchMedia
 
 /** Sets the simulated viewport width and notifies subscribers (via `change`). */
 export function setViewportWidth(width: number): void {
@@ -83,8 +84,4 @@ export function setViewportWidth(width: number): void {
 export function setSystemPrefersDark(value: boolean): void {
   systemPrefersDark = value
   notifyAll()
-}
-
-export function getViewportWidth(): number {
-  return viewportWidth
 }

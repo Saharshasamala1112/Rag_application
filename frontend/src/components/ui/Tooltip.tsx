@@ -29,13 +29,19 @@ export function Tooltip({ children, content, side = 'top', delayMs = 400 }: Tool
   }
 
   return (
-    <div className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
+    <div
+      className="relative inline-flex"
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onFocus={show}
+      onBlur={hide}
+    >
       {children}
       {visible && (
         <div
           role="tooltip"
           className={cn(
-            'absolute z-50 px-2 py-1 text-2xs font-medium rounded-md whitespace-nowrap pointer-events-none',
+            'pointer-events-none absolute z-50 whitespace-nowrap rounded-md px-2 py-1 text-2xs font-medium',
             'bg-fg text-app shadow-sm dark:bg-fg-dark dark:text-app-dark',
             'animate-fade-in',
             positionStyles[side],

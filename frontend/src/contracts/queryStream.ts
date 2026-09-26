@@ -2,12 +2,12 @@ import contract from '../../../contracts/query_stream.json'
 
 const events = contract.events
 if (
-  events.status !== 'status'
-  || events.trace !== 'trace'
-  || events.sources !== 'sources'
-  || events.token !== 'token'
-  || events.error !== 'error'
-  || events.done !== 'done'
+  events.status !== 'status' ||
+  events.trace !== 'trace' ||
+  events.sources !== 'sources' ||
+  events.token !== 'token' ||
+  events.error !== 'error' ||
+  events.done !== 'done'
 ) {
   throw new Error('Invalid query stream event contract.')
 }

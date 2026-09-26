@@ -22,13 +22,13 @@ export function useDialogFocus(
   useEffect(() => {
     if (!open) return
 
-    const previousFocus = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null
+    const previousFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
     const dialog = dialogRef.current
     const getFocusableElements = () =>
-      Array.from(dialog?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? [])
-        .filter((element) => !element.hidden && element.getAttribute('aria-hidden') !== 'true')
+      Array.from(dialog?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []).filter(
+        (element) => !element.hidden && element.getAttribute('aria-hidden') !== 'true',
+      )
 
     const focusableElements = getFocusableElements()
     const initialFocus = focusableElements[0] ?? dialog
@@ -52,10 +52,16 @@ export function useDialogFocus(
 
       const first = focusable[0]
       const last = focusable[focusable.length - 1]
-      if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+      if (
+        event.shiftKey &&
+        (document.activeElement === first || !dialog.contains(document.activeElement))
+      ) {
         event.preventDefault()
         last.focus()
-      } else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+      } else if (
+        !event.shiftKey &&
+        (document.activeElement === last || !dialog.contains(document.activeElement))
+      ) {
         event.preventDefault()
         first.focus()
       }
