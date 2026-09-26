@@ -10,7 +10,7 @@ DocuChat is a local-first RAG (Retrieval-Augmented Generation) document workspac
 |-------|--------|-----|
 | Backend | FastAPI + async | Native async for streaming SSE, Pydantic for contract enforcement, fast iteration |
 | Vector store | FAISS (IndexFlatIP) | Single-user/local deployment. In-memory search is fast for <100K chunks. No external service needed. |
-| Embeddings | `BAAI/bge-small-en-v1.5` (384d) | Best quality-per-parameter ratio for general English text. Small enough for local CPU inference. Pinned version. |
+| Embeddings | `BAAI/bge-small-en-v1.5` (384d) | Best quality-per-parameter ratio for general English text. Small enough for local CPU inference. Hugging Face revision is pinned in code. Changing it changes the embedding space and requires rebuilding all document indexes. |
 | Sparse retrieval | BM25 (custom scorer) | Complements dense retrieval for keyword-heavy queries. No external index needed. |
 | Reranker | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Highest-leverage quality lever. Cross-encoders outperform bi-encoders for pairwise relevance. |
 | LLM | Ollama (`llama3.2:latest`) | Local inference, no API keys, no data leaves the machine. Configurable via env. |
@@ -32,6 +32,16 @@ Query → Dense (FAISS) + Sparse (BM25) → Reciprocal Rank Fusion → Dedup →
 6. **Context assembly**: Top-k chunks with metadata, respecting 6000-char token budget
 7. **Generation**: Ollama with strict document-grounded prompting, streaming via SSE
 
+Queries linked to a server conversation include up to 12 preceding user/assistant messages
+(maximum 4,000 characters each) in the generation prompt. Retrieval still runs against
+the current question and selected document scope; conversation history is prompt context,
+not a query-rewriting or retrieval-expansion stage.
+
+Uploads progress through `uploading → processing → ready | failed`. The FAISS index is
+written atomically before `chunks.json` is published; startup reconciliation marks
+interrupted or inconsistent documents as failed, and retrieval excludes documents that
+do not have a complete searchable index.
+
 ## Data Storage
 
 All data lives in `data/uploads/`:
@@ -40,8 +50,8 @@ All data lives in `data/uploads/`:
 data/uploads/
 ├── {document_id}/
 │   ├── original.{ext}        # Uploaded file
-│   ├── document_info.json    # Metadata + processing state
-│   ├── chunks.json           # Extracted chunks with metadata
+│   ├── document_info.json    # Metadata + uploading/processing/ready/failed state
+│   ├── chunks.json           # Extracted chunks, atomically published after indexing
 │   └── index.faiss           # FAISS vector index
 ├── conversations/
 │   ├── {conversation_id}.json  # Conversation metadata + messages
@@ -61,7 +71,7 @@ Would be the right choice for multi-user or large-scale deployment. For a single
 ## API Design
 
 - All endpoints under `/api/v1` prefix
-- All `/api/v1` endpoints require `X-API-Key`, except `/api/v1/health`; the key is read from `API_KEY`
+- All `/api/v1` endpoints require `X-API-Key`, except the `/api/v1/health` probe family; the key is read from `API_KEY`
 - The default bind address is loopback (`127.0.0.1`); binding to a network interface is an explicit deployment choice
 - Swagger, ReDoc, and OpenAPI are disabled when `ENV=production`
 - CORS credentials cannot be combined with a wildcard origin
@@ -69,7 +79,7 @@ Would be the right choice for multi-user or large-scale deployment. For a single
 - SSE streaming for chat (never buffer full response)
 - Request bodies are capped at the configured upload limit plus multipart overhead; uploaded files are copied to disk in bounded chunks and text uploads have the same file-size limit
 - Error responses: `{"detail": "Human-readable message", "type": "error_code"}`
-- Request ID middleware for tracing
+- Request ID middleware for tracing, JSON logs in production, and Prometheus-compatible request counters/durations at `/metrics`
 
 ## Concurrency Model
 
@@ -81,6 +91,8 @@ remain responsive. The worker pool is finite; long-running CPU or model workload
 therefore limit throughput. Add Uvicorn worker processes only after accounting for the
 memory cost of loading a separate embedding model and reranker in each process. Upload
 and conversation files are local to a process host and are not a distributed job queue.
+The embedding and reranker model calls are serialized per process; FAISS index reads,
+reconstruction, publication, and cache invalidation share a process-local lock.
 
 ## Security and Threat Model
 

@@ -50,6 +50,9 @@ Install dependencies
 pip install -r requirements.txt
 ```
 
+The requirements file installs the development tools and model dependencies.
+For a locked environment, use `uv sync --locked --extra dev --extra models`.
+
 Run
 
 ```bash

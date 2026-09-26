@@ -46,23 +46,10 @@ def update_document(document_id: str, body: DocumentUpdate) -> dict:
 @router.get("/documents/{document_id}/status")
 def get_document_status(document_id: str) -> dict:
     """Get document processing status."""
-    doc = upload_service.get_document(document_id)
-    if not doc:
+    status = upload_service.get_document_status(document_id)
+    if not status:
         raise HTTPException(status_code=404, detail="Document not found.")
-
-    status = "ready"
-    chunks_file = upload_service.get_document_chunks_path(document_id)
-    if chunks_file is None:
-        status = "failed"
-    elif doc.get("chunk_count", 0) == 0:
-        status = "parsing"
-
-    return {
-        "document_id": document_id,
-        "status": status,
-        "chunk_count": doc.get("chunk_count", 0),
-        "filename": doc.get("filename", "unknown"),
-    }
+    return status
 
 
 @router.delete("/documents/{document_id}")

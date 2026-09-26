@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
+import uuid
 from pathlib import Path
 
 from app.rag.chunking import DocumentChunker
@@ -19,7 +21,7 @@ class DocumentPipeline:
     def __init__(self) -> None:
         self.loader = DocumentLoader()
         self.chunker = DocumentChunker()
-        self.embedding_service = EmbeddingService.get_instance()
+        self.embedding_service: EmbeddingService | None = None
         self.vector_store = VectorStore()
 
     def process(
@@ -49,21 +51,14 @@ class DocumentPipeline:
         )
 
         logger.info("Created %d chunks in %.2fs.", len(chunks), time.perf_counter() - start)
-
-        # Save chunks with metadata
-        chunks_file = file_path.parent / "chunks.json"
-        chunks_file.write_text(
-            json.dumps(
-                [chunk.model_dump() for chunk in chunks],
-                indent=2,
-                ensure_ascii=False,
-            ),
-            encoding="utf-8",
-        )
+        if not chunks:
+            raise ValueError("No text chunks could be generated from the document.")
 
         logger.info("Generating embeddings...")
         start = time.perf_counter()
 
+        if self.embedding_service is None:
+            self.embedding_service = EmbeddingService.get_instance()
         embeddings = self.embedding_service.encode([chunk.content for chunk in chunks])
 
         logger.info("Embeddings generated in %.2fs.", time.perf_counter() - start)
@@ -72,6 +67,23 @@ class DocumentPipeline:
             embeddings=embeddings,
             output_dir=file_path.parent,
         )
+
+        chunks_file = file_path.parent / "chunks.json"
+        temporary_chunks_file = (
+            file_path.parent / f".chunks-{uuid.uuid4().hex}.tmp"
+        )
+        try:
+            temporary_chunks_file.write_text(
+                json.dumps(
+                    [chunk.model_dump() for chunk in chunks],
+                    indent=2,
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            os.replace(temporary_chunks_file, chunks_file)
+        finally:
+            temporary_chunks_file.unlink(missing_ok=True)
 
         total_time = time.perf_counter() - total_start
         logger.info("Pipeline completed in %.2fs.", total_time)

@@ -32,7 +32,7 @@ class APIKeyMiddleware:
             await self.app(scope, receive, send)
             return
 
-        if path == "/api/v1/health":
+        if path == "/api/v1/health" or path.startswith("/api/v1/health/"):
             await self.app(scope, receive, send)
             return
 

@@ -8,12 +8,18 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from app.config.settings import settings
 from app.middleware import RequestBodyLimitMiddleware
+
+
+class _TestEmbeddingService:
+    def encode(self, texts: list[str]) -> np.ndarray:
+        return np.ones((len(texts), settings.embedding_dim), dtype=np.float32)
 
 
 @pytest.fixture()
@@ -25,12 +31,16 @@ def client():
         with patch("app.config.settings.settings.upload_dir", Path(td)):
             with patch("app.main.settings.upload_dir", Path(td)):
                 with patch.object(settings, "api_key", SecretStr("test-api-key")):
-                    with TestClient(
-                        app,
-                        headers={"X-API-Key": "test-api-key"},
-                        raise_server_exceptions=False,
-                    ) as c:
-                        yield c
+                    with patch(
+                        "app.rag.embeddings.EmbeddingService.get_instance",
+                        return_value=_TestEmbeddingService(),
+                    ):
+                        with TestClient(
+                            app,
+                            headers={"X-API-Key": "test-api-key"},
+                            raise_server_exceptions=False,
+                        ) as c:
+                            yield c
 
 
 class TestRootEndpoint:
@@ -54,9 +64,34 @@ class TestRequestMiddleware:
         assert "X-Response-Time" in resp.headers
         assert resp.headers["X-Response-Time"].endswith("ms")
 
+    def test_caller_request_id_is_echoed_and_logged(
+        self, client: TestClient, caplog: pytest.LogCaptureFixture
+    ):
+        caplog.set_level("INFO")
+        response = client.get("/", headers={"X-Request-ID": "abc"})
+
+        assert response.headers["X-Request-ID"] == "abc"
+        assert any("[abc]" in record.getMessage() for record in caplog.records)
+
+    def test_metrics_expose_request_count_and_duration(self, client: TestClient):
+        client.get("/")
+        response = client.get("/metrics")
+
+        assert response.status_code == 200
+        assert "http_requests_total" in response.text
+        assert "http_request_duration_milliseconds_count" in response.text
+        assert 'route="/"' in response.text
+
 
 class TestHealthEndpoint:
-    def test_health_returns_status(self, client: TestClient):
+    def test_health_returns_status(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(
+            type(settings),
+            "get_available_ollama_models",
+            lambda _self: [settings.ollama_model],
+        )
         resp = client.get("/api/v1/health")
         assert resp.status_code == 200
         data = resp.json()
@@ -64,9 +99,42 @@ class TestHealthEndpoint:
         assert "model" in data
         assert "embedding_model" in data
 
-    def test_health_does_not_require_api_key(self, client: TestClient):
+    def test_health_does_not_require_api_key(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(
+            type(settings),
+            "get_available_ollama_models",
+            lambda _self: [settings.ollama_model],
+        )
         resp = client.get("/api/v1/health", headers={"X-API-Key": "invalid"})
         assert resp.status_code == 200
+
+    def test_live_probe_is_independent_of_ollama(self, client: TestClient):
+        response = client.get("/api/v1/health/live", headers={"X-API-Key": "invalid"})
+        assert response.status_code == 200
+        assert response.json() == {"status": "alive"}
+
+    def test_readiness_reports_unavailable_ollama(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(type(settings), "get_available_ollama_models", lambda _self: [])
+        response = client.get("/api/v1/health/ready")
+        assert response.status_code == 503
+        assert response.json()["detail"]["ollama_available"] is False
+
+    def test_startup_does_not_contact_ollama(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from app.main import on_startup
+
+        monkeypatch.setattr(settings, "upload_dir", tmp_path)
+
+        def fail_if_called(_self):
+            raise AssertionError("startup must not contact Ollama")
+
+        monkeypatch.setattr(type(settings), "get_available_ollama_models", fail_if_called)
+        on_startup()
 
 
 class TestAPIKeyMiddleware:
@@ -291,7 +359,7 @@ def test_synchronous_upload_runs_off_the_event_loop(
     monkeypatch.setattr(
         type(health.settings),
         "get_available_ollama_models",
-        lambda _self: [],
+        lambda _self: [health.settings.ollama_model],
     )
     monkeypatch.setattr(
         type(health.settings),
@@ -329,7 +397,7 @@ def test_query_stream_does_not_block_health(
     monkeypatch.setattr(
         type(health.settings),
         "get_available_ollama_models",
-        lambda _self: [],
+        lambda _self: [health.settings.ollama_model],
     )
     monkeypatch.setattr(
         type(health.settings),
@@ -397,6 +465,134 @@ def test_request_body_limit_rejects_chunked_overflow():
         message for message in sent if message["type"] == "http.response.start"
     )
     assert response_start["status"] == 413
+
+
+def test_unknown_conversation_is_rejected_by_query(client: TestClient):
+    response = client.post(
+        "/api/v1/query",
+        json={
+            "question": "What is this?",
+            "conversation_id": "conv-000000000000",
+        },
+    )
+
+    assert response.status_code == 404
+
+
+def test_llm_failure_returns_503_without_persisting_an_answer(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    from app.api.routes import query as query_route
+    from app.exceptions import LLMError
+
+    conversation = query_route.conversation_service.create_conversation()
+    monkeypatch.setattr(
+        query_route.query_service,
+        "resolve_document_dirs",
+        lambda _document_id: [Path("document")],
+    )
+
+    def fail_query(_request):
+        raise LLMError("model unavailable")
+
+    monkeypatch.setattr(query_route.query_service, "query", fail_query)
+    response = client.post(
+        "/api/v1/query",
+        json={
+            "question": "What is this?",
+            "conversation_id": conversation["conversation_id"],
+        },
+    )
+
+    stored = query_route.conversation_service.get_conversation(
+        conversation["conversation_id"]
+    )
+    assert response.status_code == 503
+    assert stored is not None
+    assert [message["role"] for message in stored["messages"]] == ["user"]
+
+
+def test_stream_error_is_terminal_and_not_saved_as_an_answer(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    from app.api.routes import query as query_route
+
+    conversation = query_route.conversation_service.create_conversation()
+    monkeypatch.setattr(
+        query_route.query_service,
+        "resolve_document_dirs",
+        lambda _document_id: [],
+    )
+
+    def failed_events(_request):
+        yield {"type": "error", "content": "model unavailable"}
+
+    monkeypatch.setattr(query_route.query_service, "query_stream", failed_events)
+    response = client.post(
+        "/api/v1/query/stream",
+        json={
+            "question": "What is this?",
+            "conversation_id": conversation["conversation_id"],
+        },
+    )
+
+    stored = query_route.conversation_service.get_conversation(
+        conversation["conversation_id"]
+    )
+    assert response.status_code == 200
+    assert '"type": "error"' in response.text
+    assert stored is not None
+    assert [message["role"] for message in stored["messages"]] == ["user"]
+
+
+def test_query_rejects_unknown_conversation_id(client: TestClient):
+    response = client.post(
+        "/api/v1/query",
+        json={
+            "question": "What is this?",
+            "conversation_id": "conv-000000000000",
+        },
+    )
+    assert response.status_code == 404
+
+
+def test_stream_disconnect_persists_interrupted_answer(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    from app.api.routes import query as query_route
+    from app.models.request import QueryRequest
+
+    conversation = query_route.conversation_service.create_conversation()
+    monkeypatch.setattr(
+        query_route.query_service,
+        "resolve_document_dirs",
+        lambda _document_id: [],
+    )
+
+    def partial_events(_request):
+        yield {"type": "token", "content": "partial "}
+        yield {"type": "token", "content": "answer"}
+
+    monkeypatch.setattr(query_route.query_service, "query_stream", partial_events)
+    request = QueryRequest(
+        question="What is this?",
+        conversation_id=conversation["conversation_id"],
+    )
+    response = asyncio.run(query_route.query_stream(request))
+
+    async def disconnect_after_partial_answer():
+        stream = response.body_iterator
+        await anext(stream)
+        await anext(stream)
+        await stream.aclose()
+
+    asyncio.run(disconnect_after_partial_answer())
+    stored = query_route.conversation_service.get_conversation(
+        conversation["conversation_id"]
+    )
+    assert stored is not None
+    assert stored["messages"][-1]["content"] == "partial "
+    assert stored["messages"][-1]["interrupted"] is True
 
 
 class TestConversationsEndpoint:

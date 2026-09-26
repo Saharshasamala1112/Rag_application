@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import logging
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -12,21 +14,66 @@ from app.models.response import QueryResponse, SourceChunk
 from app.rag.llm import LocalLLM
 from app.rag.reranker import Reranker
 from app.rag.retriever import Retriever
+from app.services import conversation_service
 from app.services.upload_service import resolve_document_dir
 
 logger = logging.getLogger(__name__)
 
 # Approximate token budget for context (leaves room for prompt + answer)
 MAX_CONTEXT_CHARS = 6000
+MAX_HISTORY_MESSAGES = 12
+MAX_HISTORY_MESSAGE_CHARS = 4000
 
 
 class QueryService:
     """Handle document queries with advanced RAG techniques."""
 
     def __init__(self) -> None:
-        self.retriever = Retriever()
-        self.llm = LocalLLM()
+        self._retriever: Retriever | None = None
+        self._llm: LocalLLM | None = None
         self.reranker = Reranker()
+        self._components_lock = threading.RLock()
+
+    @property
+    def retriever(self) -> Retriever:
+        if self._retriever is None:
+            with self._components_lock:
+                if self._retriever is None:
+                    self._retriever = Retriever()
+        return self._retriever
+
+    @retriever.setter
+    def retriever(self, value: Retriever) -> None:
+        self._retriever = value
+
+    @property
+    def llm(self) -> LocalLLM:
+        if self._llm is None:
+            with self._components_lock:
+                if self._llm is None:
+                    self._llm = LocalLLM()
+        return self._llm
+
+    @llm.setter
+    def llm(self, value: LocalLLM) -> None:
+        self._llm = value
+
+    @staticmethod
+    def _is_document_ready(document_dir: Path) -> bool:
+        if not (document_dir / "chunks.json").is_file():
+            return False
+        if not (document_dir / "faiss.index").is_file():
+            return False
+
+        info_file = document_dir / "document_info.json"
+        if info_file.exists():
+            try:
+                info = json.loads(info_file.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                return False
+            if info.get("status") not in (None, "ready"):
+                return False
+        return True
 
     def resolve_document_dirs(self, document_id: str | None) -> list[Path]:
         """Resolve which document directories to search."""
@@ -37,7 +84,7 @@ class QueryService:
                 doc_dir = resolve_document_dir(document_id)
             except ValueError:
                 return []
-            if doc_dir.exists():
+            if self._is_document_ready(doc_dir):
                 return [doc_dir]
             return []
 
@@ -47,7 +94,7 @@ class QueryService:
                 document_dir = resolve_document_dir(child.name)
             except ValueError:
                 continue
-            if document_dir.is_dir() and (document_dir / "chunks.json").exists():
+            if document_dir.is_dir() and self._is_document_ready(document_dir):
                 dirs.append(document_dir)
         return dirs
 
@@ -97,28 +144,59 @@ class QueryService:
         if not context_chunks:
             return []
 
-        scores = [c.get("score", 0.0) for c in context_chunks]
+        scores = [
+            c.get("rerank_score", c.get("score", 0.0))
+            for c in context_chunks
+        ]
         max_score = max(scores) if scores else 1.0
+        min_score = min(scores) if scores else 0.0
 
         sources = []
         for chunk in context_chunks:
-            raw_score = chunk.get("score", 0.0)
-            normalized = (
-                round(min(max(raw_score / max_score, 0.0), 1.0), 4)
-                if max_score > 0
-                else 0.0
-            )
+            raw_score = chunk.get("rerank_score", chunk.get("score", 0.0))
+            if max_score > 0:
+                normalized = min(max(raw_score / max_score, 0.0), 1.0)
+            elif max_score > min_score:
+                normalized = (raw_score - min_score) / (max_score - min_score)
+            else:
+                normalized = 1.0
             sources.append(
                 SourceChunk(
                     chunk_id=chunk.get("chunk_id", 0),
                     content=chunk["content"][:500],
                     source=chunk.get("source", "unknown"),
-                    score=normalized,
+                    score=round(normalized, 4),
                     page_number=chunk.get("page_number"),
                     header=chunk.get("header"),
                 )
             )
         return sources
+
+    def _conversation_history(self, request: QueryRequest) -> list[dict[str, str]]:
+        if not request.conversation_id:
+            return []
+
+        conversation = conversation_service.get_conversation(request.conversation_id)
+        if not conversation:
+            return []
+
+        messages = conversation.get("messages", [])
+        if (
+            messages
+            and messages[-1].get("role") == "user"
+            and messages[-1].get("content") == request.question
+        ):
+            messages = messages[:-1]
+
+        return [
+            {
+                "role": message["role"],
+                "content": message["content"][:MAX_HISTORY_MESSAGE_CHARS],
+            }
+            for message in messages[-MAX_HISTORY_MESSAGES:]
+            if message.get("role") in {"user", "assistant"}
+            and isinstance(message.get("content"), str)
+        ]
 
     def query(
         self,
@@ -131,6 +209,8 @@ class QueryService:
 
         document_dirs = self.resolve_document_dirs(request.document_id)
         if not document_dirs:
+            if request.use_reranking:
+                logger.warning("Reranking requested but no documents were found.")
             return QueryResponse(
                 answer="No documents found. Please upload a document first.",
                 sources=[],
@@ -150,6 +230,8 @@ class QueryService:
         retrieval_time = (time.perf_counter() - retrieval_start) * 1000
 
         if not results:
+            if request.use_reranking:
+                logger.warning("Reranking requested but no candidates were retrieved.")
             return QueryResponse(
                 answer="I couldn't find relevant information in the uploaded documents.",
                 sources=[],
@@ -161,7 +243,7 @@ class QueryService:
         results = self._deduplicate_chunks(results)
 
         # Reranking
-        if request.use_reranking and len(results) > top_k:
+        if request.use_reranking and results:
             results = self.reranker.rerank(
                 query=request.question,
                 chunks=results,
@@ -179,18 +261,11 @@ class QueryService:
         # Generation
         llm_start = time.perf_counter()
 
-        try:
-            answer = self.llm.generate(
-                question=request.question,
-                context=context,
-            )
-        except LLMError as e:
-            return QueryResponse(
-                answer=f"LLM error: {e}",
-                sources=[],
-                retrieval_time_ms=round(retrieval_time, 2),
-                total_time_ms=round((time.perf_counter() - total_start) * 1000, 2),
-            )
+        answer = self.llm.generate(
+            question=request.question,
+            context=context,
+            history=self._conversation_history(request),
+        )
 
         generation_time = (time.perf_counter() - llm_start) * 1000
         total_time = (time.perf_counter() - total_start) * 1000
@@ -239,6 +314,8 @@ class QueryService:
         retrieval_time_ms = round((time.perf_counter() - retrieval_start) * 1000, 1)
 
         if not results:
+            if request.use_reranking:
+                logger.warning("Reranking requested but no candidates were retrieved.")
             yield {"type": "error", "content": "No relevant information found in the documents."}
             return
 
@@ -260,7 +337,7 @@ class QueryService:
         results = self._deduplicate_chunks(results)
 
         rerank_time_ms = 0.0
-        if request.use_reranking and len(results) > top_k:
+        if request.use_reranking and results:
             rerank_start = time.perf_counter()
             results = self.reranker.rerank(
                 query=request.question,
@@ -312,10 +389,15 @@ class QueryService:
             for chunk_text in self.llm.generate_stream(
                 question=request.question,
                 context=context,
+                history=self._conversation_history(request),
             ):
                 yield {"type": "token", "content": chunk_text}
-        except LLMError as e:
-            yield {"type": "error", "content": str(e)}
+        except LLMError:
+            logger.exception("Streaming query generation failed.")
+            yield {
+                "type": "error",
+                "content": "The language model is temporarily unavailable.",
+            }
             return
 
         generation_time_ms = round((time.perf_counter() - generation_start) * 1000, 1)

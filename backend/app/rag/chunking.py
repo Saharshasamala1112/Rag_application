@@ -33,7 +33,6 @@ class DocumentChunker:
             ],
             length_function=len,
         )
-        self._seen_hashes: set[str] = set()
 
     def _content_hash(self, text: str) -> str:
         """Compute a content hash for deduplication."""
@@ -64,19 +63,20 @@ class DocumentChunker:
         texts = self.splitter.split_text(markdown)
 
         chunks: list[DocumentChunk] = []
+        seen_hashes: set[str] = set()
         current_pos = 0
         chunk_index = 0
 
         for text in texts:
             # Deduplication: skip near-identical chunks
             h = self._content_hash(text)
-            if h in self._seen_hashes:
+            if h in seen_hashes:
                 start_pos = markdown.find(text[:80], current_pos)
                 if start_pos == -1:
                     start_pos = current_pos
                 current_pos = start_pos + len(text)
                 continue
-            self._seen_hashes.add(h)
+            seen_hashes.add(h)
 
             start_pos = markdown.find(text[:80], current_pos)
             if start_pos == -1:
