@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
-export interface BreadcrumbItem {
+interface BreadcrumbItem {
   label: string
   to?: string
 }
@@ -19,16 +19,24 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
         const isLast = i === items.length - 1
         return (
           <span key={i} className="flex items-center gap-1">
-            {i > 0 && <ChevronRight size={10} className="text-fg-muted dark:text-fg-dark-tertiary" />}
+            {i > 0 && (
+              <ChevronRight size={10} className="text-fg-muted dark:text-fg-dark-tertiary" />
+            )}
             {item.to && !isLast ? (
               <Link
                 to={item.to}
-                className="text-fg-tertiary dark:text-fg-dark-tertiary hover:text-fg-secondary dark:hover:text-fg-dark-secondary transition-colors"
+                className="text-fg-tertiary transition-colors hover:text-fg-secondary dark:text-fg-dark-tertiary dark:hover:text-fg-dark-secondary"
               >
                 {item.label}
               </Link>
             ) : (
-              <span className={isLast ? 'text-fg-secondary dark:text-fg-dark-secondary font-medium' : 'text-fg-tertiary dark:text-fg-dark-tertiary'}>
+              <span
+                className={
+                  isLast
+                    ? 'font-medium text-fg-secondary dark:text-fg-dark-secondary'
+                    : 'text-fg-tertiary dark:text-fg-dark-tertiary'
+                }
+              >
                 {item.label}
               </span>
             )}

@@ -8,7 +8,7 @@
  * - 768px - 1023px (`md`, below `lg`): tablet. Same overlay layout as phones.
  * - >= 1024px (`lg`): desktop. Persistent collapsible sidebar + inline panel.
  */
-export const BREAKPOINTS = {
+const BREAKPOINTS = {
   tablet: 768,
   desktop: 1024,
 } as const
