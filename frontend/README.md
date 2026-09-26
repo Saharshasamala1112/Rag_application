@@ -8,7 +8,10 @@ This Vite + React + TypeScript frontend powers the document upload and question-
 - npm run build
 - npm run lint
 - npm run typecheck
+- npm run knip (dead-code check)
+- npm run format:check
 - npm run test
+- npm run generate:api-types
 
 ## Responsive layout
 

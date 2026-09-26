@@ -10,7 +10,7 @@ DocuChat is a local-first RAG (Retrieval-Augmented Generation) document workspac
 |-------|--------|-----|
 | Backend | FastAPI + async | Native async for streaming SSE, Pydantic for contract enforcement, fast iteration |
 | Vector store | FAISS (IndexFlatIP) | Single-user/local deployment. In-memory search is fast for <100K chunks. No external service needed. |
-| Embeddings | `BAAI/bge-small-en-v1.5` (384d) | Best quality-per-parameter ratio for general English text. Small enough for local CPU inference. Hugging Face revision is pinned in code. Changing it changes the embedding space and requires rebuilding all document indexes. |
+| Embeddings | `BAAI/bge-small-en-v1.5` (384d) | Best quality-per-parameter ratio for general English text. Small enough for local CPU inference. The model name is configurable via `EMBEDDING_MODEL`; changing it changes the embedding space and requires rebuilding all document indexes. |
 | Sparse retrieval | BM25 (custom scorer) | Complements dense retrieval for keyword-heavy queries. No external index needed. |
 | Reranker | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Highest-leverage quality lever. Cross-encoders outperform bi-encoders for pairwise relevance. |
 | LLM | Ollama (`llama3.2:latest`) | Local inference, no API keys, no data leaves the machine. Configurable via env. |
@@ -29,7 +29,8 @@ Query → Dense (FAISS) + Sparse (BM25) → Reciprocal Rank Fusion → Dedup →
 3. **RRF fusion**: Reciprocal Rank Fusion (k=60) merges both rankings without score normalization
 4. **Deduplication**: Content-hash based dedup removes near-identical chunks
 5. **Reranking**: Cross-encoder scores query-chunk pairs for final relevance ranking
-6. **Context assembly**: Top-k chunks with metadata, respecting 6000-char token budget
+6. **Context assembly**: Top-k chunks with metadata, respecting the `MAX_CONTEXT_TOKENS`
+   budget (1,500 tokens by default)
 7. **Generation**: Ollama with strict document-grounded prompting, streaming via SSE
 
 Queries linked to a server conversation include up to 12 preceding user/assistant messages
@@ -52,7 +53,7 @@ data/uploads/
 │   ├── original.{ext}        # Uploaded file
 │   ├── document_info.json    # Metadata + uploading/processing/ready/failed state
 │   ├── chunks.json           # Extracted chunks, atomically published after indexing
-│   └── index.faiss           # FAISS vector index
+│   └── faiss.index           # FAISS vector index
 ├── conversations/
 │   ├── {conversation_id}.json  # Conversation metadata + messages
 ```
@@ -62,7 +63,7 @@ data/uploads/
 - **Local-first**: No database server to manage
 - **Fast enough**: <100K chunks search in <10ms on CPU
 - **Simple**: No connection pools, no migrations, no Docker dependency
-- **Trade-off**: Not persistent across process restarts for the in-memory index, but chunks.json is persisted and index is rebuilt on startup
+- **Trade-off**: A large collection means many per-document index files; each is loaded lazily from disk on first use instead of being rebuilt at startup
 
 ### Why not pgvector/Qdrant
 
@@ -108,7 +109,7 @@ be committed.
 
 ## Frontend Architecture
 
-- **Component decomposition**: 12 focused components from the original 873-line monolith
+- **Component decomposition**: 21 focused components in `frontend/src/components/`, grouped into chat, layout, navigation, and ui subfolders
 - **State management**: Zustand stores for chat sessions and documents
 - **Streaming**: fetch + ReadableStream for SSE, token-by-token rendering
 - **Theme**: 3-option (light/dark/system) with localStorage persistence and FOUC prevention
@@ -116,6 +117,5 @@ be committed.
 ## Known Limitations
 
 1. **Single-user**: API-key gate only; no user identities, role-based access, or multi-tenancy.
-2. **FAISS rebuild**: Vector index is rebuilt from chunks.json on startup. First query after restart may be slower.
-3. **No conversation persistence on server**: Conversations are localStorage-only. Server has no conversation API (v1).
-4. **Processing is synchronous**: Document upload blocks its worker thread until indexing completes. For large documents, this can take 10-30s.
+2. **No OCR**: Text is extracted from embedded text layers only (`PyMuPDF4LLM` for PDF, `python-docx` for DOCX, plain-text readers for everything else); scanned or image-only documents yield no chunks.
+3. **Processing is synchronous**: Document upload blocks its worker thread until indexing completes. For large documents, this can take 10-30s.
