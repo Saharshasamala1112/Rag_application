@@ -45,6 +45,7 @@ describe('SettingsPage API contract', () => {
       expect(screen.getByText('Available')).toBeInTheDocument()
       expect(screen.getByText('.pdf')).toBeInTheDocument()
       expect(screen.getByText('PDF document')).toBeInTheDocument()
+      expect(screen.getByText('2 documents indexed')).toBeInTheDocument()
     })
   })
 

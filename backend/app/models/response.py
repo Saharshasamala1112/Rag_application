@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SourceChunk(BaseModel):
@@ -11,7 +11,7 @@ class SourceChunk(BaseModel):
     chunk_id: int
     content: str
     source: str
-    score: float
+    score: float = Field(ge=0.0, le=1.0)
     page_number: int | None = None
     header: str | None = None
 
@@ -35,6 +35,16 @@ class HealthResponse(BaseModel):
     embedding_model: str
     ollama_available: bool
     document_count: int = 0
+
+
+class SupportedFileType(BaseModel):
+    extension: str
+    description: str
+
+
+class SupportedTypesResponse(BaseModel):
+    types: list[SupportedFileType]
+    total: int
 
 
 class DocumentInfo(BaseModel):

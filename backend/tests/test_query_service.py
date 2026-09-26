@@ -9,6 +9,11 @@ import pytest
 from app.config.settings import settings
 from app.exceptions import LLMError
 from app.models.request import QueryRequest
+from app.query_stream_contract import (
+    QUERY_STREAM_EVENTS,
+    QUERY_STREAM_STATUSES,
+    QUERY_STREAM_TRACE_STEPS,
+)
 from app.services.query_service import QueryService
 
 
@@ -261,6 +266,43 @@ def test_query_happy_path_retrieves_context_and_returns_citations(tmp_path: Path
     assert response.sources[0].chunk_id == 7
     service.llm.generate.assert_called_once()
     assert "30 days" in service.llm.generate.call_args.kwargs["context"]
+
+
+def test_query_stream_emits_all_contract_stages_in_order(tmp_path: Path):
+    service = QueryService.__new__(QueryService)
+    service.resolve_document_dirs = lambda _document_id: [tmp_path]
+    service.retriever = MagicMock()
+    service.retriever.retrieve.return_value = [
+        {
+            "chunk_id": 1,
+            "content": "Grounded evidence.",
+            "source": "manual.txt",
+            "score": 0.02,
+        }
+    ]
+    service.reranker = MagicMock()
+    service.reranker.rerank.side_effect = lambda **kwargs: kwargs["chunks"]
+    service.llm = MagicMock()
+    service.llm.generate_stream.return_value = iter(["Answer."])
+
+    events = list(
+        service.query_stream(
+            QueryRequest(question="Question?", use_reranking=True)
+        )
+    )
+
+    assert [event["content"] for event in events if event["type"] == QUERY_STREAM_EVENTS["status"]] == [
+        QUERY_STREAM_STATUSES["retrieving"]["text"],
+        QUERY_STREAM_STATUSES["reranking"]["text"],
+        QUERY_STREAM_STATUSES["context"]["text"],
+        QUERY_STREAM_STATUSES["generating"]["text"],
+    ]
+    assert [
+        event["content"]["step"]
+        for event in events
+        if event["type"] == QUERY_STREAM_EVENTS["trace"]
+    ] == list(QUERY_STREAM_TRACE_STEPS)
+    assert events[-1]["type"] == QUERY_STREAM_EVENTS["done"]
 
 
 def test_query_propagates_llm_errors(tmp_path: Path):

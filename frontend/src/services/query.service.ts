@@ -1,9 +1,16 @@
 import api from '../lib/axios'
 import type { QueryRequest, QueryResponse, RagTraceStep, SSEEvent } from '../types/chat'
+import { QUERY_STREAM_EVENTS } from '../contracts/queryStream'
 
 function isSSEEvent(value: unknown): value is SSEEvent {
   if (!value || typeof value !== 'object') return false
   const event = value as Record<string, unknown>
+  if (
+    typeof event.type !== 'string'
+    || !Object.values(QUERY_STREAM_EVENTS).includes(event.type)
+  ) {
+    return false
+  }
   switch (event.type) {
     case 'token':
     case 'status':
@@ -74,6 +81,7 @@ export const queryDocumentsStream = async (
   const decoder = new TextDecoder()
   let buffer = ''
   let done = false
+  let receivedTerminalEvent = false
 
   try {
     while (!done) {
@@ -100,9 +108,11 @@ export const queryDocumentsStream = async (
               if (!signal?.aborted) onTrace(event.content)
             } else if (event.type === 'done') {
               if (signal?.aborted) return
+              receivedTerminalEvent = true
               onDone(event.total_time_ms)
               return
             } else if (event.type === 'error') {
+              receivedTerminalEvent = true
               if (!signal?.aborted) onError(event.content)
               return
             }
@@ -116,5 +126,7 @@ export const queryDocumentsStream = async (
     reader.releaseLock()
   }
 
-  if (!signal?.aborted) onDone()
+  if (!signal?.aborted && !receivedTerminalEvent) {
+    onError('The response stream ended before completion.')
+  }
 }

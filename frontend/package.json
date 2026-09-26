@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "generate:api-types": "npx --yes openapi-typescript@7.13.0 ../contracts/openapi.json -o src/types/api.generated.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview",

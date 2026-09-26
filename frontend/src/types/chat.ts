@@ -1,14 +1,12 @@
+import type {
+  ApiQueryRequest,
+  ApiQueryResponse,
+  ApiSourceChunk,
+} from './api'
+
 export type ChatRole = 'user' | 'assistant'
 
-export type ChatSource = {
-  chunk_id: number
-  content: string
-  source: string
-  /** Relative relevance score normalized to the inclusive range 0.0–1.0. */
-  score: number
-  page_number: number | null
-  header: string | null
-}
+export type ChatSource = ApiSourceChunk
 
 export type RagTraceStep = {
   step: 'retrieval' | 'reranking' | 'context' | 'generation'
@@ -37,24 +35,19 @@ export type ChatMessage = {
   interrupted?: boolean
 }
 
-export type QueryRequest = {
-  question: string
-  document_id?: string | null
-  conversation_id?: string | null
-  top_k?: number
-  use_reranking?: boolean
-}
+export type QueryRequest = ApiQueryRequest
 
-export type QueryResponse = {
-  answer: string
-  sources: ChatSource[]
-  retrieval_time_ms: number
-  generation_time_ms: number
-  total_time_ms: number
-}
+export type QueryResponse = ApiQueryResponse
 
 export type SSEEvent =
   | { type: 'sources'; content: ChatSource[] }
-  | { type: 'token' | 'status' | 'error'; content: string }
-  | { type: 'done'; content: string; total_time_ms?: number }
+  | {
+      type: 'token' | 'status' | 'error'
+      content: string
+    }
+  | {
+      type: 'done'
+      content: string
+      total_time_ms?: number
+    }
   | { type: 'trace'; content: RagTraceStep }

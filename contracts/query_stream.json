@@ -1,0 +1,34 @@
+{
+  "events": {
+    "status": "status",
+    "trace": "trace",
+    "sources": "sources",
+    "token": "token",
+    "error": "error",
+    "done": "done"
+  },
+  "statuses": {
+    "retrieving": {
+      "text": "Retrieving relevant chunks...",
+      "stage": "retrieval"
+    },
+    "reranking": {
+      "text": "Processing and ranking results...",
+      "stage": "reranking"
+    },
+    "context": {
+      "text": "Building context...",
+      "stage": "context"
+    },
+    "generating": {
+      "text": "Generating answer...",
+      "stage": "generation"
+    }
+  },
+  "trace_steps": [
+    "retrieval",
+    "reranking",
+    "context",
+    "generation"
+  ]
+}
