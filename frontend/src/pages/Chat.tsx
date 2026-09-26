@@ -43,16 +43,55 @@ export const Chat = () => {
   const chatEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const latestIsAtBottomRef = useRef(isAtBottom)
+  const loadingRef = useRef(loading)
+  const hasMessages = messages.length > 0
 
   useEffect(() => {
     void fetchDocuments()
   }, [fetchDocuments])
 
   useEffect(() => {
-    if (isAtBottom) {
-      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    latestIsAtBottomRef.current = isAtBottom
+    loadingRef.current = loading
+  }, [messages, isAtBottom, loading])
+
+  useEffect(() => {
+    if (!hasMessages) return
+
+    let animationFrame = 0
+    const scheduleScroll = () => {
+      if (animationFrame !== 0) return
+      animationFrame = requestAnimationFrame(() => {
+        animationFrame = 0
+        if (!latestIsAtBottomRef.current) return
+
+        if (loadingRef.current) {
+          const container = scrollContainerRef.current
+          if (container) container.scrollTop = container.scrollHeight
+        } else {
+          chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+        }
+      })
     }
-  }, [messages, isAtBottom])
+
+    const observer = new MutationObserver(() => {
+      scheduleScroll()
+    })
+    if (scrollContainerRef.current) {
+      observer.observe(scrollContainerRef.current, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+      })
+    }
+    scheduleScroll()
+
+    return () => {
+      observer.disconnect()
+      if (animationFrame !== 0) cancelAnimationFrame(animationFrame)
+    }
+  }, [hasMessages])
 
   useEffect(() => {
     const el = scrollContainerRef.current

@@ -20,7 +20,7 @@ describe('queryDocumentsStream', () => {
     )
   }
 
-  it('passes the caller AbortSignal to fetch', async () => {
+  it('combines the caller AbortSignal with a request timeout', async () => {
     const controller = new AbortController()
     let requestSignal: AbortSignal | null | undefined
     vi.stubGlobal('fetch', vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
@@ -43,11 +43,41 @@ describe('queryDocumentsStream', () => {
       vi.fn(),
       vi.fn(),
       controller.signal,
+      1000,
     )
     controller.abort()
 
     await expect(stream).rejects.toMatchObject({ name: 'AbortError' })
-    expect(requestSignal).toBe(controller.signal)
+    expect(requestSignal).not.toBe(controller.signal)
+    expect(requestSignal?.aborted).toBe(true)
+  })
+
+  it('aborts a stalled stream when its per-request deadline expires', async () => {
+    let requestSignal: AbortSignal | null | undefined
+    vi.stubGlobal('fetch', vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      requestSignal = init?.signal
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          'abort',
+          () => reject(new DOMException('The operation was aborted.', 'AbortError')),
+          { once: true },
+        )
+      })
+    }))
+
+    const stream = queryDocumentsStream(
+      { question: 'deadline test' },
+      vi.fn(),
+      vi.fn(),
+      vi.fn(),
+      vi.fn(),
+      vi.fn(),
+      vi.fn(),
+      undefined,
+      10,
+    )
+
+    await expect(stream).rejects.toMatchObject({ name: 'AbortError' })
     expect(requestSignal?.aborted).toBe(true)
   })
 

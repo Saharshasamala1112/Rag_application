@@ -1,4 +1,5 @@
 import api from '../lib/axios'
+import type { AxiosRequestConfig } from 'axios'
 import type { QueryRequest, QueryResponse, RagTraceStep, SSEEvent } from '../types/chat'
 import { QUERY_STREAM_EVENTS } from '../contracts/queryStream'
 
@@ -27,8 +28,14 @@ function isSSEEvent(value: unknown): value is SSEEvent {
   }
 }
 
-export const queryDocuments = async (payload: QueryRequest): Promise<QueryResponse> => {
-  const res = await api.post<QueryResponse>('/query', payload)
+export const queryDocuments = async (
+  payload: QueryRequest,
+  options: Pick<AxiosRequestConfig, 'signal' | 'timeout'> = {},
+): Promise<QueryResponse> => {
+  const res = await api.post<QueryResponse>('/query', payload, {
+    ...options,
+    timeout: options.timeout ?? 120000,
+  })
   return res.data
 }
 
@@ -41,7 +48,12 @@ export const queryDocumentsStream = async (
   onDone: (totalTimeMs?: number) => void,
   onError: (error: string) => void,
   signal?: AbortSignal,
+  timeoutMs = 300000,
 ): Promise<void> => {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs)
+  const requestSignal = signal
+    ? AbortSignal.any([signal, timeoutSignal])
+    : timeoutSignal
   const response = await fetch(`${api.defaults.baseURL}/query/stream`, {
     method: 'POST',
     headers: {
@@ -49,11 +61,11 @@ export const queryDocumentsStream = async (
       ...(import.meta.env.VITE_API_KEY ? { 'X-API-Key': import.meta.env.VITE_API_KEY } : {}),
     },
     body: JSON.stringify(payload),
-    signal,
+    signal: requestSignal,
   })
 
   if (!response.ok) {
-    if (signal?.aborted) return
+    if (requestSignal.aborted) return
     let detail = `HTTP ${response.status}: ${response.statusText}`
     try {
       const body: unknown = await response.json()
@@ -68,13 +80,13 @@ export const queryDocumentsStream = async (
     } catch {
       // keep default
     }
-    onError(detail)
+    if (!requestSignal.aborted) onError(detail)
     return
   }
 
   const reader = response.body?.getReader()
   if (!reader) {
-    if (!signal?.aborted) onError('No response stream')
+    if (!requestSignal.aborted) onError('No response stream')
     return
   }
 
@@ -99,21 +111,21 @@ export const queryDocumentsStream = async (
             const event: unknown = JSON.parse(line.slice(6))
             if (!isSSEEvent(event)) continue
             if (event.type === 'token') {
-              if (!signal?.aborted) onToken(event.content)
+              if (!requestSignal.aborted) onToken(event.content)
             } else if (event.type === 'sources') {
-              if (!signal?.aborted) onSources(event.content)
+              if (!requestSignal.aborted) onSources(event.content)
             } else if (event.type === 'status') {
-              if (!signal?.aborted) onStatus(event.content)
+              if (!requestSignal.aborted) onStatus(event.content)
             } else if (event.type === 'trace') {
-              if (!signal?.aborted) onTrace(event.content)
+              if (!requestSignal.aborted) onTrace(event.content)
             } else if (event.type === 'done') {
-              if (signal?.aborted) return
+              if (requestSignal.aborted) return
               receivedTerminalEvent = true
               onDone(event.total_time_ms)
               return
             } else if (event.type === 'error') {
               receivedTerminalEvent = true
-              if (!signal?.aborted) onError(event.content)
+              if (!requestSignal.aborted) onError(event.content)
               return
             }
           } catch {
@@ -126,7 +138,7 @@ export const queryDocumentsStream = async (
     reader.releaseLock()
   }
 
-  if (!signal?.aborted && !receivedTerminalEvent) {
+  if (!requestSignal.aborted && !receivedTerminalEvent) {
     onError('The response stream ended before completion.')
   }
 }

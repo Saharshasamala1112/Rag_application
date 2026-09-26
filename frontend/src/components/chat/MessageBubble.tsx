@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { ChevronDown, FileText, Copy, Check, AlertCircle } from 'lucide-react'
@@ -43,7 +43,10 @@ interface MessageBubbleProps {
   onSelectSource?: (sources: ChatSource[]) => void
 }
 
-export function MessageBubble({ message, onSelectSource }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({
+  message,
+  onSelectSource,
+}: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const [sourcesExpanded, setSourcesExpanded] = useState(false)
   const hasSources = message.sources && message.sources.length > 0
@@ -229,4 +232,4 @@ export function MessageBubble({ message, onSelectSource }: MessageBubbleProps) {
       </div>
     </div>
   )
-}
+})
