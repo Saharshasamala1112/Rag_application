@@ -2,6 +2,14 @@ stages:
   - backend
   - quality
 
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - when: never
+
 variables:
   FF_NETWORK_PER_BUILD: "true"
 
@@ -20,20 +28,6 @@ default:
     - cd frontend
     - npm ci --no-audit --no-fund
 
-frontend-quality:
-  extends: .frontend-base
-  stage: quality
-  script:
-    - npm run generate:api-types
-    - git diff --exit-code -- src/types/api.generated.ts
-    - npm run typecheck
-    - npm run lint
-    - npm test
-    - npm run build
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
 backend-quality:
   image: python:3.12-slim
   stage: backend
@@ -43,8 +37,34 @@ backend-quality:
     - uv sync --frozen --extra dev
   script:
     - uv run python -m scripts.update_openapi_schema --check
-    - uv run ruff check app tests
-    - uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=70
+    - uv run ruff check app tests scripts
+    - uv run pytest --cov=app --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=junit.xml --cov-fail-under=70
+  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+(?:\.\d+)?)%/'
+  artifacts:
+    when: always
+    reports:
+      junit: backend/junit.xml
+    paths:
+      - backend/coverage.xml
+      - backend/junit.xml
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+
+frontend-quality:
+  extends: .frontend-base
+  stage: quality
+  script:
+    - npm run generate:api-types
+    - git diff --exit-code -- src/types/api.generated.ts
+    - npm run typecheck
+    - npm run lint
+    - npm test -- --reporter=default --reporter=junit --outputFile.junit=junit.xml
+    - npm run build
+  artifacts:
+    when: always
+    reports:
+      junit: frontend/junit.xml
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
