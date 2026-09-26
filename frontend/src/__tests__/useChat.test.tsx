@@ -4,15 +4,37 @@ import { useChat } from '../hooks/useChat'
 import { useChatStore } from '../store/chat.store'
 import { useDocumentStore } from '../store/document.store'
 import { queryDocumentsStream } from '../services/query.service'
+import * as conversationService from '../services/conversation.service'
+import { ApiError } from '../lib/axios'
 
 vi.mock('../services/query.service', () => ({
   queryDocumentsStream: vi.fn(),
 }))
 
+vi.mock('../services/conversation.service', () => ({
+  getConversation: vi.fn(),
+  createConversation: vi.fn(),
+  listConversations: vi.fn(),
+  deleteConversation: vi.fn(),
+}))
+
 const streamMock = vi.mocked(queryDocumentsStream)
+const getConversationMock = vi.mocked(conversationService.getConversation)
+const createConversationMock = vi.mocked(conversationService.createConversation)
+
+const conversationDetail = (id: string) => ({
+  conversation_id: id,
+  title: 'Test conversation',
+  messages: [],
+  created_at: '2026-09-27T00:00:00Z',
+  updated_at: '2026-09-27T00:00:00Z',
+})
 
 beforeEach(() => {
   streamMock.mockReset()
+  getConversationMock.mockReset()
+  createConversationMock.mockReset()
+  createConversationMock.mockResolvedValue(conversationDetail('conv-created12345'))
   useChatStore.setState({
     activeStream: null,
     activeSessionId: 'session-1',
@@ -173,5 +195,88 @@ describe('useChat', () => {
       isStreaming: false,
     })
     expect(sessions.find((session) => session.id === 'session-2')?.messages).toEqual([])
+  })
+
+  it('creates a conversation before the first question', async () => {
+    streamMock.mockImplementation((...args) => {
+      args[5]()
+      return Promise.resolve()
+    })
+    const { result } = renderHook(() => useChat())
+
+    await act(async () => {
+      await result.current.ask('first question')
+    })
+
+    expect(createConversationMock).toHaveBeenCalledTimes(1)
+    expect(getConversationMock).not.toHaveBeenCalled()
+    expect(streamMock.mock.calls[0][0].conversation_id).toBe('conv-created12345')
+    expect(useChatStore.getState().sessions[0].serverConversationId).toBe('conv-created12345')
+  })
+
+  it('replaces a stale conversation id the server no longer knows', async () => {
+    useChatStore.setState((state) => ({
+      sessions: state.sessions.map((session) => ({
+        ...session,
+        serverConversationId: 'conv-stale1234',
+      })),
+    }))
+    getConversationMock.mockRejectedValue(new ApiError('Conversation not found.', 404, null))
+    streamMock.mockImplementation((...args) => {
+      args[5]()
+      return Promise.resolve()
+    })
+    const { result } = renderHook(() => useChat())
+
+    await act(async () => {
+      await result.current.ask('question after server reset')
+    })
+
+    expect(getConversationMock).toHaveBeenCalledWith('conv-stale1234')
+    expect(createConversationMock).toHaveBeenCalledTimes(1)
+    expect(streamMock.mock.calls[0][0].conversation_id).toBe('conv-created12345')
+    expect(useChatStore.getState().sessions[0].serverConversationId).toBe('conv-created12345')
+  })
+
+  it('keeps the existing conversation when validation fails transiently', async () => {
+    useChatStore.setState((state) => ({
+      sessions: state.sessions.map((session) => ({
+        ...session,
+        serverConversationId: 'conv-keepme1234',
+      })),
+    }))
+    getConversationMock.mockRejectedValue(new ApiError('Request failed', undefined, undefined))
+    streamMock.mockImplementation((...args) => {
+      args[5]()
+      return Promise.resolve()
+    })
+    const { result } = renderHook(() => useChat())
+
+    await act(async () => {
+      await result.current.ask('question')
+    })
+
+    expect(createConversationMock).not.toHaveBeenCalled()
+    expect(streamMock.mock.calls[0][0].conversation_id).toBe('conv-keepme1234')
+  })
+
+  it('falls back to local-only mode when the server is unreachable', async () => {
+    createConversationMock.mockRejectedValue(new ApiError('Network Error', undefined, undefined))
+    streamMock.mockImplementation((...args) => {
+      args[5]()
+      return Promise.resolve()
+    })
+    const { result } = renderHook(() => useChat())
+
+    await act(async () => {
+      await result.current.ask('offline question')
+    })
+
+    expect(streamMock.mock.calls[0][0].conversation_id).toBeNull()
+    expect(result.current.messages.at(-1)).toMatchObject({
+      role: 'assistant',
+      content: '',
+      isStreaming: false,
+    })
   })
 })

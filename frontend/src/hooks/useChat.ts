@@ -24,7 +24,7 @@ export const useChat = () => {
   const createSession = useChatStore((state) => state.createSession)
   const setActiveSession = useChatStore((state) => state.setActiveSession)
   const deleteSession = useChatStore((state) => state.deleteSession)
-  const getServerConversationId = useChatStore((state) => state.getServerConversationId)
+  const ensureServerConversation = useChatStore((state) => state.ensureServerConversation)
 
   const messages = useMemo(() => {
     const active = sessions.find((session) => session.id === activeSessionId)
@@ -48,7 +48,6 @@ export const useChat = () => {
       }
 
       const sessionId = useChatStore.getState().activeSessionId
-      const serverConversationId = getServerConversationId()
       const documentId = useDocumentStore.getState().activeDocumentId
       const now = new Date().toISOString()
       const userMessage: ChatMessage = {
@@ -86,6 +85,10 @@ export const useChat = () => {
       }
 
       try {
+        // Validates or lazily creates the server conversation so a stale id
+        // in localStorage (e.g. conversations cleared on the server) never
+        // fails the question with "Conversation not found."
+        const serverConversationId = await ensureServerConversation(sessionId)
         await queryDocumentsStream(
           {
             question,
@@ -155,7 +158,7 @@ export const useChat = () => {
       setActiveStream,
       setActiveStreamStatus,
       setActiveStreamTraceSteps,
-      getServerConversationId,
+      ensureServerConversation,
     ],
   )
 
