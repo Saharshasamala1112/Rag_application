@@ -42,7 +42,7 @@ export function DocumentDetailPage() {
         if (!cancelled) setLoading(false)
       }
     }
-    load()
+    void load()
     return () => { cancelled = true }
   }, [id])
 
@@ -52,7 +52,7 @@ export function DocumentDetailPage() {
     try {
       await axiosInstance.delete(`/documents/${id}`)
       removeDocument(id)
-      navigate('/documents')
+      void navigate('/documents')
     } catch {
       // handled by interceptor
     } finally {
@@ -147,7 +147,7 @@ export function DocumentDetailPage() {
         title="Delete document"
         description={`Permanently delete "${doc?.filename}" and all ${total} chunks? This cannot be undone.`}
         confirmLabel="Delete"
-        onConfirm={handleDelete}
+        onConfirm={() => void handleDelete()}
         onCancel={() => setDeleteOpen(false)}
         loading={deleting}
       />

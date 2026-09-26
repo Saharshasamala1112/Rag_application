@@ -2,6 +2,7 @@ import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { ChevronDown, FileText, Copy, Check, AlertCircle } from 'lucide-react'
+import { toast } from 'sonner'
 import type { ChatMessage, ChatSource } from '../../types/chat'
 
 function formatTime(iso: string) {
@@ -15,10 +16,13 @@ function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    })
+    void navigator.clipboard.writeText(text).then(
+      () => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
+      },
+      () => toast.error('Failed to copy message'),
+    )
   }
 
   return (
@@ -101,6 +105,11 @@ export function MessageBubble({ message, onSelectSource }: MessageBubbleProps) {
                 <span className="ml-0.5">thinking</span>
               </span>
             </>
+          )}
+          {message.interrupted && (
+            <span className="rounded bg-warning-subtle px-1.5 py-0.5 text-2xs font-medium text-warning dark:bg-warning-dark-subtle dark:text-warning-dark">
+              Stopped
+            </span>
           )}
         </div>
 
@@ -213,7 +222,7 @@ export function MessageBubble({ message, onSelectSource }: MessageBubbleProps) {
 
         {/* Copy button for completed messages */}
         {!message.isStreaming && message.content && !isError && (
-          <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1 mt-2">
             <CopyButton text={message.content} />
           </div>
         )}

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { FolderOpen, Plus, Trash2, FileText, Check, X } from 'lucide-react'
 import { useDocumentStore } from '../store/document.store'
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog'
@@ -27,6 +27,7 @@ export function CollectionsPage() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const pendingMemberships = useRef(new Set<string>())
 
   useEffect(() => {
     let cancelled = false
@@ -41,7 +42,7 @@ export function CollectionsPage() {
         if (!cancelled) setLoading(false)
       }
     }
-    load()
+    void load()
     return () => { cancelled = true }
   }, [])
 
@@ -117,20 +118,31 @@ export function CollectionsPage() {
   }
 
   const handleAddDocumentToCollection = useCallback(async (colId: string, docId: string) => {
-    setCollections((prev) => {
-      const col = prev.find((c) => c.collection_id === colId)
-      if (!col || col.document_ids.includes(docId)) return prev
-      const updatedIds = [...col.document_ids, docId]
-      collectionService.updateCollection(colId, { document_ids: updatedIds }).then((updated) => {
-        setCollections((p) => p.map((c) => (c.collection_id === colId ? updated : c)))
-        const doc = documents.find((d) => d.document_id === docId)
-        toast.success(`Added "${doc?.filename}" to "${col.name}"`)
-      }).catch(() => {
-        toast.error('Failed to add document')
+    const collection = collections.find((item) => item.collection_id === colId)
+    const membershipKey = `${colId}:${docId}`
+    if (
+      !collection
+      || collection.document_ids.includes(docId)
+      || pendingMemberships.current.has(membershipKey)
+    ) return
+
+    pendingMemberships.current.add(membershipKey)
+    const updatedIds = [...collection.document_ids, docId]
+    try {
+      const updated = await collectionService.updateCollection(colId, {
+        document_ids: updatedIds,
       })
-      return prev.map((c) => (c.collection_id === colId ? { ...c, document_ids: updatedIds } : c))
-    })
-  }, [documents])
+      setCollections((previous) =>
+        previous.map((item) => item.collection_id === colId ? updated : item),
+      )
+      const document = documents.find((item) => item.document_id === docId)
+      toast.success(`Added "${document?.filename ?? 'document'}" to "${collection.name}"`)
+    } catch {
+      toast.error('Failed to add document')
+    } finally {
+      pendingMemberships.current.delete(membershipKey)
+    }
+  }, [collections, documents])
 
   const toggleDoc = (docId: string) => {
     setSelectedDocs((prev) =>
@@ -160,7 +172,7 @@ export function CollectionsPage() {
     setDragOverId(null)
     const docId = e.dataTransfer.getData('text/doc-id')
     if (docId) {
-      handleAddDocumentToCollection(colId, docId)
+      void handleAddDocumentToCollection(colId, docId)
     }
   }, [handleAddDocumentToCollection])
 
@@ -233,6 +245,8 @@ export function CollectionsPage() {
               return (
                 <div
                   key={col.collection_id}
+                  role="region"
+                  aria-label={`Collection ${col.name}`}
                   className={cn(
                     'group rounded-xl border bg-surface dark:bg-surface-dark p-4 transition-all',
                     isSelected
@@ -249,9 +263,10 @@ export function CollectionsPage() {
                     <div className="flex items-center gap-2 min-w-0">
                       <input
                         type="checkbox"
+                        aria-label={`Select ${col.name}`}
                         checked={isSelected}
                         onChange={() => toggleSelect(col.collection_id)}
-                        className="rounded border-edge dark:border-edge-dark text-accent focus:ring-accent/40 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="rounded border-edge dark:border-edge-dark text-accent focus:ring-accent/40"
                       />
                       <FolderOpen size={16} className="text-warning dark:text-warning-dark shrink-0" />
                       {isEditing && editField === 'name' ? (
@@ -261,7 +276,7 @@ export function CollectionsPage() {
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleRename(col.collection_id)
+                              if (e.key === 'Enter') void handleRename(col.collection_id)
                               if (e.key === 'Escape') setEditingId(null)
                             }}
                             autoFocus
@@ -269,7 +284,7 @@ export function CollectionsPage() {
                           />
                           <button
                             type="button"
-                            onClick={() => handleRename(col.collection_id)}
+                            onClick={() => void handleRename(col.collection_id)}
                             className="p-0.5 text-success dark:text-success-dark shrink-0"
                           >
                             <Check size={12} />
@@ -283,8 +298,10 @@ export function CollectionsPage() {
                           </button>
                         </div>
                       ) : (
-                        <h3
-                          className="text-xs font-semibold text-fg dark:text-fg-dark truncate cursor-pointer hover:text-accent dark:hover:text-accent-dark transition-colors"
+                        <button
+                          type="button"
+                          className="text-left text-xs font-semibold text-fg dark:text-fg-dark truncate hover:text-accent dark:hover:text-accent-dark transition-colors"
+                          aria-label={`Rename ${col.name}`}
                           onClick={() => {
                             setEditingId(col.collection_id)
                             setEditField('name')
@@ -293,14 +310,15 @@ export function CollectionsPage() {
                           title="Click to rename"
                         >
                           {col.name}
-                        </h3>
+                        </button>
                       )}
                     </div>
                     <button
                       type="button"
                       onClick={() => setDeleteTarget(col.collection_id)}
-                      className="p-1 rounded text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark opacity-0 group-hover:opacity-100 transition-all"
+                      className="p-1 rounded text-fg-muted hover:text-danger dark:text-fg-dark-tertiary dark:hover:text-danger-dark"
                       title="Delete"
+                      aria-label={`Delete ${col.name}`}
                     >
                       <Trash2 size={13} />
                     </button>
@@ -313,7 +331,7 @@ export function CollectionsPage() {
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleRename(col.collection_id)
+                          if (e.key === 'Enter') void handleRename(col.collection_id)
                           if (e.key === 'Escape') setEditingId(null)
                         }}
                         autoFocus
@@ -322,8 +340,9 @@ export function CollectionsPage() {
                       />
                     </div>
                   ) : col.description ? (
-                    <p
-                      className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary mb-2 line-clamp-2 cursor-pointer hover:text-fg-secondary dark:hover:text-fg-dark-secondary transition-colors"
+                    <button
+                      type="button"
+                      className="mb-2 block w-full text-left text-2xs text-fg-tertiary dark:text-fg-dark-tertiary line-clamp-2 hover:text-fg-secondary dark:hover:text-fg-dark-secondary transition-colors"
                       onClick={() => {
                         setEditingId(col.collection_id)
                         setEditField('description')
@@ -332,10 +351,11 @@ export function CollectionsPage() {
                       title="Click to edit description"
                     >
                       {col.description}
-                    </p>
+                    </button>
                   ) : (
-                    <p
-                      className="text-2xs text-fg-muted dark:text-fg-dark-tertiary mb-2 italic cursor-pointer hover:text-fg-tertiary dark:hover:text-fg-dark-tertiary transition-colors"
+                    <button
+                      type="button"
+                      className="mb-2 block w-full text-left text-2xs text-fg-muted dark:text-fg-dark-tertiary italic hover:text-fg-tertiary dark:hover:text-fg-dark-tertiary transition-colors"
                       onClick={() => {
                         setEditingId(col.collection_id)
                         setEditField('description')
@@ -343,7 +363,7 @@ export function CollectionsPage() {
                       }}
                     >
                       + Add description
-                    </p>
+                    </button>
                   )}
 
                   <div className="flex items-center justify-between">
@@ -374,7 +394,7 @@ export function CollectionsPage() {
             <Button
               variant="primary"
               size="sm"
-              onClick={handleCreate}
+              onClick={() => void handleCreate()}
               disabled={!newName.trim() || creating}
               loading={creating}
             >
@@ -436,7 +456,7 @@ export function CollectionsPage() {
         title="Delete collection"
         description="This will permanently remove the collection. Documents will not be deleted."
         confirmLabel="Delete"
-        onConfirm={handleDelete}
+        onConfirm={() => void handleDelete()}
         onCancel={() => setDeleteTarget(null)}
         loading={deleting}
       />
@@ -446,7 +466,7 @@ export function CollectionsPage() {
         title={`Delete ${selectedIds.length} collections`}
         description={`This will permanently remove ${selectedIds.length} collections. Documents will not be deleted.`}
         confirmLabel={`Delete ${selectedIds.length} collections`}
-        onConfirm={handleBulkDelete}
+        onConfirm={() => void handleBulkDelete()}
         onCancel={() => setBulkDeleteOpen(false)}
         loading={bulkDeleting}
       />

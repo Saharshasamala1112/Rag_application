@@ -1,5 +1,5 @@
-import { useRef, useEffect, useState } from 'react'
-import { Paperclip, X, Loader2, Search, ArrowUp } from 'lucide-react'
+import { useRef, useEffect } from 'react'
+import { Paperclip, X, Loader2, ArrowUp } from 'lucide-react'
 import { FileIcon } from '../ui/FileIcon'
 import { Tooltip } from '../ui/Tooltip'
 
@@ -29,7 +29,6 @@ export function ChatComposer({
   fileInputRef,
 }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const [searchMode, setSearchMode] = useState(false)
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onInputChange(e.target.value)
@@ -101,12 +100,12 @@ export function ChatComposer({
             onKeyDown={onKeyDown}
             placeholder={
               loading
-                ? 'Waiting for response... (Esc to stop)'
+                ? 'Waiting for response... Press Escape to stop'
                 : 'Ask anything about your documents...'
             }
             rows={1}
-            disabled={loading}
-            className="w-full resize-none border-0 bg-transparent pl-4 pr-4 pt-3.5 pb-2 text-sm text-fg dark:text-fg-dark outline-none placeholder:text-fg-tertiary dark:placeholder:text-fg-dark-tertiary min-h-[44px] max-h-[200px] rounded-t-2xl disabled:opacity-50"
+            readOnly={loading}
+            className="w-full resize-none border-0 bg-transparent pl-4 pr-4 pt-3.5 pb-2 text-sm text-fg dark:text-fg-dark outline-none placeholder:text-fg-tertiary dark:placeholder:text-fg-dark-tertiary min-h-[44px] max-h-[200px] rounded-t-2xl"
             aria-label="Message input"
           />
 
@@ -126,22 +125,6 @@ export function ChatComposer({
                 </button>
               </Tooltip>
 
-              {/* Search mode toggle */}
-              <Tooltip content={searchMode ? 'Search mode on — queries all documents' : 'Focus mode — active document only'} side="top">
-                <button
-                  type="button"
-                  aria-label={searchMode ? 'Search mode' : 'Focus mode'}
-                  onClick={() => setSearchMode((p) => !p)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-2xs font-medium transition-colors ${
-                    searchMode
-                      ? 'bg-accent/10 dark:bg-accent-dark/10 text-accent dark:text-accent-dark'
-                      : 'text-fg-tertiary hover:text-fg hover:bg-surface-secondary dark:text-fg-dark-tertiary dark:hover:text-fg-dark dark:hover:bg-surface-dark-elevated'
-                  }`}
-                >
-                  <Search size={12} />
-                  <span className="hidden sm:inline">{searchMode ? 'All docs' : 'Active doc'}</span>
-                </button>
-              </Tooltip>
             </div>
 
             <div className="flex items-center gap-1.5">

@@ -13,20 +13,34 @@ type ChatSession = {
   updatedAt: string
 }
 
+type ActiveStream = {
+  sessionId: string
+  assistantId: string
+  controller: AbortController
+  status: string | null
+  traceSteps: string[]
+}
+
 type ChatState = {
   sessions: ChatSession[]
   activeSessionId: string
-  addUserMessage: (message: ChatMessage) => void
-  addAssistantMessage: (message: ChatMessage) => void
-  updateAssistantMessage: (messageId: string, content: string) => void
-  setStreamingSources: (messageId: string, sources: ChatSource[]) => void
-  setTrace: (messageId: string, trace: RagTrace) => void
-  finishStreaming: (messageId: string) => void
+  activeStream: ActiveStream | null
+  addUserMessage: (message: ChatMessage, sessionId?: string) => void
+  addAssistantMessage: (message: ChatMessage, sessionId?: string) => void
+  updateAssistantMessage: (messageId: string, content: string, sessionId?: string) => void
+  setStreamingSources: (messageId: string, sources: ChatSource[], sessionId?: string) => void
+  setTrace: (messageId: string, trace: RagTrace, sessionId?: string) => void
+  finishStreaming: (messageId: string, sessionId?: string) => void
+  interruptStreaming: (messageId: string, sessionId?: string) => void
+  setActiveStream: (stream: ActiveStream | null) => void
+  setActiveStreamStatus: (controller: AbortController, status: string | null) => void
+  setActiveStreamTraceSteps: (controller: AbortController, traceSteps: string[]) => void
+  cancelActiveStream: (sessionId?: string) => void
   clearMessages: () => void
   createSession: () => string
   setActiveSession: (sessionId: string) => void
   deleteSession: (sessionId: string) => void
-  getMessages: () => ChatMessage[]
+  getMessages: (sessionId?: string) => ChatMessage[]
   getServerConversationId: () => string | null
   loadServerConversations: () => Promise<void>
   syncSessionFromServer: (sessionId: string) => Promise<void>
@@ -38,13 +52,23 @@ const loadSessions = (): ChatSession[] => {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw) as ChatSession[]
-    return Array.isArray(parsed) ? parsed : []
+    return Array.isArray(parsed)
+      ? parsed.map((session) => ({
+          ...session,
+          messages: session.messages.map((message) =>
+            message.isStreaming
+              ? { ...message, isStreaming: false, interrupted: true }
+              : message,
+          ),
+        }))
+      : []
   } catch {
     return []
   }
 }
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null
+let serverConversationLoad: Promise<void> | null = null
 
 const saveSessionsDebounced = (sessions: ChatSession[]) => {
   if (typeof window === 'undefined') return
@@ -79,9 +103,10 @@ const initialActiveId = initialSessions[0].id
 export const useChatStore = create<ChatState>((set, get) => ({
   sessions: initialSessions,
   activeSessionId: initialActiveId,
+  activeStream: null,
 
-  getMessages: () => {
-    const active = get().sessions.find((session) => session.id === get().activeSessionId)
+  getMessages: (sessionId) => {
+    const active = get().sessions.find((session) => session.id === (sessionId ?? get().activeSessionId))
     return active?.messages ?? []
   },
 
@@ -90,10 +115,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return active?.serverConversationId ?? null
   },
 
-  addUserMessage: (message) => {
+  addUserMessage: (message, sessionId) => {
     const { sessions, activeSessionId } = get()
+    const targetSessionId = sessionId ?? activeSessionId
     const updated = sessions.map((session) => {
-      if (session.id !== activeSessionId) return session
+      if (session.id !== targetSessionId) return session
       const newMessages = [...session.messages, message]
       const title = session.messages.length === 0
         ? message.content.slice(0, 50) + (message.content.length > 50 ? '...' : '')
@@ -109,10 +135,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ sessions: updated })
   },
 
-  addAssistantMessage: (message) => {
+  addAssistantMessage: (message, sessionId) => {
     const { sessions, activeSessionId } = get()
+    const targetSessionId = sessionId ?? activeSessionId
     const updated = sessions.map((session) =>
-      session.id === activeSessionId
+      session.id === targetSessionId
         ? {
             ...session,
             messages: [...session.messages, message],
@@ -124,10 +151,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ sessions: updated })
   },
 
-  updateAssistantMessage: (messageId, content) => {
+  updateAssistantMessage: (messageId, content, sessionId) => {
     const { sessions, activeSessionId } = get()
+    const targetSessionId = sessionId ?? activeSessionId
     const updated = sessions.map((session) =>
-      session.id === activeSessionId
+      session.id === targetSessionId
         ? {
             ...session,
             messages: session.messages.map((msg) =>
@@ -140,10 +168,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ sessions: updated })
   },
 
-  setStreamingSources: (messageId, sources) => {
+  setStreamingSources: (messageId, sources, sessionId) => {
     const { sessions, activeSessionId } = get()
+    const targetSessionId = sessionId ?? activeSessionId
     const updated = sessions.map((session) =>
-      session.id === activeSessionId
+      session.id === targetSessionId
         ? {
             ...session,
             messages: session.messages.map((msg) =>
@@ -156,10 +185,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ sessions: updated })
   },
 
-  setTrace: (messageId, trace) => {
+  setTrace: (messageId, trace, sessionId) => {
     const { sessions, activeSessionId } = get()
+    const targetSessionId = sessionId ?? activeSessionId
     const updated = sessions.map((session) =>
-      session.id === activeSessionId
+      session.id === targetSessionId
         ? {
             ...session,
             messages: session.messages.map((msg) =>
@@ -172,10 +202,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ sessions: updated })
   },
 
-  finishStreaming: (messageId) => {
+  finishStreaming: (messageId, sessionId) => {
     const { sessions, activeSessionId } = get()
+    const targetSessionId = sessionId ?? activeSessionId
     const updated = sessions.map((session) =>
-      session.id === activeSessionId
+      session.id === targetSessionId
         ? {
             ...session,
             messages: session.messages.map((msg) =>
@@ -186,7 +217,58 @@ export const useChatStore = create<ChatState>((set, get) => ({
         : session,
     )
     saveSessionsImmediate(updated)
-    set({ sessions: updated })
+    set({
+      sessions: updated,
+      activeStream:
+        get().activeStream?.assistantId === messageId ? null : get().activeStream,
+    })
+  },
+
+  interruptStreaming: (messageId, sessionId) => {
+    const { sessions, activeSessionId } = get()
+    const targetSessionId = sessionId ?? activeSessionId
+    const updated = sessions.map((session) =>
+      session.id === targetSessionId
+        ? {
+            ...session,
+            messages: session.messages.map((msg) =>
+              msg.id === messageId
+                ? { ...msg, isStreaming: false, interrupted: true }
+                : msg,
+            ),
+            updatedAt: new Date().toISOString(),
+          }
+        : session,
+    )
+    saveSessionsImmediate(updated)
+    set({
+      sessions: updated,
+      activeStream:
+        get().activeStream?.assistantId === messageId ? null : get().activeStream,
+    })
+  },
+
+  setActiveStream: (activeStream) => set({ activeStream }),
+
+  setActiveStreamStatus: (controller, status) => {
+    const activeStream = get().activeStream
+    if (activeStream?.controller === controller) {
+      set({ activeStream: { ...activeStream, status } })
+    }
+  },
+
+  setActiveStreamTraceSteps: (controller, traceSteps) => {
+    const activeStream = get().activeStream
+    if (activeStream?.controller === controller) {
+      set({ activeStream: { ...activeStream, traceSteps } })
+    }
+  },
+
+  cancelActiveStream: (sessionId) => {
+    const activeStream = get().activeStream
+    if (!activeStream || (sessionId && activeStream.sessionId !== sessionId)) return
+    activeStream.controller.abort()
+    get().interruptStreaming(activeStream.assistantId, activeStream.sessionId)
   },
 
   clearMessages: () => {
@@ -255,36 +337,44 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   loadServerConversations: async () => {
-    try {
-      const { conversations } = await conversationService.listConversations()
-      const { sessions } = get()
+    if (serverConversationLoad) return serverConversationLoad
 
-      const existingServerIds = new Set(
-        sessions.filter((s) => s.serverConversationId).map((s) => s.serverConversationId),
-      )
+    serverConversationLoad = (async () => {
+      try {
+        const { conversations } = await conversationService.listConversations()
+        const { sessions } = get()
 
-      const newSessions: ChatSession[] = []
-      for (const conv of conversations) {
-        if (!existingServerIds.has(conv.conversation_id)) {
-          newSessions.push({
-            id: `session-${conv.conversation_id}`,
-            serverConversationId: conv.conversation_id,
-            title: conv.title,
+        const existingServerIds = new Set(
+          sessions.filter((session) => session.serverConversationId)
+            .map((session) => session.serverConversationId),
+        )
+
+        const newSessions: ChatSession[] = conversations
+          .filter((conversation) => !existingServerIds.has(conversation.conversation_id))
+          .map((conversation) => ({
+            id: `session-${conversation.conversation_id}`,
+            serverConversationId: conversation.conversation_id,
+            title: conversation.title,
             messages: [],
-            createdAt: conv.created_at,
-            updatedAt: conv.updated_at,
-          })
-        }
-      }
+            createdAt: conversation.created_at,
+            updatedAt: conversation.updated_at,
+          }))
 
-      if (newSessions.length > 0) {
-        const merged = [...newSessions, ...sessions]
-        saveSessionsImmediate(merged)
-        set({ sessions: merged })
+        if (newSessions.length > 0) {
+          const merged = [...newSessions, ...get().sessions]
+          saveSessionsImmediate(merged)
+          set({ sessions: merged })
+          await Promise.all(
+            newSessions.map((session) => get().syncSessionFromServer(session.id)),
+          )
+        }
+      } catch {
+        // Server unavailable — local-only mode
+      } finally {
+        serverConversationLoad = null
       }
-    } catch {
-      // Server unavailable — local-only mode
-    }
+    })()
+    return serverConversationLoad
   },
 
   syncSessionFromServer: async (sessionId: string) => {
@@ -299,6 +389,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         content: m.content,
         sources: m.sources as ChatSource[] | undefined,
         createdAt: m.created_at,
+        isStreaming: false,
+        interrupted: m.interrupted,
       }))
       const updated = get().sessions.map((s) =>
         s.id === sessionId ? { ...s, messages, title: detail.title } : s,

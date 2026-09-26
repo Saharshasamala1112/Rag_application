@@ -12,7 +12,11 @@ const HISTORY_KEY = 'rag-search-history'
 function loadHistory(): string[] {
   try {
     const raw = localStorage.getItem(HISTORY_KEY)
-    return raw ? JSON.parse(raw) : []
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : []
   } catch {
     return []
   }
@@ -42,8 +46,8 @@ export function SearchPage() {
     inputRef.current?.focus()
   }, [])
 
-  const handleSearch = async () => {
-    const q = query.trim()
+  const handleSearch = async (searchText = query) => {
+    const q = searchText.trim()
     if (!q || loading) return
 
     setLoading(true)
@@ -70,7 +74,7 @@ export function SearchPage() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      handleSearch()
+      void handleSearch()
     }
   }
 
@@ -96,7 +100,7 @@ export function SearchPage() {
           {query && (
             <button
               type="button"
-              onClick={handleSearch}
+              onClick={() => void handleSearch()}
               disabled={loading}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-fg-tertiary hover:text-accent dark:hover:text-accent-dark transition-colors disabled:opacity-50"
             >
@@ -140,7 +144,7 @@ export function SearchPage() {
                       type="button"
                       onClick={() => {
                         setQuery(h)
-                        setTimeout(() => handleSearch(), 0)
+                        void handleSearch(h)
                       }}
                       className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-left text-xs text-fg-secondary dark:text-fg-dark-secondary hover:bg-surface-secondary dark:hover:bg-surface-dark-elevated transition-colors group"
                     >

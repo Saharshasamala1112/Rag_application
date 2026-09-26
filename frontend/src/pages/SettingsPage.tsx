@@ -1,40 +1,73 @@
 import { useEffect, useState } from 'react'
 import { Settings, Cpu, FileText, CheckCircle2, XCircle } from 'lucide-react'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
-import axiosInstance from '../lib/axios'
+import axiosInstance, { ApiError } from '../lib/axios'
 
 interface HealthData {
   status: string
   model: string
   embedding_model: string
-  ollama_status: string
+  ollama_available: boolean
   document_count: number
+}
+
+function isHealthData(value: unknown): value is HealthData {
+  if (!value || typeof value !== 'object') return false
+  const data = value as Partial<HealthData>
+  return (
+    typeof data.status === 'string'
+    && typeof data.model === 'string'
+    && typeof data.embedding_model === 'string'
+    && typeof data.ollama_available === 'boolean'
+    && typeof data.document_count === 'number'
+  )
+}
+
+type SupportedType = {
+  extension: string
+  description: string
 }
 
 export function SettingsPage() {
   const [health, setHealth] = useState<HealthData | null>(null)
   const [healthLoading, setHealthLoading] = useState(true)
-  const [supportedTypes, setSupportedTypes] = useState<Record<string, string> | null>(null)
+  const [supportedTypes, setSupportedTypes] = useState<SupportedType[] | null>(null)
 
   useEffect(() => {
     let cancelled = false
     const load = async () => {
-      try {
-        const [healthRes, typesRes] = await Promise.all([
-          axiosInstance.get('/health'),
-          axiosInstance.get('/upload/supported-types'),
-        ])
-        if (!cancelled) {
-          setHealth(healthRes.data)
-          setSupportedTypes(typesRes.data.supported_types)
+      const [healthResult, typesResult] = await Promise.allSettled([
+        axiosInstance.get<HealthData>('/health'),
+        axiosInstance.get<{ types: SupportedType[] }>('/upload/supported-types'),
+      ])
+      if (cancelled) return
+
+      if (healthResult.status === 'fulfilled') {
+        if (isHealthData(healthResult.value.data)) setHealth(healthResult.value.data)
+      } else {
+        const error: unknown = healthResult.reason
+        if (error instanceof ApiError) {
+          const data = error.responseData
+          const detail =
+            data && typeof data === 'object' && 'detail' in data
+              ? data.detail
+              : undefined
+          if (isHealthData(detail)) setHealth(detail)
         }
-      } catch {
-        // handled by interceptor
-      } finally {
-        if (!cancelled) setHealthLoading(false)
       }
+      if (
+        typesResult.status === 'fulfilled'
+        && typesResult.value.data.types.every(
+          (item) =>
+            typeof item.extension === 'string'
+            && typeof item.description === 'string',
+        )
+      ) {
+        setSupportedTypes(typesResult.value.data.types)
+      }
+      setHealthLoading(false)
     }
-    load()
+    void load()
     return () => { cancelled = true }
   }, [])
 
@@ -83,13 +116,13 @@ export function SettingsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      {health.ollama_status === 'available' ? (
+                      {health.ollama_available ? (
                         <CheckCircle2 size={12} className="text-success dark:text-success-dark" />
                       ) : (
                         <XCircle size={12} className="text-danger dark:text-danger-dark" />
                       )}
                       <span className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary">
-                        {health.ollama_status}
+                        {health.ollama_available ? 'Available' : 'Unavailable'}
                       </span>
                     </div>
                   </div>
@@ -120,14 +153,14 @@ export function SettingsPage() {
               </h2>
               <div className="rounded-xl border border-edge dark:border-edge-dark bg-surface dark:bg-surface-dark p-4">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {Object.entries(supportedTypes).map(([ext, desc]) => (
-                    <div key={ext} className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-surface-secondary dark:bg-surface-dark-elevated">
+                  {supportedTypes.map(({ extension, description }) => (
+                    <div key={extension} className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-surface-secondary dark:bg-surface-dark-elevated">
                       <FileText size={11} className="text-fg-tertiary dark:text-fg-dark-tertiary shrink-0" />
                       <div className="min-w-0">
                         <p className="text-2xs font-medium text-fg-secondary dark:text-fg-dark-secondary uppercase">
-                          {ext}
+                          {extension}
                         </p>
-                        <p className="text-[9px] text-fg-tertiary dark:text-fg-dark-tertiary truncate">{desc}</p>
+                        <p className="text-2xs text-fg-tertiary dark:text-fg-dark-tertiary truncate">{description}</p>
                       </div>
                     </div>
                   ))}

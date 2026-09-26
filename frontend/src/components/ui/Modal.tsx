@@ -1,6 +1,7 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useId, useRef, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { useDialogFocus } from '../../hooks/useDialogFocus'
 
 interface ModalProps {
   open: boolean
@@ -20,19 +21,9 @@ const sizeStyles = {
 
 export function Modal({ open, onClose, title, description, children, footer, size = 'sm' }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', handleKey)
-    return () => document.removeEventListener('keydown', handleKey)
-  }, [open, onClose])
-
-  useEffect(() => {
-    if (open) panelRef.current?.focus()
-  }, [open])
+  const titleId = useId()
+  const descriptionId = useId()
+  useDialogFocus(open, onClose, panelRef)
 
   if (!open) return null
 
@@ -47,8 +38,8 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={title ? 'modal-title' : undefined}
-        aria-describedby={description ? 'modal-desc' : undefined}
+        aria-labelledby={title ? titleId : undefined}
+        aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={cn(
           'relative z-10 w-full mx-4 bg-surface border border-edge rounded-xl shadow-lg animate-scale-in',
@@ -60,12 +51,12 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         {(title || description) && (
           <div className="px-5 pt-5 pb-0">
             {title && (
-              <h2 id="modal-title" className="text-sm font-semibold text-fg dark:text-fg-dark">
+              <h2 id={titleId} className="text-sm font-semibold text-fg dark:text-fg-dark">
                 {title}
               </h2>
             )}
             {description && (
-              <p id="modal-desc" className="mt-1 text-xs text-fg-secondary dark:text-fg-dark-secondary leading-relaxed">
+              <p id={descriptionId} className="mt-1 text-xs text-fg-secondary dark:text-fg-dark-secondary leading-relaxed">
                 {description}
               </p>
             )}
