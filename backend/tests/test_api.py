@@ -206,30 +206,40 @@ class TestUploadEndpoint:
             "/api/v1/upload",
             files={"file": ("test.exe", b"binary data", "application/octet-stream")},
         )
-        # Should return 422 or 400 for unsupported file type
-        assert resp.status_code in (400, 422)
+        assert resp.status_code == 400
 
     def test_upload_empty_file(self, client: TestClient):
         resp = client.post(
             "/api/v1/upload",
             files={"file": ("empty.txt", b"", "text/plain")},
         )
-        # Should handle empty file gracefully
-        assert resp.status_code in (200, 400, 422)
+        assert resp.status_code == 400
 
-    def test_upload_malicious_filename(self, client: TestClient):
+    def test_upload_traversal_filename_cannot_escape_upload_directory(
+        self,
+        client: TestClient,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        upload_dir = tmp_path / "uploads"
+        upload_dir.mkdir()
+        sentinel = tmp_path / "escape.txt"
+        sentinel.write_text("keep", encoding="utf-8")
+        monkeypatch.setattr(settings, "upload_dir", upload_dir)
         resp = client.post(
             "/api/v1/upload",
             files={
                 "file": (
-                    "../../../etc/passwd.txt",
+                    "../../escape.txt",
                     b"not real passwd",
                     "text/plain",
                 )
             },
         )
-        # Should sanitize or reject
-        assert resp.status_code in (200, 400, 422)
+        assert resp.status_code == 200
+        assert resp.json()["filename"] == "../../escape.txt"
+        assert (upload_dir / resp.json()["document_id"] / "original.txt").is_file()
+        assert sentinel.read_text(encoding="utf-8") == "keep"
 
     def test_upload_rejects_file_over_configured_limit(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch
@@ -290,6 +300,102 @@ class TestQueryEndpoint:
         assert resp.status_code == 422
 
 
+def test_query_stream_emits_events_and_persists_completed_conversation(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    from app.api.routes import query as query_route
+
+    conversation = query_route.conversation_service.create_conversation()
+    sources = [
+        {
+            "chunk_id": 1,
+            "content": "grounded evidence",
+            "source": "manual.txt",
+            "score": 0.9,
+            "page_number": 1,
+            "header": None,
+        }
+    ]
+    stream_events = [
+        {"type": "status", "content": "Retrieving relevant chunks..."},
+        {"type": "sources", "content": sources},
+        {"type": "token", "content": "A grounded "},
+        {"type": "token", "content": "answer."},
+        {"type": "done", "content": "", "total_time_ms": 12.5},
+    ]
+    monkeypatch.setattr(
+        query_route.query_service,
+        "query_stream",
+        lambda _request: iter(stream_events),
+    )
+
+    response = client.post(
+        "/api/v1/query/stream",
+        json={
+            "question": "What does the manual say?",
+            "conversation_id": conversation["conversation_id"],
+        },
+    )
+
+    events = [
+        json.loads(line.removeprefix("data: "))
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    stored = query_route.conversation_service.get_conversation(
+        conversation["conversation_id"]
+    )
+
+    assert response.status_code == 200
+    assert [event["type"] for event in events] == [
+        "status",
+        "sources",
+        "token",
+        "token",
+        "done",
+    ]
+    assert stored is not None
+    assert [message["role"] for message in stored["messages"]] == [
+        "user",
+        "assistant",
+    ]
+    assert stored["messages"][1]["content"] == "A grounded answer."
+    assert stored["messages"][1]["sources"] == sources
+
+
+def test_collections_crud_uses_a_redirected_temporary_directory(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from app.api.routes import collections as collections_route
+
+    collection_dir = tmp_path / "collections"
+    monkeypatch.setattr(collections_route, "COLLECTIONS_DIR", collection_dir)
+
+    created = client.post(
+        "/api/v1/collections",
+        json={"name": "Research", "description": "Test collection"},
+    )
+    assert created.status_code == 200
+    collection = created.json()
+    collection_id = collection["collection_id"]
+    assert list(collection_dir.iterdir()) == [collection_dir / f"{collection_id}.json"]
+
+    listing = client.get("/api/v1/collections")
+    assert listing.status_code == 200
+    assert listing.json()["collections"][0]["name"] == "Research"
+
+    updated = client.patch(
+        f"/api/v1/collections/{collection_id}",
+        json={"document_ids": ["document-1"]},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["document_ids"] == ["document-1"]
+
+    deleted = client.delete(f"/api/v1/collections/{collection_id}")
+    assert deleted.status_code == 200
+    assert list(collection_dir.iterdir()) == []
+
+
 class TestEndToEnd:
     def test_upload_then_documents_list(self, client: TestClient):
         # Upload two documents
@@ -337,7 +443,7 @@ class TestEndToEnd:
 
         for document_id in ("..", "%2e%2e", "conversations", "collections"):
             response = client.delete(f"/api/v1/documents/{document_id}")
-            assert response.status_code in (404, 405, 422)
+            assert response.status_code == 404
             assert sentinel.read_text() == "keep"
             assert list(upload_dir.iterdir()) == []
 

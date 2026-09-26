@@ -21,6 +21,22 @@ def test_load_caches_unchanged_faiss_index(tmp_path: Path):
     assert first is second
 
 
+def test_saved_index_round_trips_embeddings_and_search_results(tmp_path: Path):
+    vectors = np.array(
+        [[1.0, 0.0], [0.0, 1.0], [0.6, 0.8]],
+        dtype=np.float32,
+    )
+    VectorStore.invalidate_cache()
+    VectorStore.save(vectors, tmp_path)
+
+    loaded = VectorStore().load(tmp_path)
+
+    assert loaded is not None
+    np.testing.assert_allclose(VectorStore.get_embeddings(loaded), vectors)
+    _, indices = loaded.search(np.array([[1.0, 0.0]], dtype=np.float32), 3)
+    assert indices[0].tolist() == [0, 2, 1]
+
+
 def test_corrupt_faiss_index_is_refused(tmp_path: Path):
     (tmp_path / "faiss.index").write_bytes(b"corrupt index")
 
