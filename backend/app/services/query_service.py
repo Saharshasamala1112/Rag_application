@@ -258,11 +258,24 @@ class QueryService:
     def _apply_rerank_threshold(results: list[dict]) -> list[dict]:
         if not results or not all("rerank_score" in chunk for chunk in results):
             return results
-        return [
+        kept = [
             chunk
             for chunk in results
             if float(chunk["rerank_score"]) >= settings.reranker_min_score
         ]
+        if kept:
+            return kept
+        # All candidates collapsed below the threshold. The cross-encoder
+        # scores long, meta-questions far below any useful cut-off, so
+        # refusing here would reject answerable questions; keep the
+        # reranked top candidates and let generation use them instead.
+        logger.warning(
+            "All %d reranked candidates scored below RERANKER_MIN_SCORE=%.2f; "
+            "keeping the top candidates instead of refusing.",
+            len(results),
+            settings.reranker_min_score,
+        )
+        return results
 
     def _build_sources(self, context_chunks: list[dict]) -> list[SourceChunk]:
         """Build SourceChunk list with normalized scores."""
