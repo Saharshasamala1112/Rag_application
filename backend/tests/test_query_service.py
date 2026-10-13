@@ -128,6 +128,50 @@ class TestResolveDocumentDirs:
                 assert svc.resolve_document_dirs(None) == []
                 assert svc.resolve_document_dirs("00000000-007") == []
 
+    @pytest.mark.parametrize(
+        "metadata_payload",
+        ["[1, 2, 3]", '"just a string"', "42", "{not json"],
+        ids=["list-root", "string-root", "int-root", "malformed-json"],
+    )
+    def test_invalid_metadata_is_excluded_from_search_all_and_specific_query(
+        self, metadata_payload: str
+    ):
+        """Invalid metadata is excluded consistently, matching the retriever.
+
+        A non-dict metadata root (e.g. ``[1, 2, 3]``) used to crash the
+        readiness gate on ``info.get("status")``. It is now excluded, the same
+        way the retriever skips the document.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            svc = QueryService.__new__(QueryService)
+            invalid = Path(td) / "00000000-005"
+            invalid.mkdir()
+            (invalid / "chunks.json").write_text("[]")
+            _write_index(invalid, dimension=384)
+            (invalid / "document_info.json").write_text(metadata_payload, encoding="utf-8")
+
+            with patch.object(settings, "upload_dir", Path(td)):
+                assert svc.resolve_document_dirs(None) == []
+                assert svc.resolve_document_dirs("00000000-005") == []
+
+    def test_valid_legacy_metadata_is_still_included_in_search_all(self):
+        """A provenance-free document with a matching dimension stays usable."""
+        with tempfile.TemporaryDirectory() as td:
+            svc = QueryService.__new__(QueryService)
+            legacy = Path(td) / "00000000-006"
+            legacy.mkdir()
+            (legacy / "chunks.json").write_text("[]")
+            _write_index(legacy, dimension=384)
+            # No document_info.json at all — a genuinely legacy index.
+
+            with patch.object(settings, "upload_dir", Path(td)):
+                assert [d.name for d in svc.resolve_document_dirs(None)] == [
+                    "00000000-006"
+                ]
+                assert [d.name for d in svc.resolve_document_dirs("00000000-006")] == [
+                    "00000000-006"
+                ]
+
 
 class TestDeduplicateChunks:
     def test_removes_duplicates(self):

@@ -16,6 +16,7 @@ from typing import BinaryIO
 from app.config.settings import settings
 from app.rag.embedding_compat import (
     PROVENANCE_KEYS,
+    ProvenanceRead,
     active_identity,
     compatibility_error,
 )
@@ -436,12 +437,14 @@ class UploadService:
         # Derive (never persist) an embedding-compatibility verdict so a
         # document indexed under a different embedding configuration is
         # reported as unusable with actionable guidance, while the stored
-        # metadata and index stay untouched (BE-04).
+        # metadata and index stay untouched (BE-04). ``info`` is the already
+        # parsed document record (a dict, guaranteed by the ``.get`` calls
+        # above), so it is a successful read of the metadata object.
         if status == "ready" and index is not None:
             incompatibility = compatibility_error(
                 doc_dir,
                 index.d,
-                info,
+                ProvenanceRead(data=info, state="ok"),
                 active_identity(),
             )
             if incompatibility is not None:

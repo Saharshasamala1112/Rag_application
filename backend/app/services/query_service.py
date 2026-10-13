@@ -21,7 +21,11 @@ from app.query_stream_contract import (
     QUERY_STREAM_STATUSES,
     QUERY_STREAM_TRACE_STEPS,
 )
-from app.rag.embedding_compat import active_identity, compatibility_error
+from app.rag.embedding_compat import (
+    active_identity,
+    compatibility_error,
+    read_embedding_provenance,
+)
 from app.rag.llm import LocalLLM
 from app.rag.reranker import Reranker
 from app.rag.retriever import Retriever
@@ -150,9 +154,15 @@ class QueryService:
         info_file = document_dir / "document_info.json"
         if info_file.exists():
             try:
-                info = json.loads(info_file.read_text(encoding="utf-8"))
+                parsed = json.loads(info_file.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
                 return False
+            if not isinstance(parsed, dict):
+                # Malformed metadata (e.g. a JSON list root) is not a document
+                # record and must never be treated as legacy provenance-free
+                # data; exclude it just like an unreadable file.
+                return False
+            info = parsed
             if info.get("status") not in (None, "ready"):
                 return False
 
@@ -164,7 +174,7 @@ class QueryService:
         incompatibility = compatibility_error(
             document_dir,
             index.d,
-            info,
+            read_embedding_provenance(document_dir),
             active_identity(),
         )
         if incompatibility is not None:

@@ -20,6 +20,7 @@ import pytest
 from app.config.settings import settings
 from app.rag.embedding_compat import (
     EmbeddingIdentity,
+    ProvenanceRead,
     active_identity,
     compatibility_error,
     read_embedding_provenance,
@@ -159,11 +160,42 @@ class TestActiveIdentity:
 
 
 class TestReadEmbeddingProvenance:
-    def test_missing_or_corrupt_metadata_returns_none(self, tmp_path: Path):
-        assert read_embedding_provenance(tmp_path) is None
+    def test_missing_metadata_is_reported_as_missing(self, tmp_path: Path):
+        result = read_embedding_provenance(tmp_path)
 
+        assert result.state == "missing"
+        assert result.data is None
+
+    def test_malformed_json_is_reported_as_invalid(self, tmp_path: Path):
         (tmp_path / "document_info.json").write_text("{not json", encoding="utf-8")
-        assert read_embedding_provenance(tmp_path) is None
+
+        result = read_embedding_provenance(tmp_path)
+
+        assert result.state == "invalid"
+        assert result.data is None
+        assert result.detail is not None
+
+    @pytest.mark.parametrize(
+        ("payload", "root_type"),
+        [
+            ("[1, 2, 3]", "list"),
+            ('"just a string"', "str"),
+            ("42", "int"),
+            ("true", "bool"),
+            ("null", "NoneType"),
+        ],
+        ids=["list", "string", "int", "bool", "null"],
+    )
+    def test_non_object_roots_are_reported_as_invalid(
+        self, tmp_path: Path, payload: str, root_type: str
+    ):
+        (tmp_path / "document_info.json").write_text(payload, encoding="utf-8")
+
+        result = read_embedding_provenance(tmp_path)
+
+        assert result.state == "invalid"
+        assert result.data is None
+        assert root_type in (result.detail or "")
 
     def test_valid_metadata_is_returned(self, tmp_path: Path):
         info = {"embedding_model": "acme/model", "embedding_dim": 384}
@@ -171,11 +203,18 @@ class TestReadEmbeddingProvenance:
             json.dumps(info), encoding="utf-8"
         )
 
-        assert read_embedding_provenance(tmp_path) == info
+        result = read_embedding_provenance(tmp_path)
+
+        assert result.state == "ok"
+        assert result.data == info
 
 
 class TestCompatibilityError:
     IDENTITY = EmbeddingIdentity(model=BGE_MODEL, dimension=384, revision=BGE_REVISION)
+
+    @staticmethod
+    def _ok(data: dict | None) -> ProvenanceRead:
+        return ProvenanceRead(data=data, state="ok" if data is not None else "missing")
 
     def test_matching_provenance_is_accepted(self, tmp_path: Path):
         provenance = {
@@ -184,13 +223,17 @@ class TestCompatibilityError:
             "embedding_dim": 384,
         }
         assert (
-            compatibility_error(tmp_path / "doc", 384, provenance, self.IDENTITY)
+            compatibility_error(
+                tmp_path / "doc", 384, self._ok(provenance), self.IDENTITY
+            )
             is None
         )
 
     def test_index_dimension_mismatch_is_refused(self, tmp_path: Path):
         provenance = {"embedding_model": BGE_MODEL, "embedding_dim": 384}
-        error = compatibility_error(tmp_path / "doc", 768, provenance, self.IDENTITY)
+        error = compatibility_error(
+            tmp_path / "doc", 768, self._ok(provenance), self.IDENTITY
+        )
 
         assert error is not None
         assert "768" in error
@@ -199,7 +242,9 @@ class TestCompatibilityError:
 
     def test_recorded_model_mismatch_is_refused(self, tmp_path: Path):
         provenance = {"embedding_model": "acme/other-model", "embedding_dim": 384}
-        error = compatibility_error(tmp_path / "doc", 384, provenance, self.IDENTITY)
+        error = compatibility_error(
+            tmp_path / "doc", 384, self._ok(provenance), self.IDENTITY
+        )
 
         assert error is not None
         assert "acme/other-model" in error
@@ -211,7 +256,9 @@ class TestCompatibilityError:
             "embedding_revision": "deadbeef",
             "embedding_dim": 384,
         }
-        error = compatibility_error(tmp_path / "doc", 384, provenance, self.IDENTITY)
+        error = compatibility_error(
+            tmp_path / "doc", 384, self._ok(provenance), self.IDENTITY
+        )
 
         assert error is not None
         assert "deadbeef" in error
@@ -219,7 +266,9 @@ class TestCompatibilityError:
 
     def test_recorded_dimension_contradiction_is_refused(self, tmp_path: Path):
         provenance = {"embedding_model": BGE_MODEL, "embedding_dim": 768}
-        error = compatibility_error(tmp_path / "doc", 384, provenance, self.IDENTITY)
+        error = compatibility_error(
+            tmp_path / "doc", 384, self._ok(provenance), self.IDENTITY
+        )
 
         assert error is not None
         assert "768" in error
@@ -229,7 +278,9 @@ class TestCompatibilityError:
     ):
         caplog.set_level(logging.WARNING)
 
-        error = compatibility_error(tmp_path / "legacy-doc", 384, None, self.IDENTITY)
+        error = compatibility_error(
+            tmp_path / "legacy-doc", 384, self._ok(None), self.IDENTITY
+        )
 
         assert error is None
         assert "no embedding provenance metadata" in caplog.text
@@ -240,7 +291,7 @@ class TestCompatibilityError:
     ):
         caplog.set_level(logging.WARNING)
 
-        compatibility_error(tmp_path / "legacy-doc", 384, None, self.IDENTITY)
+        compatibility_error(tmp_path / "legacy-doc", 384, self._ok(None), self.IDENTITY)
 
         # The verdict must describe the metadata as absent, not attribute a model.
         assert "has no embedding provenance metadata" in caplog.text
@@ -251,7 +302,9 @@ class TestCompatibilityError:
     ):
         caplog.set_level(logging.WARNING)
 
-        error = compatibility_error(tmp_path / "legacy-doc", 768, None, self.IDENTITY)
+        error = compatibility_error(
+            tmp_path / "legacy-doc", 768, self._ok(None), self.IDENTITY
+        )
 
         assert error is not None
         assert "768" in error
@@ -262,4 +315,95 @@ class TestCompatibilityError:
         identity = EmbeddingIdentity(model="acme/model", dimension=None, revision=None)
         provenance = {"embedding_model": "acme/model"}
 
-        assert compatibility_error(tmp_path / "doc", 5, provenance, identity) is None
+        assert (
+            compatibility_error(tmp_path / "doc", 5, self._ok(provenance), identity)
+            is None
+        )
+
+    @pytest.mark.parametrize("payload", ["[1, 2, 3]", '"text"', "42", "null"])
+    def test_truthy_and_falsy_non_dict_roots_are_refused_not_treated_as_legacy(
+        self, tmp_path: Path, payload: str, caplog: pytest.LogCaptureFixture
+    ):
+        """A non-object metadata root must never be accepted as legacy data."""
+        caplog.set_level(logging.WARNING)
+        (tmp_path / "document_info.json").write_text(payload, encoding="utf-8")
+
+        provenance = read_embedding_provenance(tmp_path)
+        error = compatibility_error(tmp_path / "doc", 384, provenance, self.IDENTITY)
+
+        assert error is not None
+        assert "unusable index metadata" in error
+        # Refusal, not the legacy-acceptance path.
+        assert "legacy policy" not in caplog.text
+
+    def test_truthy_non_dict_root_does_not_crash_the_check(self, tmp_path: Path):
+        """Regression: a truthy list root used to raise AttributeError on .get()."""
+        (tmp_path / "document_info.json").write_text("[1, 2, 3]", encoding="utf-8")
+
+        provenance = read_embedding_provenance(tmp_path)
+        error = compatibility_error(tmp_path / "doc", 384, provenance, self.IDENTITY)
+
+        assert error is not None
+        assert "unusable index metadata" in error
+
+    def test_malformed_json_is_refused_not_treated_as_legacy(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ):
+        caplog.set_level(logging.WARNING)
+        (tmp_path / "document_info.json").write_text("{not json", encoding="utf-8")
+
+        provenance = read_embedding_provenance(tmp_path)
+        error = compatibility_error(tmp_path / "doc", 384, provenance, self.IDENTITY)
+
+        assert error is not None
+        assert "unusable index metadata" in error
+        assert "legacy policy" not in caplog.text
+
+    def test_unreadable_metadata_is_refused_not_treated_as_legacy(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ):
+        caplog.set_level(logging.WARNING)
+        info_file = tmp_path / "document_info.json"
+        info_file.write_text("{}", encoding="utf-8")
+
+        original_read_text = Path.read_text
+
+        def _targeted_read(self, *args, **kwargs):
+            if self == info_file:
+                raise PermissionError("permission denied")
+            return original_read_text(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", _targeted_read)
+
+        provenance = read_embedding_provenance(tmp_path)
+        error = compatibility_error(tmp_path / "doc", 384, provenance, self.IDENTITY)
+
+        assert provenance.state == "invalid"
+        assert error is not None
+        assert "unusable index metadata" in error
+        assert "legacy policy" not in caplog.text
+
+    def test_dimension_mismatch_is_still_the_primary_verdict_for_invalid_metadata(
+        self, tmp_path: Path
+    ):
+        """An incompatible index stays refused even when metadata is corrupt."""
+        (tmp_path / "document_info.json").write_text("[1, 2, 3]", encoding="utf-8")
+
+        provenance = read_embedding_provenance(tmp_path)
+        error = compatibility_error(tmp_path / "doc", 768, provenance, self.IDENTITY)
+
+        assert error is not None
+        assert "768" in error
+
+    def test_hand_built_non_dict_payload_is_refused_not_crashed(self, tmp_path: Path):
+        """A caller that hand-builds a ProvenanceRead must not crash the check."""
+        provenance = ProvenanceRead(data=[1, 2, 3], state="ok")  # type: ignore[arg-type]
+
+        error = compatibility_error(tmp_path / "doc", 384, provenance, self.IDENTITY)
+
+        # Refused with an actionable error instead of raising AttributeError.
+        assert error is not None
+        assert "unusable index metadata" in error

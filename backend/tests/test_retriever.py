@@ -164,3 +164,71 @@ def test_retriever_skips_incompatible_embedding_indexes_without_touching_files(
         (wrong_model / "document_info.json").read_text(encoding="utf-8")
     )
     assert stored_info["embedding_model"] == "acme/other-model"
+
+
+@pytest.mark.parametrize(
+    "metadata_payload",
+    ["[1, 2, 3]", '"just a string"', "42", "{not json"],
+    ids=["list-root", "string-root", "int-root", "malformed-json"],
+)
+def test_retriever_skips_invalid_metadata_without_crashing(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, metadata_payload: str
+):
+    """Regression: invalid document_info.json must be skipped, not crash retrieve().
+
+    A truthy non-dict root (e.g. ``[1, 2, 3]``) used to raise AttributeError on
+    ``provenance.get(...)`` inside the compatibility check, crashing retrieval.
+    Invalid metadata is now refused and the document excluded, consistent with
+    the readiness gate.
+    """
+
+    class QueryEmbedding:
+        model_name = "BAAI/bge-small-en-v1.5"
+        revision = None
+        dimension = 2
+
+        def encode(self, _texts: list[str]) -> np.ndarray:
+            return np.array([[1.0, 0.0]], dtype=np.float32)
+
+    Retriever.invalidate_corpus_cache()
+    VectorStore.invalidate_cache()
+
+    def make_document(name: str) -> Path:
+        directory = tmp_path / name
+        directory.mkdir()
+        (directory / "chunks.json").write_text(
+            json.dumps([{"chunk_id": 0, "content": "needle", "source": f"{name}.txt"}]),
+            encoding="utf-8",
+        )
+        return directory
+
+    # Usable legacy document (no metadata) — must still be returned.
+    legacy = make_document("legacy")
+    VectorStore.save(np.array([[1.0, 0.0]], dtype=np.float32), legacy)
+
+    # Document whose metadata root is invalid — must be skipped, never crash.
+    invalid = make_document("invalid-metadata")
+    VectorStore.save(np.array([[1.0, 0.0]], dtype=np.float32), invalid)
+    (invalid / "document_info.json").write_text(metadata_payload, encoding="utf-8")
+
+    retriever = Retriever.__new__(Retriever)
+    retriever.embedding_service = QueryEmbedding()
+    retriever.vector_store = VectorStore()
+
+    results = retriever.retrieve("needle", [legacy, invalid], top_k=3)
+
+    assert {chunk["source"] for chunk in results} == {"legacy.txt"}
+    # The invalid document is refused with an actionable error, not crashed on.
+    assert "Skipping incompatible document index" in caplog.text
+    assert "unusable index metadata" in caplog.text
+    # ...and its refusal is never framed as a legacy acceptance. (The only
+    # legacy-policy warning comes from the genuinely legacy document.)
+    legacy_lines = [
+        line for line in caplog.text.splitlines() if "legacy policy" in line
+    ]
+    assert legacy_lines, "the legacy document should still be accepted with a warning"
+    assert all("'legacy'" in line for line in legacy_lines)
+    # The refusal must not modify the stored (invalid) metadata file.
+    assert (invalid / "document_info.json").read_text(encoding="utf-8") == (
+        metadata_payload
+    )
