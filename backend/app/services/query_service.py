@@ -21,9 +21,11 @@ from app.query_stream_contract import (
     QUERY_STREAM_STATUSES,
     QUERY_STREAM_TRACE_STEPS,
 )
+from app.rag.embedding_compat import active_identity, compatibility_error
 from app.rag.llm import LocalLLM
 from app.rag.reranker import Reranker
 from app.rag.retriever import Retriever
+from app.rag.vector_store import VectorStore
 from app.services import conversation_service
 from app.services.upload_service import resolve_document_dir
 
@@ -144,6 +146,7 @@ class QueryService:
         if not (document_dir / "faiss.index").is_file():
             return False
 
+        info: dict | None = None
         info_file = document_dir / "document_info.json"
         if info_file.exists():
             try:
@@ -152,6 +155,21 @@ class QueryService:
                 return False
             if info.get("status") not in (None, "ready"):
                 return False
+
+        # An unreadable or embedding-incompatible index is not usable, so the
+        # document must not enter retrieval via the search-all flow (BE-04).
+        index = VectorStore.load(document_dir)
+        if index is None:
+            return False
+        incompatibility = compatibility_error(
+            document_dir,
+            index.d,
+            info,
+            active_identity(),
+        )
+        if incompatibility is not None:
+            logger.warning("Excluding document from retrieval: %s", incompatibility)
+            return False
         return True
 
     def resolve_document_dirs(self, document_id: str | None) -> list[Path]:

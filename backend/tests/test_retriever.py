@@ -66,6 +66,10 @@ def test_bm25_batch_tokenizes_query_once_and_handles_empty_corpus():
 
 def test_hybrid_retrieval_fuses_semantic_and_bm25_ranks(tmp_path: Path):
     class QueryEmbedding:
+        model_name = "BAAI/bge-small-en-v1.5"
+        revision = None
+        dimension = 2
+
         def encode(self, _texts: list[str]) -> np.ndarray:
             return np.array([[1.0, 0.0]], dtype=np.float32)
 
@@ -92,3 +96,71 @@ def test_hybrid_retrieval_fuses_semantic_and_bm25_ranks(tmp_path: Path):
 
     assert [chunk["chunk_id"] for chunk in results] == [0, 1, 2]
     assert results[0]["score"] > results[1]["score"] > results[2]["score"]
+
+
+def test_retriever_skips_incompatible_embedding_indexes_without_touching_files(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+):
+    class QueryEmbedding:
+        model_name = "BAAI/bge-small-en-v1.5"
+        revision = None
+        dimension = 2
+
+        def encode(self, _texts: list[str]) -> np.ndarray:
+            return np.array([[1.0, 0.0]], dtype=np.float32)
+
+    def make_document(name: str) -> Path:
+        directory = tmp_path / name
+        directory.mkdir()
+        (directory / "chunks.json").write_text(
+            json.dumps([{"chunk_id": 0, "content": "needle", "source": f"{name}.txt"}]),
+            encoding="utf-8",
+        )
+        return directory
+
+    Retriever.invalidate_corpus_cache()
+    VectorStore.invalidate_cache()
+
+    # Legacy document: no provenance, index dimension matches — stays usable.
+    legacy = make_document("legacy")
+    VectorStore.save(np.array([[1.0, 0.0]], dtype=np.float32), legacy)
+
+    # Wrong vector dimension — must be skipped, never handed to FAISS.
+    wrong_dimension = make_document("wrong-dimension")
+    VectorStore.save(np.array([[1.0, 0.0, 0.0]], dtype=np.float32), wrong_dimension)
+
+    # Right dimension but indexed with a different model — must be skipped.
+    wrong_model = make_document("wrong-model")
+    VectorStore.save(np.array([[1.0, 0.0]], dtype=np.float32), wrong_model)
+    (wrong_model / "document_info.json").write_text(
+        json.dumps(
+            {
+                "status": "ready",
+                "chunk_count": 1,
+                "embedding_model": "acme/other-model",
+                "embedding_revision": None,
+                "embedding_dim": 2,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    retriever = Retriever.__new__(Retriever)
+    retriever.embedding_service = QueryEmbedding()
+    retriever.vector_store = VectorStore()
+
+    results = retriever.retrieve(
+        "needle", [legacy, wrong_dimension, wrong_model], top_k=3
+    )
+
+    assert {chunk["source"] for chunk in results} == {"legacy.txt"}
+    assert "Skipping incompatible document index" in caplog.text
+    assert "acme/other-model" in caplog.text
+
+    # Compatibility failures must never modify stored data.
+    assert (wrong_dimension / "faiss.index").is_file()
+    assert (wrong_model / "faiss.index").is_file()
+    stored_info = json.loads(
+        (wrong_model / "document_info.json").read_text(encoding="utf-8")
+    )
+    assert stored_info["embedding_model"] == "acme/other-model"

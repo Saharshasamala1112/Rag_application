@@ -211,13 +211,129 @@ def test_ready_document_requires_matching_chunks_and_index(tmp_path: Path):
 
     with patch.object(settings, "upload_dir", tmp_path):
         status_without_index = store.get_document_status(document_dir.name)
-        VectorStore.save(np.array([[1.0, 0.0]], dtype=np.float32), document_dir)
+        # 384-dim so the index is embedding-compatible with the active config;
+        # this test targets chunk/index count consistency.
+        VectorStore.save(
+            np.zeros((1, settings.embedding_dim), dtype=np.float32), document_dir
+        )
         status_with_index = store.get_document_status(document_dir.name)
 
     assert status_without_index is not None
     assert status_without_index["status"] == "failed"
     assert status_with_index is not None
     assert status_with_index["status"] == "ready"
+
+
+def test_upload_persists_embedding_provenance(tmp_path: Path):
+    service = UploadService.__new__(UploadService)
+    service.pipeline = MagicMock()
+    service.pipeline.process.return_value = {
+        "chunk_count": 1,
+        "total_chars": 7,
+        "processing_time": 0.01,
+        "embedding_model": "acme/indexing-model",
+        "embedding_revision": "rev-x",
+        "embedding_dim": 384,
+    }
+
+    with (
+        patch.object(settings, "upload_dir", tmp_path),
+        patch("app.rag.retriever.Retriever.invalidate_corpus_cache"),
+    ):
+        result = service.process_upload_stream(BytesIO(b"content"), "doc.txt")
+
+    assert result["embedding_model"] == "acme/indexing-model"
+    assert result["embedding_revision"] == "rev-x"
+    assert result["embedding_dim"] == 384
+
+    stored = json.loads(
+        (tmp_path / result["document_id"] / "document_info.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert stored["embedding_model"] == "acme/indexing-model"
+    assert stored["embedding_revision"] == "rev-x"
+    assert stored["embedding_dim"] == 384
+
+
+def test_upload_without_provenance_result_stays_working(tmp_path: Path):
+    """A pipeline result without provenance keys must not break the upload."""
+    service = UploadService.__new__(UploadService)
+    service.pipeline = MagicMock()
+    service.pipeline.process.return_value = {"chunk_count": 1, "total_chars": 7}
+
+    with (
+        patch.object(settings, "upload_dir", tmp_path),
+        patch("app.rag.retriever.Retriever.invalidate_corpus_cache"),
+    ):
+        result = service.process_upload_stream(BytesIO(b"content"), "doc.txt")
+
+    assert result["status"] == "ready"
+    stored = json.loads(
+        (tmp_path / result["document_id"] / "document_info.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "embedding_model" not in stored
+
+
+def test_status_reports_incompatible_index_without_touching_files(tmp_path: Path):
+    document_dir = tmp_path / "12345678-abc"
+    document_dir.mkdir()
+    (document_dir / "chunks.json").write_text(json.dumps([{"content": "one"}]))
+    info = {
+        "document_id": document_dir.name,
+        "filename": "original.txt",
+        "chunk_count": 1,
+        "status": "ready",
+        "embedding_model": "acme/other-model",
+        "embedding_revision": None,
+        "embedding_dim": 2,
+    }
+    (document_dir / "document_info.json").write_text(json.dumps(info), encoding="utf-8")
+    VectorStore.save(np.array([[1.0, 0.0]], dtype=np.float32), document_dir)
+    store = UploadService.__new__(UploadService)
+
+    with patch.object(settings, "upload_dir", tmp_path):
+        status = store.get_document_status(document_dir.name)
+
+    assert status is not None
+    assert status["status"] == "failed"
+    assert "2-dimensional" in status["error"]
+    assert "re-upload" in status["error"]
+
+    # Compatibility failure must never modify stored data.
+    stored = json.loads((document_dir / "document_info.json").read_text())
+    assert stored == info
+    assert (document_dir / "faiss.index").is_file()
+    assert (document_dir / "chunks.json").is_file()
+
+
+def test_status_accepts_legacy_index_with_matching_dimension(tmp_path: Path):
+    """Legacy (provenance-free) documents stay usable under the legacy policy."""
+    document_dir = tmp_path / "12345678-def"
+    document_dir.mkdir()
+    (document_dir / "chunks.json").write_text(json.dumps([{"content": "one"}]))
+    (document_dir / "document_info.json").write_text(
+        json.dumps({
+            "document_id": document_dir.name,
+            "filename": "original.txt",
+            "chunk_count": 1,
+            "status": "ready",
+        }),
+        encoding="utf-8",
+    )
+    VectorStore.save(
+        np.zeros((1, settings.embedding_dim), dtype=np.float32), document_dir
+    )
+    store = UploadService.__new__(UploadService)
+
+    with patch.object(settings, "upload_dir", tmp_path):
+        status = store.get_document_status(document_dir.name)
+
+    assert status is not None
+    assert status["status"] == "ready"
+    assert status["error"] is None
 
 
 def test_document_pipeline_rejects_zero_chunk_documents(tmp_path: Path):

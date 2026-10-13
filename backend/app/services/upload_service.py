@@ -14,6 +14,11 @@ from pathlib import Path
 from typing import BinaryIO
 
 from app.config.settings import settings
+from app.rag.embedding_compat import (
+    PROVENANCE_KEYS,
+    active_identity,
+    compatibility_error,
+)
 from app.rag.pipeline import DocumentPipeline
 from app.rag.vector_store import VectorStore
 
@@ -215,6 +220,11 @@ class UploadService:
             "file_size": file_size,
             "status": "ready",
         }
+        # Record the embedding configuration that produced this index so
+        # retrieval can validate it before use (BE-04).
+        for key in PROVENANCE_KEYS:
+            if key in result:
+                doc_info[key] = result[key]
 
         from app.rag.retriever import Retriever
 
@@ -422,6 +432,21 @@ class UploadService:
         ):
             status = "failed"
             error = "Document does not have a complete searchable index."
+
+        # Derive (never persist) an embedding-compatibility verdict so a
+        # document indexed under a different embedding configuration is
+        # reported as unusable with actionable guidance, while the stored
+        # metadata and index stay untouched (BE-04).
+        if status == "ready" and index is not None:
+            incompatibility = compatibility_error(
+                doc_dir,
+                index.d,
+                info,
+                active_identity(),
+            )
+            if incompatibility is not None:
+                status = "failed"
+                error = incompatibility
 
         return {
             "document_id": document_id,

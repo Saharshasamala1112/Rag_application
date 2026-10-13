@@ -94,6 +94,10 @@ def test_retriever_skips_index_chunk_count_mismatch(
 
 def test_concurrent_retrieval_keeps_document_scopes_isolated(tmp_path: Path):
     class QueryEmbedding:
+        model_name = "BAAI/bge-small-en-v1.5"
+        revision = None
+        dimension = 2
+
         def encode(self, texts: list[str]) -> np.ndarray:
             vector = [1.0, 0.0] if texts[0] == "first" else [0.0, 1.0]
             return np.array([vector], dtype=np.float32)

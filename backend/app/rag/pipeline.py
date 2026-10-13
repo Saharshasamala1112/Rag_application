@@ -92,4 +92,9 @@ class DocumentPipeline:
             "chunk_count": len(chunks),
             "total_chars": sum(c.chunk_length for c in chunks),
             "processing_time": total_time,
+            # Provenance: which embedding configuration produced the index so
+            # retrieval can refuse stale or foreign indexes (BE-04).
+            "embedding_model": self.embedding_service.model_name,
+            "embedding_revision": self.embedding_service.revision,
+            "embedding_dim": self.embedding_service.dimension,
         }

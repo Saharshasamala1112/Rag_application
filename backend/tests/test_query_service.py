@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pytest
 import tiktoken
 
@@ -15,11 +17,20 @@ from app.query_stream_contract import (
     QUERY_STREAM_STATUSES,
     QUERY_STREAM_TRACE_STEPS,
 )
+from app.rag.vector_store import VectorStore
 from app.services.query_service import (
     INSUFFICIENT_CONTEXT_ANSWER,
     QueryService,
     _validate_citations,
 )
+
+
+def _write_index(directory: Path, dimension: int = 384) -> None:
+    """Write a real single-vector FAISS index into a document directory."""
+    VectorStore.save(
+        np.zeros((1, dimension), dtype=np.float32),
+        directory,
+    )
 
 
 class TestResolveDocumentDirs:
@@ -30,7 +41,7 @@ class TestResolveDocumentDirs:
             doc_dir = Path(td) / document_id
             doc_dir.mkdir()
             (doc_dir / "chunks.json").write_text("[]")
-            (doc_dir / "faiss.index").write_bytes(b"index")
+            _write_index(doc_dir)
 
             with patch.object(settings, "upload_dir", Path(td)):
                 result = svc.resolve_document_dirs(document_id)
@@ -51,7 +62,7 @@ class TestResolveDocumentDirs:
                 d = Path(td) / name
                 d.mkdir()
                 (d / "chunks.json").write_text("[]")
-                (d / "faiss.index").write_bytes(b"index")
+                _write_index(d)
             # Add a dir without chunks.json (should be excluded)
             (Path(td) / "no_chunks").mkdir()
 
@@ -63,6 +74,59 @@ class TestResolveDocumentDirs:
                 assert "00000000-002" in names
                 assert "00000000-003" in names
                 assert "no_chunks" not in names
+
+    def test_incompatible_dimension_document_is_excluded_from_search_all(self):
+        with tempfile.TemporaryDirectory() as td:
+            svc = QueryService.__new__(QueryService)
+            compatible = Path(td) / "00000000-001"
+            compatible.mkdir()
+            (compatible / "chunks.json").write_text("[]")
+            _write_index(compatible, dimension=384)
+
+            incompatible = Path(td) / "00000000-002"
+            incompatible.mkdir()
+            (incompatible / "chunks.json").write_text("[]")
+            _write_index(incompatible, dimension=768)
+
+            with patch.object(settings, "upload_dir", Path(td)):
+                result = svc.resolve_document_dirs(None)
+
+            assert [d.name for d in result] == ["00000000-001"]
+
+    def test_document_indexed_with_other_model_is_excluded(self):
+        with tempfile.TemporaryDirectory() as td:
+            svc = QueryService.__new__(QueryService)
+            foreign = Path(td) / "00000000-009"
+            foreign.mkdir()
+            (foreign / "chunks.json").write_text("[]")
+            _write_index(foreign, dimension=384)
+            (foreign / "document_info.json").write_text(
+                json.dumps(
+                    {
+                        "status": "ready",
+                        "embedding_model": "acme/other-model",
+                        "embedding_revision": None,
+                        "embedding_dim": 384,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.object(settings, "upload_dir", Path(td)):
+                assert svc.resolve_document_dirs(None) == []
+                assert svc.resolve_document_dirs("00000000-009") == []
+
+    def test_unreadable_index_is_excluded(self):
+        with tempfile.TemporaryDirectory() as td:
+            svc = QueryService.__new__(QueryService)
+            corrupt = Path(td) / "00000000-007"
+            corrupt.mkdir()
+            (corrupt / "chunks.json").write_text("[]")
+            (corrupt / "faiss.index").write_bytes(b"index")
+
+            with patch.object(settings, "upload_dir", Path(td)):
+                assert svc.resolve_document_dirs(None) == []
+                assert svc.resolve_document_dirs("00000000-007") == []
 
 
 class TestDeduplicateChunks:

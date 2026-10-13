@@ -15,9 +15,20 @@ from pydantic import SecretStr
 
 from app.config.settings import settings
 from app.middleware import RequestBodyLimitMiddleware
+from app.rag.embeddings import revision_for_model
 
 
 class _TestEmbeddingService:
+    """Stands in for the configured embedding model (never loads a real one).
+
+    Its identity mirrors the configured default so provenance recorded during
+    test uploads stays compatible with the active configuration.
+    """
+
+    model_name = settings.embedding_model
+    revision = revision_for_model(settings.embedding_model)
+    dimension = settings.embedding_dim
+
     def encode(self, texts: list[str]) -> np.ndarray:
         return np.ones((len(texts), settings.embedding_dim), dtype=np.float32)
 
@@ -128,6 +139,43 @@ class TestHealthEndpoint:
         response = client.get("/api/v1/health/ready")
         assert response.status_code == 503
         assert response.json()["detail"]["ollama_available"] is False
+
+    def test_health_reports_the_actually_loaded_embedding_model(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        from app.rag.embeddings import EmbeddingService
+
+        monkeypatch.setattr(
+            type(settings),
+            "get_available_ollama_models",
+            lambda _self: [settings.ollama_model],
+        )
+        loaded = _TestEmbeddingService()
+        loaded.model_name = "acme/actually-loaded"
+        monkeypatch.setattr(EmbeddingService, "_instance", loaded)
+
+        response = client.get("/api/v1/health")
+
+        assert response.status_code == 200
+        assert response.json()["embedding_model"] == "acme/actually-loaded"
+        assert response.json()["embedding_model"] != settings.embedding_model
+
+    def test_health_reports_configured_model_while_embedding_service_unloaded(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        from app.rag.embeddings import EmbeddingService
+
+        monkeypatch.setattr(
+            type(settings),
+            "get_available_ollama_models",
+            lambda _self: [settings.ollama_model],
+        )
+        monkeypatch.setattr(EmbeddingService, "_instance", None)
+
+        response = client.get("/api/v1/health")
+
+        assert response.status_code == 200
+        assert response.json()["embedding_model"] == settings.embedding_model
 
     def test_startup_does_not_contact_ollama(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

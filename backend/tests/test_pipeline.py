@@ -31,6 +31,10 @@ def test_document_pipeline_writes_chunks_and_saves_embeddings(tmp_path: Path):
             return [chunk]
 
     class Embeddings:
+        model_name = "test/pipeline-model"
+        revision = None
+        dimension = 2
+
         def encode(self, texts: list[str]) -> np.ndarray:
             assert texts == ["source text."]
             return np.array([[1.0, 0.0]], dtype=np.float32)

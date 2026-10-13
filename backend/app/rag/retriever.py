@@ -12,6 +12,11 @@ import faiss
 import numpy as np
 
 from app.config.settings import settings
+from app.rag.embedding_compat import (
+    active_identity,
+    compatibility_error,
+    read_embedding_provenance,
+)
 from app.rag.embeddings import EmbeddingService
 from app.rag.vector_store import VectorStore
 
@@ -166,6 +171,18 @@ class Retriever:
                     index.ntotal,
                     len(chunks),
                 )
+                continue
+
+            # Refuse indexes produced by a different embedding configuration
+            # instead of letting FAISS raise a raw dimension error (BE-04).
+            incompatibility = compatibility_error(
+                doc_dir,
+                index.d,
+                read_embedding_provenance(doc_dir),
+                active_identity(self.embedding_service),
+            )
+            if incompatibility is not None:
+                logger.error("Skipping incompatible document index: %s", incompatibility)
                 continue
 
             all_chunks.extend(chunks)

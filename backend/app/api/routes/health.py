@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.config.settings import settings
 from app.models.response import HealthLiveResponse, HealthResponse
+from app.rag.embeddings import EmbeddingService
 from app.services.upload_service import UploadService
 
 router = APIRouter(tags=["Health"])
@@ -22,12 +23,20 @@ def readiness() -> HealthResponse:
         for document in documents
         if document.get("status", "ready") == "ready"
     )
+    # Report the model the embedding service actually loaded; fall back to the
+    # configured value only while the model is still unloaded (BE-01). Reading
+    # the singleton never triggers a model load.
+    loaded_embedding = EmbeddingService.peek_instance()
 
     response = HealthResponse(
         status="healthy" if available_models and indexes_ready else "degraded",
         version="3.1.0",
         model=model_resolved,
-        embedding_model=settings.embedding_model,
+        embedding_model=(
+            loaded_embedding.model_name
+            if loaded_embedding is not None
+            else settings.embedding_model
+        ),
         ollama_available=len(available_models) > 0,
         document_count=len(documents),
     )
