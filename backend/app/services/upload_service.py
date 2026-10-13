@@ -19,6 +19,7 @@ from app.rag.embedding_compat import (
     ProvenanceRead,
     active_identity,
     compatibility_error,
+    read_embedding_provenance,
 )
 from app.rag.pipeline import DocumentPipeline
 from app.rag.vector_store import VectorStore
@@ -248,10 +249,11 @@ class UploadService:
             except ValueError:
                 continue
 
-            info_file = document_dir / "document_info.json"
-            try:
-                info = json.loads(info_file.read_text(encoding="utf-8"))
-            except FileNotFoundError:
+            # Reuse the shared provenance reader so a missing file (interrupted
+            # upload) is distinguished from a corrupt one (malformed JSON, an
+            # unreadable file, or a non-object root such as ``[1, 2, 3]``).
+            provenance = read_embedding_provenance(document_dir)
+            if provenance.state == "missing":
                 originals = list(document_dir.glob("original.*"))
                 if not originals and not (
                     (document_dir / "chunks.json").exists()
@@ -271,8 +273,12 @@ class UploadService:
                 }
                 UploadService._save_document_info(document_dir, info)
                 continue
-            except (json.JSONDecodeError, OSError):
-                logger.exception("Could not read document metadata in %s.", document_dir)
+            if provenance.state == "invalid":
+                logger.error(
+                    "Could not read document metadata in %s: %s",
+                    document_dir,
+                    provenance.detail,
+                )
                 info = {
                     "document_id": child.name,
                     "filename": "unknown",
@@ -286,6 +292,9 @@ class UploadService:
                 }
                 UploadService._save_document_info(document_dir, info)
                 continue
+
+            # ``state == "ok"`` guarantees the reader returned a dict.
+            info = provenance.data
 
             if info.get("status") == "failed":
                 continue
@@ -403,7 +412,13 @@ class UploadService:
 
     def get_document_status(self, document_id: str) -> dict | None:
         info = self.get_document(document_id)
-        if info is None:
+        if not isinstance(info, dict):
+            # ``get_document`` returns ``None`` for missing/malformed metadata
+            # and the raw parsed JSON otherwise. A non-object root (e.g. a list
+            # or string) is just as unusable, so report not-found instead of
+            # crashing on ``info.get`` below. This keeps the existing behaviour
+            # for malformed JSON (also ``None`` -> 404) and never reports a
+            # corrupt record as healthy or ready.
             return None
 
         status = info.get("status", "ready")
@@ -438,7 +453,7 @@ class UploadService:
         # document indexed under a different embedding configuration is
         # reported as unusable with actionable guidance, while the stored
         # metadata and index stay untouched (BE-04). ``info`` is the already
-        # parsed document record (a dict, guaranteed by the ``.get`` calls
+        # parsed document record (a dict, guaranteed by the isinstance guard
         # above), so it is a successful read of the metadata object.
         if status == "ready" and index is not None:
             incompatibility = compatibility_error(

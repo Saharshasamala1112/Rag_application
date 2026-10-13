@@ -194,6 +194,80 @@ def test_reconciliation_marks_interrupted_uploads_failed(tmp_path: Path):
     assert "complete searchable index" in info["error"]
 
 
+@pytest.mark.parametrize(
+    "payload",
+    ["[1, 2, 3]", '"text"', "42", "null"],
+    ids=["list-root", "str-root", "int-root", "null-root"],
+)
+def test_reconciliation_marks_non_object_metadata_failed(
+    payload: str, tmp_path: Path
+):
+    """A non-object JSON root must be marked failed, not crash reconciliation.
+
+    Regression: a valid-JSON non-dictionary root (e.g. ``[1, 2, 3]``) used to
+    reach ``info.get("status")`` in ``reconcile_documents`` and raise
+    ``AttributeError``. It is now classified as corrupt metadata (the same
+    handling as malformed JSON) and marked failed with an actionable error.
+    """
+    document_dir = tmp_path / "12345678-abc"
+    document_dir.mkdir()
+    (document_dir / "document_info.json").write_text(payload, encoding="utf-8")
+
+    with patch.object(settings, "upload_dir", tmp_path):
+        UploadService.reconcile_documents()
+
+    info = json.loads((document_dir / "document_info.json").read_text())
+    assert info["status"] == "failed"
+    assert "missing or corrupt" in info["error"]
+
+
+def test_reconciliation_marks_malformed_metadata_failed(tmp_path: Path):
+    """Malformed JSON is marked failed (unchanged behaviour, regression guard)."""
+    document_dir = tmp_path / "12345678-abc"
+    document_dir.mkdir()
+    (document_dir / "document_info.json").write_text("{not json", encoding="utf-8")
+
+    with patch.object(settings, "upload_dir", tmp_path):
+        UploadService.reconcile_documents()
+
+    info = json.loads((document_dir / "document_info.json").read_text())
+    assert info["status"] == "failed"
+    assert "missing or corrupt" in info["error"]
+
+
+def test_reconciliation_continues_past_invalid_document(tmp_path: Path):
+    """A single bad document must not stop reconciliation of the others."""
+    bad = tmp_path / "12345678-aaa"
+    bad.mkdir()
+    (bad / "document_info.json").write_text("[1, 2, 3]", encoding="utf-8")
+
+    # A valid interrupted upload: reconciliation should still mark it failed
+    # even though another document's metadata is corrupt.
+    good = tmp_path / "12345678-bbb"
+    good.mkdir()
+    (good / "original.txt").write_text("content")
+    (good / "document_info.json").write_text(
+        json.dumps({
+            "document_id": good.name,
+            "filename": "original.txt",
+            "chunk_count": 0,
+            "status": "processing",
+        }),
+        encoding="utf-8",
+    )
+
+    with patch.object(settings, "upload_dir", tmp_path):
+        UploadService.reconcile_documents()  # must not raise
+
+    bad_info = json.loads((bad / "document_info.json").read_text())
+    assert bad_info["status"] == "failed"
+    assert "missing or corrupt" in bad_info["error"]
+
+    good_info = json.loads((good / "document_info.json").read_text())
+    assert good_info["status"] == "failed"
+    assert "complete searchable index" in good_info["error"]
+
+
 def test_ready_document_requires_matching_chunks_and_index(tmp_path: Path):
     document_dir = tmp_path / "12345678-abc"
     document_dir.mkdir()
@@ -334,6 +408,41 @@ def test_status_accepts_legacy_index_with_matching_dimension(tmp_path: Path):
     assert status is not None
     assert status["status"] == "ready"
     assert status["error"] is None
+
+
+@pytest.mark.parametrize(
+    "payload",
+    ["[1, 2, 3]", '"text"', "42", "null"],
+    ids=["list-root", "str-root", "int-root", "null-root"],
+)
+def test_status_with_non_object_metadata_returns_not_found(
+    payload: str, tmp_path: Path
+):
+    """A non-object JSON root must be reported as not found, not crash.
+
+    Regression: a valid-JSON non-dictionary root (e.g. ``[1, 2, 3]``) used to
+    reach ``info.get("status")`` in ``get_document_status`` and raise
+    ``AttributeError``. It is now treated like missing/malformed metadata and
+    reported as not found rather than healthy or ready.
+    """
+    document_dir = tmp_path / "12345678-abc"
+    document_dir.mkdir()
+    (document_dir / "document_info.json").write_text(payload, encoding="utf-8")
+    store = UploadService.__new__(UploadService)
+
+    with patch.object(settings, "upload_dir", tmp_path):
+        assert store.get_document_status(document_dir.name) is None
+
+
+def test_status_with_malformed_metadata_returns_not_found(tmp_path: Path):
+    """Malformed JSON reports not found (unchanged behaviour, regression guard)."""
+    document_dir = tmp_path / "12345678-abc"
+    document_dir.mkdir()
+    (document_dir / "document_info.json").write_text("{not json", encoding="utf-8")
+    store = UploadService.__new__(UploadService)
+
+    with patch.object(settings, "upload_dir", tmp_path):
+        assert store.get_document_status(document_dir.name) is None
 
 
 def test_document_pipeline_rejects_zero_chunk_documents(tmp_path: Path):
