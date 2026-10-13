@@ -268,6 +268,44 @@ def test_reconciliation_continues_past_invalid_document(tmp_path: Path):
     assert "complete searchable index" in good_info["error"]
 
 
+def test_reconciliation_marks_invalid_utf8_metadata_failed(tmp_path: Path):
+    """Invalid UTF-8 metadata is marked failed without aborting other docs.
+
+    ``UnicodeDecodeError`` is a ``ValueError``, not an ``OSError``, so it used
+    to escape the reader and crash startup reconciliation. It is now classified
+    as corrupt metadata (the same handling as malformed JSON) and marked failed
+    with an actionable error, while unrelated documents are still processed.
+    """
+    bad = tmp_path / "12345678-aaa"
+    bad.mkdir()
+    (bad / "document_info.json").write_bytes(b"\xff\xfe\x00 not utf-8")
+
+    # A valid interrupted upload that reconciliation should still mark failed.
+    good = tmp_path / "12345678-bbb"
+    good.mkdir()
+    (good / "original.txt").write_text("content")
+    (good / "document_info.json").write_text(
+        json.dumps({
+            "document_id": good.name,
+            "filename": "original.txt",
+            "chunk_count": 0,
+            "status": "processing",
+        }),
+        encoding="utf-8",
+    )
+
+    with patch.object(settings, "upload_dir", tmp_path):
+        UploadService.reconcile_documents()  # must not raise
+
+    bad_info = json.loads((bad / "document_info.json").read_text())
+    assert bad_info["status"] == "failed"
+    assert "missing or corrupt" in bad_info["error"]
+
+    good_info = json.loads((good / "document_info.json").read_text())
+    assert good_info["status"] == "failed"
+    assert "complete searchable index" in good_info["error"]
+
+
 def test_ready_document_requires_matching_chunks_and_index(tmp_path: Path):
     document_dir = tmp_path / "12345678-abc"
     document_dir.mkdir()
@@ -443,6 +481,90 @@ def test_status_with_malformed_metadata_returns_not_found(tmp_path: Path):
 
     with patch.object(settings, "upload_dir", tmp_path):
         assert store.get_document_status(document_dir.name) is None
+
+
+@pytest.mark.parametrize(
+    "payload",
+    ["[1, 2, 3]", '"text"', "42", "null"],
+    ids=["list-root", "str-root", "int-root", "null-root"],
+)
+def test_get_document_returns_none_for_non_object_root(payload: str, tmp_path: Path):
+    """``get_document`` must honour its ``dict | None`` contract.
+
+    Regression: a valid-JSON non-dictionary root used to be returned raw, so
+    the ``/documents/{id}`` and ``PATCH /documents/{id}`` routes crashed with
+    ``TypeError`` on ``DocumentInfo(**doc)``. It is now reported as not found.
+    """
+    document_dir = tmp_path / "12345678-abc"
+    document_dir.mkdir()
+    (document_dir / "document_info.json").write_text(payload, encoding="utf-8")
+    store = UploadService.__new__(UploadService)
+
+    with patch.object(settings, "upload_dir", tmp_path):
+        assert store.get_document(document_dir.name) is None
+
+
+def test_get_document_handles_invalid_utf8_metadata(tmp_path: Path):
+    """Invalid UTF-8 metadata reports not found instead of raising."""
+    document_dir = tmp_path / "12345678-abc"
+    document_dir.mkdir()
+    (document_dir / "document_info.json").write_bytes(b"\xff\xfe\x00 not utf-8")
+    store = UploadService.__new__(UploadService)
+
+    with patch.object(settings, "upload_dir", tmp_path):
+        assert store.get_document(document_dir.name) is None
+
+
+def test_list_documents_skips_non_object_root_but_lists_valid_document(
+    tmp_path: Path,
+):
+    """A non-object metadata root is skipped; valid documents still list."""
+    bad = tmp_path / "12345678-aaa"
+    bad.mkdir()
+    (bad / "document_info.json").write_text("[1, 2, 3]", encoding="utf-8")
+
+    good = tmp_path / "12345678-bbb"
+    good.mkdir()
+    (good / "document_info.json").write_text(
+        json.dumps({
+            "document_id": good.name,
+            "filename": "original.txt",
+            "chunk_count": 1,
+            "status": "ready",
+        }),
+        encoding="utf-8",
+    )
+    store = UploadService.__new__(UploadService)
+
+    with patch.object(settings, "upload_dir", tmp_path):
+        documents = store.list_documents()
+
+    assert [document["document_id"] for document in documents] == [good.name]
+
+
+def test_list_documents_handles_invalid_utf8_metadata(tmp_path: Path):
+    """Invalid UTF-8 metadata is skipped; valid documents still list."""
+    bad = tmp_path / "12345678-aaa"
+    bad.mkdir()
+    (bad / "document_info.json").write_bytes(b"\xff\xfe\x00 not utf-8")
+
+    good = tmp_path / "12345678-bbb"
+    good.mkdir()
+    (good / "document_info.json").write_text(
+        json.dumps({
+            "document_id": good.name,
+            "filename": "original.txt",
+            "chunk_count": 1,
+            "status": "ready",
+        }),
+        encoding="utf-8",
+    )
+    store = UploadService.__new__(UploadService)
+
+    with patch.object(settings, "upload_dir", tmp_path):
+        documents = store.list_documents()
+
+    assert [document["document_id"] for document in documents] == [good.name]
 
 
 def test_document_pipeline_rejects_zero_chunk_documents(tmp_path: Path):

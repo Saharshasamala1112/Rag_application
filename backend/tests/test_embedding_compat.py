@@ -208,6 +208,22 @@ class TestReadEmbeddingProvenance:
         assert result.state == "ok"
         assert result.data == info
 
+    def test_invalid_utf8_bytes_are_reported_as_invalid(self, tmp_path: Path):
+        """Invalid UTF-8 must not escape the reader as an uncaught exception.
+
+        ``UnicodeDecodeError`` is a ``ValueError`` (not an ``OSError``), so it
+        previously slipped past the reader's exception handling and crashed
+        callers. It is now classified as ``invalid`` metadata, exactly like
+        malformed JSON, and is never treated as a valid legacy document.
+        """
+        (tmp_path / "document_info.json").write_bytes(b"\xff\xfe\x00 not utf-8")
+
+        result = read_embedding_provenance(tmp_path)
+
+        assert result.state == "invalid"
+        assert result.data is None
+        assert result.detail is not None
+
 
 class TestCompatibilityError:
     IDENTITY = EmbeddingIdentity(model=BGE_MODEL, dimension=384, revision=BGE_REVISION)

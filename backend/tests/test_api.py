@@ -219,6 +219,96 @@ class TestDocumentsEndpoint:
         assert data["total"] == 0
 
 
+class TestDocumentMetadataCorruption:
+    """A corrupt ``document_info.json`` must never 500 a documents/health route.
+
+    A valid-JSON non-object root (e.g. ``[1, 2, 3]``) used to be returned raw by
+    ``get_document``/``list_documents`` and crash the routes with ``TypeError``
+    (``DocumentInfo(**doc)``) or ``AttributeError`` (``document.get``). These
+    tests seed such a document on disk and assert the routes degrade gracefully.
+    """
+
+    @staticmethod
+    def _seed_document(upload_dir: Path, document_id: str, raw_metadata: bytes):
+        document_dir = upload_dir / document_id
+        document_dir.mkdir()
+        (document_dir / "document_info.json").write_bytes(raw_metadata)
+
+    def test_list_documents_skips_non_object_root(
+        self, client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        upload_dir = tmp_path / "uploads"
+        upload_dir.mkdir()
+        self._seed_document(upload_dir, "12345678-aaa", b"[1, 2, 3]")
+        self._seed_document(
+            upload_dir,
+            "12345678-bbb",
+            json.dumps(
+                {
+                    "document_id": "12345678-bbb",
+                    "filename": "good.txt",
+                    "chunk_count": 1,
+                    "status": "ready",
+                }
+            ).encode(),
+        )
+        monkeypatch.setattr(settings, "upload_dir", upload_dir)
+
+        resp = client.get("/api/v1/documents")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert [d["document_id"] for d in data["documents"]] == ["12345678-bbb"]
+        assert data["total"] == 1
+
+    def test_get_document_non_object_root_returns_404(
+        self, client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        upload_dir = tmp_path / "uploads"
+        upload_dir.mkdir()
+        self._seed_document(upload_dir, "12345678-aaa", b"[1, 2, 3]")
+        monkeypatch.setattr(settings, "upload_dir", upload_dir)
+
+        resp = client.get("/api/v1/documents/12345678-aaa")
+
+        assert resp.status_code == 404
+
+    def test_patch_document_non_object_root_returns_404(
+        self, client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        upload_dir = tmp_path / "uploads"
+        upload_dir.mkdir()
+        self._seed_document(upload_dir, "12345678-aaa", b"[1, 2, 3]")
+        monkeypatch.setattr(settings, "upload_dir", upload_dir)
+
+        resp = client.patch(
+            "/api/v1/documents/12345678-aaa", json={"filename": "renamed.txt"}
+        )
+
+        assert resp.status_code == 404
+
+    def test_health_does_not_crash_on_non_object_root(
+        self, client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        upload_dir = tmp_path / "uploads"
+        upload_dir.mkdir()
+        self._seed_document(upload_dir, "12345678-aaa", b"[1, 2, 3]")
+        monkeypatch.setattr(settings, "upload_dir", upload_dir)
+        monkeypatch.setattr(
+            type(settings),
+            "get_available_ollama_models",
+            lambda _self: [settings.ollama_model],
+        )
+
+        resp = client.get("/api/v1/health")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        # The corrupt document is skipped, so it is neither listed nor counted.
+        assert data["document_count"] == 0
+        assert data["status"] == "healthy"
+
+
 class TestUploadEndpoint:
     def test_upload_text_file(self, client: TestClient):
         resp = client.post(

@@ -350,9 +350,16 @@ class UploadService:
                     if info_file.exists():
                         try:
                             info = json.loads(info_file.read_text(encoding="utf-8"))
-                            documents.append(info)
-                        except (json.JSONDecodeError, OSError):
+                        except (json.JSONDecodeError, OSError, UnicodeError):
+                            # Malformed JSON, invalid UTF-8 bytes, or an
+                            # unreadable file: skip this document but keep
+                            # listing the others.
                             continue
+                        # A non-object JSON root is not a document record; skip
+                        # it (consistent with malformed JSON) so one invalid
+                        # document never hides or crashes the whole listing.
+                        if isinstance(info, dict):
+                            documents.append(info)
 
             _document_list_cache = documents
             _document_list_cache_dir = settings.upload_dir
@@ -369,9 +376,14 @@ class UploadService:
             return None
 
         try:
-            return json.loads(info_file.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
+            info = json.loads(info_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError, UnicodeError):
+            # Malformed JSON, invalid UTF-8 bytes (``UnicodeError``), or an
+            # unreadable file all mean there is no usable metadata record.
             return None
+        # A non-object JSON root (e.g. ``[1, 2, 3]``) is not a document record;
+        # report not-found rather than handing a non-dict to callers.
+        return info if isinstance(info, dict) else None
 
     def save_document(self, document_id: str, data: dict) -> bool:
         """Save document info."""

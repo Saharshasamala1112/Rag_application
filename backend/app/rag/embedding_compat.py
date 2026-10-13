@@ -94,6 +94,12 @@ def read_embedding_provenance(document_dir: Path) -> ProvenanceRead:
         raw = info_file.read_text(encoding="utf-8")
     except FileNotFoundError:
         return ProvenanceRead(data=None, state="missing")
+    except UnicodeError as exc:
+        # ``UnicodeDecodeError`` (invalid UTF-8 bytes) is a ``ValueError``, not
+        # an ``OSError``; without this branch it would escape the reader and
+        # crash callers. Treat it exactly like any other corrupt metadata: an
+        # ``invalid`` read that is never accepted as legacy.
+        return ProvenanceRead(data=None, state="invalid", detail=str(exc))
     except OSError as exc:
         return ProvenanceRead(data=None, state="invalid", detail=str(exc))
 
